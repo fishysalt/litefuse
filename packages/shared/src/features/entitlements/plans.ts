@@ -1,20 +1,19 @@
 // used on organization.cloudConfig.plan
 export const cloudConfigPlans = [
-  "Hobby",
-  "Core",
+  "Developer",
+  // "Core",
   "Pro",
   "Team",
-  "Enterprise",
+  // "Enterprise",
 ] as const;
 
 export const planLabels = {
   oss: "OSS",
-  "cloud:hobby": "Developer",
-  "cloud:core": "Core",
+  "cloud:developer": "Developer",
+  // "cloud:core": "Core",
   "cloud:pro": "Pro",
   "cloud:team": "Teams",
-  "cloud:enterprise": "Enterprise",
-  "self-hosted:pro": "Pro (self-hosted)",
+  // "cloud:enterprise": "Enterprise",
   "self-hosted:enterprise": "Enterprise (self-hosted)",
 } as const;
 

@@ -63,7 +63,7 @@ export default withMiddlewares({
     responseSchema: CreateAnnotationQueueResponse,
     fn: async ({ body, auth }) => {
       // entitlement check
-      if (auth.scope.plan === "cloud:hobby") {
+      if (auth.scope.plan === "cloud:developer") {
         if (
           (await prisma.annotationQueue.count({
             where: {

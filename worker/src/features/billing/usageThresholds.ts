@@ -14,7 +14,7 @@ import { nextUsageState, type UsageState } from "./constants";
 
 function isPaidOrganization(org: ReturnType<typeof parseDbOrg>) {
   return Boolean(
-    (org.cloudConfig?.plan && org.cloudConfig.plan !== "Hobby") ||
+    (org.cloudConfig?.plan && org.cloudConfig.plan !== "Developer") ||
       (org.cloudConfig?.stripe?.activeSubscriptionId &&
         org.cloudConfig?.stripe?.resolvedPlan),
   );

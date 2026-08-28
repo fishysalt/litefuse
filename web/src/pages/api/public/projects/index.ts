@@ -3,6 +3,8 @@ import { cors, runMiddleware } from "@/src/features/public-api/server/cors";
 import { prisma } from "@langfuse/shared/src/db";
 import { logger, redis } from "@langfuse/shared/src/server";
 import { type NextApiRequest, type NextApiResponse } from "next";
+import { requireAdminApi } from "@/src/features/enterprise/auth/requireAdminApi";
+import { createProject } from "@/src/features/enterprise/projects/createProject";
 
 export default async function handler(
   req: NextApiRequest,
@@ -10,16 +12,21 @@ export default async function handler(
 ) {
   await runMiddleware(req, res, cors);
 
-  // POST (project creation) was part of the admin API, which is an EE feature
-  // and has been removed from the OSS build.
-  if (req.method !== "GET") {
+  if (req.method !== "GET" && req.method !== "POST") {
     logger.error(
       `Method not allowed for ${req.method} on /api/public/projects`,
     );
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  // CHECK AUTH
+  // POST：创建项目（组织级 key + admin-api entitlement）
+  if (req.method === "POST") {
+    const scope = await requireAdminApi(req, res);
+    if (!scope) return;
+    return createProject(req, res, scope);
+  }
+
+  // GET：按 project key 查项目（保留原逻辑）
   const authCheck = await new ApiAuthService(
     prisma,
     redis,
@@ -29,7 +36,6 @@ export default async function handler(
       message: authCheck.error,
     });
   }
-  // END CHECK AUTH
 
   if (authCheck.scope.accessLevel !== "project" || !authCheck.scope.projectId) {
     return res.status(403).json({

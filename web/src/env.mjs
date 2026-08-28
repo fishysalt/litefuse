@@ -285,6 +285,8 @@ export const env = createEnv({
     LITEFUSE_UI_DEFAULT_BASE_URL_AZURE: z.string().url().optional(),
 
     ADMIN_API_KEY: z.string().optional(),
+    LITEFUSE_EE_LICENSE_KEY: z.string().optional(),
+
     ENCRYPTION_KEY: z
       .string()
       .length(
@@ -720,6 +722,7 @@ export const env = createEnv({
       process.env.NEXT_PUBLIC_LITEFUSE_PLAYGROUND_STREAMING_ENABLED_DEFAULT,
     NEXT_PUBLIC_ENABLE_LOGGING: process.env.NEXT_PUBLIC_ENABLE_LOGGING,
     ADMIN_API_KEY: process.env.ADMIN_API_KEY,
+    LITEFUSE_EE_LICENSE_KEY: process.env.LITEFUSE_EE_LICENSE_KEY,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
     // langfuse caching
     LITEFUSE_CACHE_API_KEY_ENABLED: process.env.LITEFUSE_CACHE_API_KEY_ENABLED,

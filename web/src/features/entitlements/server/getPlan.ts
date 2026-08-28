@@ -1,5 +1,6 @@
 import { type Plan } from "@langfuse/shared";
 import { type CloudConfigSchema } from "@langfuse/shared";
+import { resolveSelfHostedPlan } from "@/src/features/enterprise/plan/resolvePlan";
 
 /**
  * Get the plan of the organization based on the cloud configuration. Used to add this plan to the organization object in JWT via NextAuth.
@@ -16,16 +17,16 @@ export function getOrganizationPlanServerSide(
       // manual plan override
       if (cloudConfig.plan) {
         switch (cloudConfig.plan) {
-          case "Hobby":
-            return "cloud:hobby";
-          case "Core":
-            return "cloud:core";
+          case "Developer":
+            return "cloud:developer";
+          // case "Core":
+          //   return "cloud:core";
           case "Pro":
             return "cloud:pro";
           case "Team":
             return "cloud:team";
-          case "Enterprise":
-            return "cloud:enterprise";
+          // case "Enterprise":
+          //   return "cloud:enterprise";
           default:
             const exhaustiveCheck: never = cloudConfig.plan;
             throw new Error(`Unhandled plan case: ${exhaustiveCheck}`);
@@ -40,10 +41,13 @@ export function getOrganizationPlanServerSide(
           : "cloud:pro";
       }
     }
-    return "cloud:hobby";
+    return "cloud:developer";
   }
 
-  // EE license keys are not supported in the OSS build; self-hosted
-  // deployments always resolve to the base self-hosted plan.
+  // Self-hosted: resolve plan from the EE license key (falls back to oss).
+  const selfHostedPlan = resolveSelfHostedPlan(
+    process.env.LITEFUSE_EE_LICENSE_KEY,
+  );
+  if (selfHostedPlan) return selfHostedPlan;
   return "oss";
 }

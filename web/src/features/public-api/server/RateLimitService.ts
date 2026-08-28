@@ -217,14 +217,13 @@ const getPlanBasedRateLimitConfig = (
 ): z.infer<typeof RateLimitConfig> => {
   switch (plan) {
     case "oss":
-    case "self-hosted:pro":
     case "self-hosted:enterprise":
       return {
         resource,
         points: null,
         durationInSec: null,
       };
-    case "cloud:hobby":
+    case "cloud:developer":
       switch (resource) {
         case "ingestion":
           return {
@@ -278,7 +277,7 @@ const getPlanBasedRateLimitConfig = (
           const exhaustiveCheck: never = resource;
           throw new Error(`Unhandled resource case: ${exhaustiveCheck}`);
       }
-    case "cloud:core":
+    /* case "cloud:core":
       // TEMPORARY: Expanded core plan rate limits to pro limits to enable legacy pro -> core migration
       // Original core limits (commented out):
       // ingestion: 4000, public-api: 100, datasets: 200, public-api-metrics: 200, public-api-daily-metrics-legacy: 20
@@ -340,9 +339,9 @@ const getPlanBasedRateLimitConfig = (
           const exhaustiveCheck: never = resource;
           throw new Error(`Unhandled resource case: ${exhaustiveCheck}`);
       }
+    */
     case "cloud:pro":
     case "cloud:team":
-    case "cloud:enterprise":
       switch (resource) {
         case "ingestion":
           return {

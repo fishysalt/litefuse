@@ -55,7 +55,7 @@ export const VersionLabel = ({ className }: { className?: string }) => {
       ? // self-host plan
         // TODO: clean up to use planLabels in packages/shared/src/features/entitlements/plans.ts
         {
-          short: plan === "self-hosted:pro" ? "Pro" : "EE",
+          short: "EE",
           long: planLabels[plan],
         }
       : // no plan, oss

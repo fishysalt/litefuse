@@ -129,7 +129,7 @@ export function BillingSettings({ orgId }: BillingSettingsProps) {
   }
 
   const data = billingStatus.data;
-  const plan = data?.plan ?? "cloud:hobby";
+  const plan = data?.plan ?? "cloud:developer";
   const status = data?.stripe.subscriptionStatus;
   const hasSubscription = Boolean(data?.stripe.activeSubscriptionId);
   const hasCustomer = Boolean(data?.stripe.customerId);
@@ -244,7 +244,7 @@ export function BillingSettings({ orgId }: BillingSettingsProps) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant={plan === "cloud:hobby" ? "secondary" : "success"}>
+            <Badge variant={plan === "cloud:developer" ? "secondary" : "success"}>
               {planLabels[plan as Plan]}
             </Badge>
             {status ? (
@@ -324,7 +324,7 @@ export function BillingSettings({ orgId }: BillingSettingsProps) {
           price="Free"
           description="For individual projects and proofs of concept."
           features={["100k units each month", "30 days data access", "2 users"]}
-          current={plan === "cloud:hobby"}
+          current={plan === "cloud:developer"}
         />
         <PlanCard
           title="Pro"
@@ -337,7 +337,7 @@ export function BillingSettings({ orgId }: BillingSettingsProps) {
           loading={pendingPlan === "cloud:pro"}
           disabled={!availablePlans.has("cloud:pro") || isManualPlanOverride}
         />
-        <PlanCard
+        {/* <PlanCard
           title="Enterprise"
           price="Custom"
           description="For custom scale, deployment, and commercial terms."
@@ -349,7 +349,7 @@ export function BillingSettings({ orgId }: BillingSettingsProps) {
           current={plan === "cloud:enterprise"}
           actionLabel="Contact sales"
           href="mailto:sales@litefuse.ai"
-        />
+        /> */}
       </section>
 
       {hasSubscription && !isManualPlanOverride ? (

@@ -378,8 +378,8 @@ export async function getBillingStatus(
   let subscriptionId = cloudConfig?.stripe?.activeSubscriptionId;
   let cancelAtPeriodEnd = cloudConfig?.stripe?.cancelAtPeriodEnd ?? false;
   let currentPeriodEnd = storedPeriodEnd(cloudConfig);
-  let scheduledPlan: "cloud:hobby" | "cloud:pro" | "cloud:team" | null =
-    cancelAtPeriodEnd && subscriptionId ? "cloud:hobby" : null;
+  let scheduledPlan: "cloud:developer" | "cloud:pro" | "cloud:team" | null =
+    cancelAtPeriodEnd && subscriptionId ? "cloud:developer" : null;
   let subscription: Stripe.Subscription | null = null;
   let activeStripeClient = stripeClient;
 
@@ -407,7 +407,7 @@ export async function getBillingStatus(
 
     cancelAtPeriodEnd = hasScheduledCancellation(subscription);
     currentPeriodEnd = subscriptionPeriodEnd(subscription);
-    scheduledPlan = cancelAtPeriodEnd && subscriptionId ? "cloud:hobby" : null;
+    scheduledPlan = cancelAtPeriodEnd && subscriptionId ? "cloud:developer" : null;
 
     if (subscriptionId && activeStripeClient) {
       try {
@@ -439,10 +439,10 @@ export async function getBillingStatus(
   }
 
   const plan = getOrganizationPlanServerSide(cloudConfig ?? undefined);
-  const includedUnits = plan === "cloud:hobby" ? 100_000 : 200_000;
+  const includedUnits = plan === "cloud:developer" ? 100_000 : 200_000;
   const stripeCustomerId = cloudConfig?.stripe?.customerId;
   const hasStripeMetering =
-    plan !== "cloud:hobby" && Boolean(subscriptionId && stripeCustomerId);
+    plan !== "cloud:developer" && Boolean(subscriptionId && stripeCustomerId);
   const usagePromise =
     hasStripeMetering && stripeCustomerId
       ? getPaidBillingUsage({
@@ -474,7 +474,7 @@ export async function getBillingStatus(
   // This still supports Stripe Test Clocks whose active period is ahead of the
   // app's wall clock.
   const cycleEnd =
-    plan !== "cloud:hobby" && currentPeriodEnd && currentPeriodEnd > now
+    plan !== "cloud:developer" && currentPeriodEnd && currentPeriodEnd > now
       ? currentPeriodEnd
       : getBillingCycleEnd(org, now);
 
@@ -505,7 +505,7 @@ export async function getBillingStatus(
       includedUnits,
       overageUnits: Math.max(0, currentUnits - includedUnits),
       estimatedOverageUsd:
-        plan === "cloud:hobby"
+        plan === "cloud:developer"
           ? 0
           : Math.max(0, currentUnits - includedUnits) * 0.00004,
       state: org.cloudFreeTierUsageThresholdState,

@@ -39,7 +39,12 @@ export const organizationRoleAccessRights: Record<Role, OrganizationScope[]> = {
     "auditLogs:read",
   ],
   MEMBER: ["organizationMembers:read"],
+  DEVELOPER: ["organizationMembers:read"],
+  PROMPT_MANAGER: ["organizationMembers:read"],
+  EVALUATOR: [],
+  ANNOTATOR: [],
   VIEWER: [],
+  AUDITOR: ["organizationMembers:read", "auditLogs:read"],
   NONE: [],
 };
 

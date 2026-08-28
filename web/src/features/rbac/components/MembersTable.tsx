@@ -27,6 +27,7 @@ import { useHasEntitlement } from "@/src/features/entitlements/hooks";
 import { showSuccessToast } from "@/src/features/notifications/showSuccessToast";
 import { useHasProjectAccess } from "@/src/features/rbac/utils/checkProjectAccess";
 import { RoleSelectItem } from "@/src/features/rbac/components/RoleSelectItem";
+import { getSelectableRoles } from "@/src/features/rbac/constants/orderedRoles";
 import {
   HoverCard,
   HoverCardContent,
@@ -485,6 +486,7 @@ const OrgRoleDropdown = ({
 }) => {
   const utils = api.useUtils();
   const session = useSession();
+  const hasExtendedRoles = useHasEntitlement("admin-api");
   const mut = api.members.updateOrgMembership.useMutation({
     onSuccess: (data) => {
       utils.members.invalidate();
@@ -520,7 +522,7 @@ const OrgRoleDropdown = ({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {Object.values(Role).map((role) => (
+        {getSelectableRoles(hasExtendedRoles).map((role) => (
           <RoleSelectItem role={role} key={role} />
         ))}
       </SelectContent>
@@ -545,6 +547,7 @@ const ProjectRoleDropdown = ({
 }) => {
   const utils = api.useUtils();
   const session = useSession();
+  const hasExtendedRoles = useHasEntitlement("admin-api");
   const mut = api.members.updateProjectRole.useMutation({
     onSuccess: (data) => {
       utils.members.invalidate();
@@ -580,7 +583,7 @@ const ProjectRoleDropdown = ({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {Object.values(Role).map((role) => (
+        {getSelectableRoles(hasExtendedRoles).map((role) => (
           <RoleSelectItem role={role} key={role} isProjectRole />
         ))}
       </SelectContent>

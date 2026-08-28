@@ -27,7 +27,7 @@ import {
 } from "@/src/features/rbac/utils/checkProjectAccess";
 import { allMembersRoutes } from "@/src/features/rbac/server/allMembersRoutes";
 import { allInvitesRoutes } from "@/src/features/rbac/server/allInvitesRoutes";
-import { orderedRoles } from "@/src/features/rbac/constants/orderedRoles";
+import { extendedRoles, orderedRoles } from "@/src/features/rbac/constants/orderedRoles";
 import {
   getUserProjectRoles,
   getUserProjectRolesCount,
@@ -172,6 +172,26 @@ export const membersRouter = createTRPCRouter({
         ownRole: ctx.session.orgRole,
         role: input.orgRole,
       });
+
+      // 扩展角色（付费专属）校验
+      const requestedExtendedRoles = [
+        input.orgRole,
+        ...(input.projectRole ? [input.projectRole] : []),
+      ].filter((role) => extendedRoles.includes(role));
+      if (requestedExtendedRoles.length > 0) {
+        const entitled = hasEntitlement({
+          entitlement: "admin-api",
+          sessionUser: ctx.session.user,
+          orgId: input.orgId,
+        });
+        if (!entitled) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Extended roles are only available on paid plans (Pro, Team, or Enterprise)",
+          });
+        }
+      }
 
       // check for entilement (project role)
       if (input.projectId && input.projectRole) {
@@ -554,6 +574,22 @@ export const membersRouter = createTRPCRouter({
         role: membership.role, // old
       });
 
+      // 扩展角色（付费专属）校验
+      if (extendedRoles.includes(input.role)) {
+        const entitled = hasEntitlement({
+          entitlement: "admin-api",
+          sessionUser: ctx.session.user,
+          orgId: input.orgId,
+        });
+        if (!entitled) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Extended roles are only available on paid plans (Pro, Team, or Enterprise)",
+          });
+        }
+      }
+
       // check if this is the only remaining owner
       const otherOwners = await ctx.prisma.organizationMembership.count({
         where: {
@@ -641,6 +677,22 @@ export const membersRouter = createTRPCRouter({
         ownRole: ctx.session.orgRole,
         role: orgMembership.role,
       });
+
+      // 扩展角色（付费专属）校验
+      if (input.projectRole && extendedRoles.includes(input.projectRole)) {
+        const entitled = hasEntitlement({
+          entitlement: "admin-api",
+          sessionUser: ctx.session.user,
+          orgId: input.orgId,
+        });
+        if (!entitled) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Extended roles are only available on paid plans (Pro, Team, or Enterprise)",
+          });
+        }
+      }
 
       const projectMembership = await ctx.prisma.projectMembership.findFirst({
         where: {
