@@ -337,19 +337,6 @@ export function BillingSettings({ orgId }: BillingSettingsProps) {
           loading={pendingPlan === "cloud:pro"}
           disabled={!availablePlans.has("cloud:pro") || isManualPlanOverride}
         />
-        {/* <PlanCard
-          title="Enterprise"
-          price="Custom"
-          description="For custom scale, deployment, and commercial terms."
-          features={[
-            "Cloud or self-hosted deployment",
-            "Contract pricing and invoicing",
-            "Enterprise support and controls",
-          ]}
-          current={plan === "cloud:enterprise"}
-          actionLabel="Contact sales"
-          href="mailto:sales@litefuse.ai"
-        /> */}
       </section>
 
       {hasSubscription && !isManualPlanOverride ? (

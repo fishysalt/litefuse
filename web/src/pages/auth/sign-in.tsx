@@ -42,6 +42,7 @@ import { AuthProviderButton } from "@/src/features/auth/components/AuthProviderB
 import { cn } from "@/src/utils/tailwind";
 import { useLangfuseCloudRegion } from "@/src/features/organizations/hooks";
 import { getSafeRedirectPath } from "@/src/utils/redirect";
+import { hasSsoConfig } from "@/src/features/enterprise/sso/ssoProviders";
 
 const credentialAuthForm = z.object({
   email: z.string().email(),
@@ -101,9 +102,8 @@ type CredentialsSubmitAction = "standard" | "demo";
 // Also used in src/pages/auth/sign-up.tsx
 
 export const getServerSideProps: GetServerSideProps<PageProps> = async () => {
-  // Multi-tenant SSO discovery was an EE feature; the OSS build never has
-  // dynamically-configured SSO providers.
-  const sso = false;
+  // 动态检测是否配置了多租户 SSO（Enterprise SSO）
+  const sso: boolean = await hasSsoConfig();
   return {
     props: {
       authProviders: {
@@ -250,6 +250,16 @@ export function SSOButtons({
           )
         ) : null}
         <div className="flex flex-row flex-wrap items-center justify-center gap-2">
+          {authProviders.sso && (
+            <AuthProviderButton
+              icon={<Key className="mr-3" size={18} />}
+              label="Enterprise SSO"
+              onClick={() => {
+                capture("sign_in:button_click", { provider: "sso" });
+                window.location.href = "/auth/enterprise-sso-required";
+              }}
+            />
+          )}
           {authProviders.google && (
             <AuthProviderButton
               icon={<SiGoogle className="mr-3" size={18} />}

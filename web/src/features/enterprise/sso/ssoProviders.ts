@@ -42,8 +42,8 @@ let ssoConfigCache: {
 
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 const FAILED_RETRY_AFTER = 60 * 1000; // 1 minute
-const DB_MAX_WAIT = 2 * 1000;
-const DB_TIMEOUT = 3 * 1000;
+const DB_MAX_WAIT = 5 * 1000;
+const DB_TIMEOUT = 5 * 1000;
 
 /**
  * 从数据库加载所有 SSO 配置（带本地缓存），并解析为 schema 对象。
@@ -60,7 +60,7 @@ async function loadSsoConfigs(): Promise<SsoProviderConfig[]> {
     let failedToFetch = false;
     try {
       dbConfigs = await prisma.$transaction(
-        async (tx: any) => tx.ssoConfig.findMany(),
+        async (tx) => tx.ssoConfig.findMany(),
         { maxWait: DB_MAX_WAIT, timeout: DB_TIMEOUT },
       );
     } catch (e) {

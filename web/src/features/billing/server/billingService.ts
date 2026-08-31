@@ -378,7 +378,7 @@ export async function getBillingStatus(
   let subscriptionId = cloudConfig?.stripe?.activeSubscriptionId;
   let cancelAtPeriodEnd = cloudConfig?.stripe?.cancelAtPeriodEnd ?? false;
   let currentPeriodEnd = storedPeriodEnd(cloudConfig);
-  let scheduledPlan: "cloud:developer" | "cloud:pro" | "cloud:team" | null =
+  let scheduledPlan: "cloud:developer" | "cloud:pro" | null =
     cancelAtPeriodEnd && subscriptionId ? "cloud:developer" : null;
   let subscription: Stripe.Subscription | null = null;
   let activeStripeClient = stripeClient;
@@ -424,9 +424,7 @@ export async function getBillingStatus(
               ),
             ),
           );
-          scheduledPlan = finalKinds.has("teams-addon")
-            ? "cloud:team"
-            : "cloud:pro";
+          scheduledPlan = "cloud:pro";
         }
       } catch (error) {
         logger.warn("Unable to retrieve Stripe subscription schedule", {
