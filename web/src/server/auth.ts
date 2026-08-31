@@ -60,12 +60,32 @@ import { ENTERPRISE_SSO_REQUIRED_MESSAGE } from "@/src/features/auth/constants";
 import { projectRoleAccessRights } from "@/src/features/rbac/constants/projectAccessRights";
 import { getSSOBlockedDomains } from "@/src/features/auth-credentials/server/signupApiHandler";
 import { createSupportEmailHash } from "@/src/features/support-chat/createSupportEmailHash";
+import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/hasEntitlement";
+import { resolveSelfHostedPlan } from "@/src/features/enterprise/plan/resolvePlan";
 
-function canCreateOrganizations(): boolean {
-  // Restricting organization creation (`self-host-allowed-organization-creators`)
-  // was an enterprise-licensed entitlement; in the OSS build all users may
-  // create organizations.
-  return true;
+function canCreateOrganizations(userEmail: string | null): boolean {
+  const instancePlan = resolveSelfHostedPlan(
+    process.env.LITEFUSE_EE_LICENSE_KEY,
+  );
+
+  // If no allowlist is configured, or the instance lacks the
+  // self-host-allowed-organization-creators entitlement, all users may create
+  // organizations.
+  if (
+    !env.LITEFUSE_ALLOWED_ORGANIZATION_CREATORS ||
+    !hasEntitlementBasedOnPlan({
+      plan: instancePlan,
+      entitlement: "self-host-allowed-organization-creators",
+    })
+  ) {
+    return true;
+  }
+
+  if (!userEmail) return false;
+
+  const allowedOrgCreators =
+    env.LITEFUSE_ALLOWED_ORGANIZATION_CREATORS.toLowerCase().split(",");
+  return allowedOrgCreators.includes(userEmail.toLowerCase());
 }
 
 const staticProviders: Provider[] = [
@@ -133,7 +153,7 @@ const staticProviders: Provider[] = [
         image: dbUser.image,
         emailVerified: dbUser.emailVerified?.toISOString(),
         featureFlags: parseFlags(dbUser.featureFlags),
-        canCreateOrganizations: canCreateOrganizations(),
+        canCreateOrganizations: canCreateOrganizations(dbUser.email),
         organizations: [],
       };
 
@@ -724,7 +744,7 @@ export async function getAuthOptions(): Promise<NextAuthOptions> {
                     image: dbUser.image,
                     admin: dbUser.admin,
                     v4BetaEnabled: dbUser.v4BetaEnabled,
-                    canCreateOrganizations: canCreateOrganizations(),
+                    canCreateOrganizations: canCreateOrganizations(dbUser.email),
                     organizations: dbUser.organizationMemberships.map(
                       (orgMembership) => {
                         const parsedCloudConfig = CloudConfigSchema.safeParse(

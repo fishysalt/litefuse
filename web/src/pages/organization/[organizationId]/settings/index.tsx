@@ -15,10 +15,10 @@ import { ApiKeyList } from "@/src/features/public-api/components/ApiKeyList";
 import { env } from "@/src/env.mjs";
 import { BillingSettings } from "@/src/features/billing/components/BillingSettings";
 import { useHasOrganizationAccess } from "@/src/features/rbac/utils/checkOrganizationAccess";
+import { OrgAuditLogsSettingsPage } from "@/src/features/audit-logs/OrgAuditLogsSettingsPage";
 
 // EE features removed from OSS build:
 //  - SSOSettings (multi-tenant SSO config)
-//  - OrgAuditLogsSettingsPage (audit log viewer)
 
 type OrganizationSettingsPage = {
   title: string;
@@ -122,8 +122,12 @@ export const getOrganizationSettingsPages = ({
       </div>
     ),
   },
-  // Audit Logs and SSO settings pages were EE features and are not available
-  // in the OSS build.
+  {
+    title: "Audit Logs",
+    slug: "audit-logs",
+    cmdKKeywords: ["trail"],
+    content: <OrgAuditLogsSettingsPage orgId={organization.id} />,
+  },
   {
     title: "Projects",
     slug: "projects",

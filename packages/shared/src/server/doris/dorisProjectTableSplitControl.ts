@@ -144,7 +144,11 @@ const isOrgPaid = (cloudConfig: unknown): boolean => {
       };
     } | null
   )?.stripe;
-  return Boolean(stripe?.activeSubscriptionId && stripe?.resolvedPlan);
+  if (stripe?.activeSubscriptionId && stripe?.resolvedPlan) return true;
+  // Self-hosted: an enterprise license (litefuse_ee_ prefix) counts as paid —
+  // mirrors resolveSelfHostedPlan in web/src/features/enterprise/plan/resolvePlan.ts.
+  const license = process.env.LITEFUSE_EE_LICENSE_KEY;
+  return Boolean(license?.startsWith("litefuse_ee_"));
 };
 
 /**
