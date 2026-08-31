@@ -36,6 +36,11 @@ export function useOrganizationSettingsPages(): OrganizationSettingsPage[] {
   });
   const showBillingSettings =
     Boolean(env.NEXT_PUBLIC_LITEFUSE_CLOUD_REGION) && hasBillingAccess;
+  const showAuditLogsSettings =
+    useHasOrganizationAccess({
+      organizationId: organization?.id,
+      scope: "auditLogs:read",
+    }) && useHasEntitlement("audit-logs");
 
   if (!organization) return [];
 
@@ -43,6 +48,7 @@ export function useOrganizationSettingsPages(): OrganizationSettingsPage[] {
     organization,
     showOrgApiKeySettings,
     showBillingSettings,
+    showAuditLogsSettings,
   });
 }
 
@@ -50,10 +56,12 @@ export const getOrganizationSettingsPages = ({
   organization,
   showOrgApiKeySettings,
   showBillingSettings,
+  showAuditLogsSettings,
 }: {
   organization: { id: string; name: string; metadata: Record<string, unknown> };
   showOrgApiKeySettings: boolean;
   showBillingSettings: boolean;
+  showAuditLogsSettings: boolean;
 }): OrganizationSettingsPage[] => [
   {
     title: "General",
@@ -127,6 +135,7 @@ export const getOrganizationSettingsPages = ({
     slug: "audit-logs",
     cmdKKeywords: ["trail"],
     content: <OrgAuditLogsSettingsPage orgId={organization.id} />,
+    show: showAuditLogsSettings,
   },
   {
     title: "Projects",

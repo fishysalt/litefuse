@@ -43,9 +43,28 @@ export function useProjectSettingsPages(): ProjectSettingsPage[] {
   const router = useRouter();
   const { project, organization } = useQueryProject();
   const showRetentionSettings = useHasEntitlement("data-retention");
+  const projectId =
+    typeof router.query.projectId === "string"
+      ? router.query.projectId
+      : undefined;
   const showProtectedLabelsSettings = useHasEntitlement(
     "prompt-protected-labels",
   );
+  const showAuditLogsSettings =
+    useHasProjectAccess({ projectId, scope: "auditLogs:read" }) &&
+    useHasEntitlement("audit-logs");
+  const showExportsSettings = useHasProjectAccess({
+    projectId,
+    scope: "batchExports:read",
+  });
+  const showBatchActionsSettings = useHasProjectAccess({
+    projectId,
+    scope: "datasets:CUD",
+  });
+  const showIntegrationsSettings = useHasProjectAccess({
+    projectId,
+    scope: "integrations:CRUD",
+  });
 
   if (!project || !organization || !router.query.projectId) {
     return [];
@@ -57,6 +76,10 @@ export function useProjectSettingsPages(): ProjectSettingsPage[] {
     showRetentionSettings,
     showLLMConnectionsSettings: true,
     showProtectedLabelsSettings,
+    showAuditLogsSettings,
+    showExportsSettings,
+    showBatchActionsSettings,
+    showIntegrationsSettings,
   });
 }
 
@@ -66,12 +89,20 @@ export const getProjectSettingsPages = ({
   showRetentionSettings,
   showLLMConnectionsSettings,
   showProtectedLabelsSettings,
+  showAuditLogsSettings,
+  showExportsSettings,
+  showBatchActionsSettings,
+  showIntegrationsSettings,
 }: {
   project: { id: string; name: string; metadata: Record<string, unknown> };
   organization: { id: string; name: string; metadata: Record<string, unknown> };
   showRetentionSettings: boolean;
   showLLMConnectionsSettings: boolean;
   showProtectedLabelsSettings: boolean;
+  showAuditLogsSettings: boolean;
+  showExportsSettings: boolean;
+  showBatchActionsSettings: boolean;
+  showIntegrationsSettings: boolean;
 }): ProjectSettingsPage[] => [
   {
     title: "General",
@@ -198,24 +229,28 @@ export const getProjectSettingsPages = ({
     slug: "integrations",
     cmdKKeywords: ["posthog", "mixpanel", "analytics"],
     content: <Integrations projectId={project.id} />,
+    show: showIntegrationsSettings,
   },
   {
     title: "Exports",
     slug: "exports",
     cmdKKeywords: ["csv", "download", "json", "batch"],
     content: <BatchExportsSettingsPage projectId={project.id} />,
+    show: showExportsSettings,
   },
   {
     title: "Batch Actions",
     slug: "batch-actions",
     cmdKKeywords: ["bulk", "batch", "action", "dataset", "delete"],
     content: <BatchActionsSettingsPage projectId={project.id} />,
+    show: showBatchActionsSettings,
   },
   {
     title: "Audit Logs",
     slug: "audit-logs",
     cmdKKeywords: ["trail"],
     content: <AuditLogsSettingsPage projectId={project.id} />,
+    show: showAuditLogsSettings,
   },
   {
     title: "Notifications",
