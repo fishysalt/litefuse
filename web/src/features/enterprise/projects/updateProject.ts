@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
-import { logger, type ApiAccessScope } from "@langfuse/shared/src/server";
+import { logger, enqueueDorisSplitTableProvisioning, type ApiAccessScope } from "@langfuse/shared/src/server";
 import { projectNameSchema } from "@/src/features/auth/lib/projectNameSchema";
 import { projectRetentionSchema } from "@/src/features/auth/lib/projectRetentionSchema";
 import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/hasEntitlement";
@@ -73,6 +73,18 @@ export async function updateProject(
         metadata: true,
       },
     });
+
+    // Retention 单源于 Project.retentionDays：改了 retention 要让 split 表的
+    // dynamic_partition TTL 跟着变（幂等 ALTER，无控制行时 no-op）。
+    // 与 UI 的 setRetention（projectsRouter）保持一致。
+    if (retention !== undefined) {
+      await enqueueDorisSplitTableProvisioning(projectId).catch((e) =>
+        logger.error(
+          `[table-split] TTL re-provision enqueue for ${projectId} failed`,
+          e,
+        ),
+      );
+    }
 
     return res.status(200).json({
       id: updatedProject.id,
