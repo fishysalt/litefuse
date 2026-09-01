@@ -1,5 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
+import { Role } from "@langfuse/shared";
 import { z } from "zod/v4";
 
 const DeleteOrgMembershipBody = z.object({
@@ -21,6 +22,23 @@ export async function deleteOrgMembership(
       error: "Invalid request body",
       details: parsed.error.issues,
     });
+  }
+
+  // 最后 OWNER 保护（与 UI membersRouter.deleteOrgMembership 一致）：
+  // 不允许删除组织中唯一的 OWNER，防止组织失去所有者。
+  const existing = await prisma.organizationMembership.findUnique({
+    where: { orgId_userId: { orgId, userId: parsed.data.userId } },
+  });
+  if (existing?.role === Role.OWNER) {
+    const owners = await prisma.organizationMembership.count({
+      where: { orgId, role: Role.OWNER },
+    });
+    if (owners === 1) {
+      return res.status(403).json({
+        error:
+          "Cannot remove the last owner of an organization. Assign new owner or delete organization.",
+      });
+    }
   }
 
   await prisma.organizationMembership.deleteMany({

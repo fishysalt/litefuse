@@ -32,6 +32,23 @@ export async function upsertOrgMembership(
     return res.status(404).json({ error: "User not found" });
   }
 
+  // 最后 OWNER 保护（与 UI membersRouter.updateOrgMembership 一致）：
+  // 如果把唯一的 OWNER 降为非 OWNER，拒绝，防止组织失去所有者。
+  const existing = await prisma.organizationMembership.findUnique({
+    where: { orgId_userId: { orgId, userId: parsed.data.userId } },
+  });
+  if (existing?.role === Role.OWNER && parsed.data.role !== Role.OWNER) {
+    const otherOwners = await prisma.organizationMembership.count({
+      where: { orgId, role: Role.OWNER, id: { not: existing.id } },
+    });
+    if (otherOwners === 0) {
+      return res.status(403).json({
+        error:
+          "Cannot remove the last owner of an organization. Assign new owner or delete organization.",
+      });
+    }
+  }
+
   const membership = await prisma.organizationMembership.upsert({
     where: {
       orgId_userId: { orgId, userId: parsed.data.userId },
