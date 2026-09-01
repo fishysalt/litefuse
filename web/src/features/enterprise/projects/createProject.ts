@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
-import { logger, type ApiAccessScope } from "@langfuse/shared/src/server";
+import { logger, provisionSplitForNewProject, type ApiAccessScope } from "@langfuse/shared/src/server";
 import { projectNameSchema } from "@/src/features/auth/lib/projectNameSchema";
 import { projectRetentionSchema } from "@/src/features/auth/lib/projectRetentionSchema";
 import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/hasEntitlement";
@@ -85,6 +85,18 @@ export async function createProject(
 
       return created;
     });
+
+    // Universal Doris table split：每个新项目都要有自己的 Doris 表。
+    // 与 UI 创建项目（projectsRouter.create）保持一致——designation 失败时
+    // 删除刚创建的项目，让请求干净地失败，而不是留下一个未建表的项目。
+    try {
+      await provisionSplitForNewProject(project.id);
+    } catch (e) {
+      await prisma.project
+        .delete({ where: { id: project.id } })
+        .catch(() => undefined);
+      throw e;
+    }
 
     return res.status(201).json({
       id: project.id,
