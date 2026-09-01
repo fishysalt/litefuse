@@ -711,27 +711,36 @@ export const membersRouter = createTRPCRouter({
         });
       }
 
-      // If the project role is set to null, delete the project membership
+      // NONE/null 表示"继承组织角色"：保留 project_memberships 记录并标记为 NONE，
+      // 查询时回退到组织角色（见 userProjectRoleAuth.ts 的 CASE 逻辑）。
       if (input.projectRole === null || input.projectRole === Role.NONE) {
-        if (projectMembership) {
-          await ctx.prisma.projectMembership.delete({
-            where: {
-              projectId_userId: {
-                projectId: input.projectId,
-                userId: input.userId,
-              },
-              orgMembershipId: input.orgMembershipId,
+        await ctx.prisma.projectMembership.upsert({
+          where: {
+            projectId_userId: {
+              projectId: input.projectId,
+              userId: input.userId,
             },
-          });
+            orgMembershipId: input.orgMembershipId,
+          },
+          update: {
+            role: Role.NONE,
+          },
+          create: {
+            projectId: input.projectId,
+            userId: input.userId,
+            role: Role.NONE,
+            orgMembershipId: input.orgMembershipId,
+          },
+        });
 
-          await auditLog({
-            session: ctx.session,
-            resourceType: "projectMembership",
-            resourceId: `${input.orgMembershipId}--${input.projectId}`,
-            action: "delete",
-            before: projectMembership,
-          });
-        }
+        await auditLog({
+          session: ctx.session,
+          resourceType: "projectMembership",
+          resourceId: `${input.orgMembershipId}--${input.projectId}`,
+          action: "update",
+          before: projectMembership,
+        });
+
         return {
           userId: input.userId,
         };

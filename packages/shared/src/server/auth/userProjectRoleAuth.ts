@@ -12,10 +12,13 @@ export function resolveProjectRole({
   projectMemberships: ProjectMembership[];
   orgMembershipRole: Role;
 }): Role {
-  return (
-    projectMemberships.find((membership) => membership.projectId === projectId)
-      ?.role ?? orgMembershipRole
-  );
+  const projectRole = projectMemberships.find(
+    (membership) => membership.projectId === projectId,
+  )?.role;
+  // NONE 表示"继承组织角色"，回退到组织角色（而非返回 NONE）
+  return projectRole && projectRole !== Role.NONE
+    ? projectRole
+    : orgMembershipRole;
 }
 
 /**
@@ -77,13 +80,14 @@ function generateUserProjectRolesQuery({
       ${sqlFilter}
       ${searchFilter}
       UNION
-      SELECT u.id, u.name, u.email, pm.role as role
+      SELECT u.id, u.name, u.email,
+        CASE WHEN pm.role = 'NONE' THEN om.role ELSE pm.role END as role
       FROM organization_memberships om
       INNER JOIN project_memberships pm ON om.id = pm.org_membership_id
       INNER JOIN users u ON om.user_id = u.id
       WHERE om.org_id = ${orgId}
         AND pm.project_id = ${projectId}
-        AND pm.role != 'NONE'
+        AND CASE WHEN pm.role = 'NONE' THEN om.role ELSE pm.role END != 'NONE'
       ${sqlFilter}
       ${searchFilter}
     )
