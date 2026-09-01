@@ -13,13 +13,8 @@ export type ApiKeyScope = (typeof ApiKeyScope)[keyof typeof ApiKeyScope];
 export const Role = {
   OWNER: "OWNER",
   ADMIN: "ADMIN",
-  DEVELOPER: "DEVELOPER",
   MEMBER: "MEMBER",
-  PROMPT_MANAGER: "PROMPT_MANAGER",
-  EVALUATOR: "EVALUATOR",
-  ANNOTATOR: "ANNOTATOR",
   VIEWER: "VIEWER",
-  AUDITOR: "AUDITOR",
   NONE: "NONE",
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];

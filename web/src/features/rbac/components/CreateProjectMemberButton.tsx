@@ -39,7 +39,6 @@ import {
 } from "@/src/features/entitlements/hooks";
 import { useHasProjectAccess } from "@/src/features/rbac/utils/checkProjectAccess";
 import { RoleSelectItem } from "@/src/features/rbac/components/RoleSelectItem";
-import { getSelectableRoles } from "@/src/features/rbac/constants/orderedRoles";
 import { ActionButton } from "@/src/components/ActionButton";
 
 const formSchema = z.object({
@@ -84,7 +83,6 @@ export function CreateProjectMemberButton(props: {
     },
   ).data?.totalCount;
   const hasProjectRoleEntitlement = useHasEntitlement("rbac-project-roles");
-  const hasExtendedRoles = useHasEntitlement("admin-api");
   const hasOnlySingleProjectAccess =
     !hasOrgAccess && hasProjectAccess && hasProjectRoleEntitlement;
 
@@ -197,7 +195,7 @@ export function CreateProjectMemberButton(props: {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {getSelectableRoles(hasExtendedRoles).map((role) => (
+                            {Object.values(Role).map((role) => (
                               <RoleSelectItem role={role} key={role} />
                             ))}
                           </SelectContent>
@@ -228,7 +226,7 @@ export function CreateProjectMemberButton(props: {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {getSelectableRoles(hasExtendedRoles)
+                            {Object.values(Role)
                               .filter(
                                 (role) =>
                                   !hasOnlySingleProjectAccess ||
