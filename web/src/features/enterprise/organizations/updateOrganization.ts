@@ -22,14 +22,25 @@ export async function updateOrganization(
   const { name } = validationResult.data;
 
   const { metadata } = req.body;
+  let parsedMetadata = metadata;
   if (metadata !== undefined && typeof metadata !== "object") {
     try {
-      JSON.parse(metadata);
+      parsedMetadata = JSON.parse(metadata);
     } catch (error) {
       return res.status(400).json({
-        message: `Invalid metadata. Should be a valid JSON object: ${error}`,
+        error: `Invalid metadata. Should be a valid JSON object: ${error}`,
       });
     }
+  }
+  if (
+    parsedMetadata !== undefined &&
+    (typeof parsedMetadata !== "object" ||
+      parsedMetadata === null ||
+      Array.isArray(parsedMetadata))
+  ) {
+    return res.status(400).json({
+      error: "Invalid metadata. Should be a valid JSON object.",
+    });
   }
 
   const existing = await prisma.organization.findUnique({
@@ -41,7 +52,7 @@ export async function updateOrganization(
 
   const updated = await prisma.organization.update({
     where: { id: organizationId },
-    data: { name, metadata },
+    data: { name, metadata: parsedMetadata },
     select: {
       id: true,
       name: true,
