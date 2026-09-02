@@ -48,7 +48,7 @@ const createAdminSession = (
         id: "session-org-id",
         name: "Session Organization",
         role: "OWNER",
-        plan: "cloud:hobby",
+        plan: "cloud:developer",
         cloudConfig: undefined,
         metadata: {},
         projects: projects.map((project) => ({

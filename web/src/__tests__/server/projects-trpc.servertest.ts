@@ -98,10 +98,10 @@ describe("projectsRouter.create - project limit enforcement", () => {
   });
 
   it.each([0, 1, 2])(
-    "allows a cloud:hobby organization to create project %i of 3",
+    "allows a cloud:developer organization to create project %i of 3",
     async (activeProjectCount) => {
       const { caller, prisma } = createCaller({
-        plan: "cloud:hobby",
+        plan: "cloud:developer",
         activeProjectCount,
       });
 
@@ -116,9 +116,9 @@ describe("projectsRouter.create - project limit enforcement", () => {
     },
   );
 
-  it("rejects a fourth active project for a cloud:hobby organization", async () => {
+  it("rejects a fourth active project for a cloud:developer organization", async () => {
     const { caller, prisma } = createCaller({
-      plan: "cloud:hobby",
+      plan: "cloud:developer",
       activeProjectCount: 3,
     });
 
@@ -132,7 +132,7 @@ describe("projectsRouter.create - project limit enforcement", () => {
 
   it("does not count soft-deleted projects", async () => {
     const { caller, prisma } = createCaller({
-      plan: "cloud:hobby",
+      plan: "cloud:developer",
       activeProjectCount: 2,
     });
 
@@ -148,7 +148,7 @@ describe("projectsRouter.create - project limit enforcement", () => {
   it.each([
     ["cloud:pro", false],
     ["oss", false],
-    ["cloud:hobby", true],
+    ["cloud:developer", true],
   ] as const)(
     "does not limit %s organizations when admin is %s",
     async (plan, admin) => {
@@ -168,7 +168,7 @@ describe("projectsRouter.create - project limit enforcement", () => {
 });
 
 describe("projectsRouter.transfer - project limit enforcement", () => {
-  it("rejects a transfer into a cloud:hobby organization with three active projects", async () => {
+  it("rejects a transfer into a cloud:developer organization with three active projects", async () => {
     const targetOrgId = "target-project-limit-org";
     const prisma = {
       project: {
@@ -188,7 +188,7 @@ describe("projectsRouter.transfer - project limit enforcement", () => {
       async (callback: (tx: typeof prisma) => Promise<unknown>) =>
         callback(prisma),
     );
-    const session = createSession({ plan: "cloud:hobby" });
+    const session = createSession({ plan: "cloud:developer" });
     session.user.organizations[0].projects.push({
       id: "project-to-transfer",
       name: "Project To Transfer",
@@ -198,7 +198,7 @@ describe("projectsRouter.transfer - project limit enforcement", () => {
       id: targetOrgId,
       name: "Target Project Limit Organization",
       role: Role.OWNER,
-      plan: "cloud:hobby",
+      plan: "cloud:developer",
       cloudConfig: undefined,
       metadata: {},
       aiFeaturesEnabled: false,

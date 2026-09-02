@@ -35,7 +35,7 @@ async function prepare() {
           id: org.id,
           name: org.name,
           role: "OWNER",
-          plan: "cloud:hobby",
+          plan: "cloud:developer",
           cloudConfig: undefined,
           metadata: {},
           projects: [
@@ -59,7 +59,7 @@ async function prepare() {
     },
     environment: {
       enableExperimentalFeatures: false,
-      selfHostedInstancePlan: "cloud:hobby",
+      selfHostedInstancePlan: "cloud:developer",
     },
   };
 

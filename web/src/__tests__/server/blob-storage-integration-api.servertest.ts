@@ -76,7 +76,7 @@ describe("Blob Storage Integrations API", () => {
     const testOrg = await prisma.organization.create({
       data: {
         name: `Blob Storage Test Org ${randomUUID().substring(0, 8)}`,
-        cloudConfig: { plan: "Team" },
+        cloudConfig: { plan: "Pro" },
       },
     });
     testOrgId = testOrg.id;
@@ -116,7 +116,7 @@ describe("Blob Storage Integrations API", () => {
     const otherOrg = await prisma.organization.create({
       data: {
         name: `Other Blob Storage Org ${randomUUID().substring(0, 8)}`,
-        cloudConfig: { plan: "Team" },
+        cloudConfig: { plan: "Pro" },
       },
     });
     otherOrgId = otherOrg.id;

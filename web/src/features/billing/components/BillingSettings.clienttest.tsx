@@ -32,15 +32,15 @@ const mockedCreatePortalMutation = api.billing.createPortalSession
 
 function billingStatus(
   overrides: Partial<{
-    plan: "cloud:hobby" | "cloud:pro" | "cloud:team";
+    plan: "cloud:developer" | "cloud:pro";
     subscriptionStatus: string | null;
     activeSubscriptionId: string | null;
-    scheduledPlan: "cloud:hobby" | "cloud:pro" | "cloud:team" | null;
+    scheduledPlan: "cloud:developer" | "cloud:pro" | null;
     cancelAtPeriodEnd: boolean;
     usageState: string | null;
   }> = {},
 ) {
-  const plan = overrides.plan ?? "cloud:hobby";
+  const plan = overrides.plan ?? "cloud:developer";
   return {
     isLoading: false,
     data: {
@@ -51,24 +51,26 @@ function billingStatus(
       billingConfigurationIssues: [],
       catalogue: [{ plan: "cloud:pro" }],
       stripe: {
-        customerId: plan === "cloud:hobby" ? null : "cus_test",
+        customerId: plan === "cloud:developer" ? null : "cus_test",
         activeSubscriptionId:
           overrides.activeSubscriptionId ??
-          (plan === "cloud:hobby" ? null : "sub_test"),
+          (plan === "cloud:developer" ? null : "sub_test"),
         subscriptionStatus: overrides.subscriptionStatus ?? null,
         cancelAtPeriodEnd: overrides.cancelAtPeriodEnd ?? false,
         currentPeriodEnd: new Date("2026-08-16T00:00:00.000Z"),
         scheduledPlan: overrides.scheduledPlan ?? null,
       },
       usage: {
-        currentUnits: plan === "cloud:hobby" ? 80_000 : 250_000,
-        includedUnits: plan === "cloud:hobby" ? 100_000 : 200_000,
-        overageUnits: plan === "cloud:hobby" ? 0 : 50_000,
-        estimatedOverageUsd: plan === "cloud:hobby" ? 0 : 2,
-        reportedUnits: plan === "cloud:hobby" ? null : 240_000,
-        pendingUnits: plan === "cloud:hobby" ? null : 10_000,
+        currentUnits: plan === "cloud:developer" ? 80_000 : 250_000,
+        includedUnits: plan === "cloud:developer" ? 100_000 : 200_000,
+        overageUnits: plan === "cloud:developer" ? 0 : 50_000,
+        estimatedOverageUsd: plan === "cloud:developer" ? 0 : 2,
+        reportedUnits: plan === "cloud:developer" ? null : 240_000,
+        pendingUnits: plan === "cloud:developer" ? null : 10_000,
         reportedThrough:
-          plan === "cloud:hobby" ? null : new Date("2026-07-16T10:00:00.000Z"),
+          plan === "cloud:developer"
+            ? null
+            : new Date("2026-07-16T10:00:00.000Z"),
         state: overrides.usageState ?? null,
       },
       billingCycle: { end: new Date("2026-08-16T00:00:00.000Z") },
@@ -105,7 +107,7 @@ describe("BillingSettings", () => {
   it("shows Teams, past-due, scheduled downgrade, and overage", () => {
     mockedUseQuery.mockReturnValue(
       billingStatus({
-        plan: "cloud:team",
+        plan: "cloud:pro",
         subscriptionStatus: "past_due",
         scheduledPlan: "cloud:pro",
       }),
@@ -128,7 +130,7 @@ describe("BillingSettings", () => {
         plan: "cloud:pro",
         subscriptionStatus: "active",
         cancelAtPeriodEnd: true,
-        scheduledPlan: "cloud:hobby",
+        scheduledPlan: "cloud:developer",
       }),
     );
 

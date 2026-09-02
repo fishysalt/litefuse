@@ -60,7 +60,7 @@ describe("Authenticate API calls", () => {
   };
 
   beforeEach(async () => {
-    const fixture = await createOrgProjectAndApiKey({ plan: "Hobby" });
+    const fixture = await createOrgProjectAndApiKey({ plan: "Developer" });
     const note = "seeded key";
     const createdApiKey = await prisma.apiKey.findUniqueOrThrow({
       where: { publicKey: fixture.publicKey },
@@ -144,7 +144,7 @@ describe("Authenticate API calls", () => {
 
       if (auth.validKey) {
         expect(auth.scope.orgId).toBe(testApiKey.orgId);
-        expect(auth.scope.plan).toBe("cloud:hobby");
+        expect(auth.scope.plan).toBe("cloud:developer");
         expect(auth.scope.rateLimitOverrides).toEqual([]);
       }
 
@@ -194,7 +194,7 @@ describe("Authenticate API calls", () => {
 
       if (auth.validKey) {
         expect(auth.scope.orgId).toBe(testApiKey.orgId);
-        expect(auth.scope.plan).toBe("cloud:hobby");
+        expect(auth.scope.plan).toBe("cloud:developer");
         expect(auth.scope.rateLimitOverrides).toEqual([
           {
             resource: "ingestion",
@@ -345,7 +345,7 @@ describe("Authenticate API calls", () => {
       expect(parsed).toEqual({
         ...apiKey,
         orgId: testApiKey.orgId,
-        plan: "cloud:hobby",
+        plan: "cloud:developer",
         rateLimitOverrides: [
           {
             resource: "public-api",
@@ -412,7 +412,7 @@ describe("Authenticate API calls", () => {
         fastHashedSecretKey: apiKey?.fastHashedSecretKey,
         hashedSecretKey: apiKey?.hashedSecretKey,
         orgId: testApiKey.orgId,
-        plan: "cloud:team",
+        plan: "cloud:pro",
         projectId: testApiKey.projectId,
         // scope property is intentionally missing
       };
@@ -459,7 +459,7 @@ describe("Authenticate API calls", () => {
       expect(parsed).toEqual({
         ...apiKey,
         orgId: testApiKey.orgId,
-        plan: "cloud:hobby",
+        plan: "cloud:developer",
         scope: "PROJECT", // Now the scope is present
         projectId: testApiKey.projectId,
         rateLimitOverrides: [
@@ -586,7 +586,7 @@ describe("Authenticate API calls", () => {
         isIngestionSuspended: expect.anything(),
         projectId: expect.any(String),
         orgId: testApiKey.orgId,
-        plan: "cloud:hobby",
+        plan: "cloud:developer",
         scope: "PROJECT",
       });
     });
@@ -676,7 +676,7 @@ describe("Authenticate API calls", () => {
       expect(parsed).toEqual({
         ...apiKey,
         orgId: testApiKey.orgId,
-        plan: "cloud:hobby",
+        plan: "cloud:developer",
         createdAt: apiKey?.createdAt.toISOString(),
         scope: "PROJECT",
         isIngestionSuspended: expect.anything(),

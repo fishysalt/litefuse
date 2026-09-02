@@ -38,7 +38,7 @@ describe("PostHog Integration SSRF Protection", () => {
           {
             id: orgId,
             role: "OWNER",
-            plan: "cloud:hobby",
+            plan: "cloud:developer",
             cloudConfig: undefined,
             name: "Test Organization",
             metadata: {},

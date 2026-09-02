@@ -86,7 +86,7 @@ function createSession(params: {
           id: params.org.id,
           name: params.org.name,
           role: params.role,
-          plan: params.plan ?? "cloud:hobby",
+          plan: params.plan ?? "cloud:developer",
           cloudConfig: undefined,
           metadata: {},
           aiFeaturesEnabled: false,
@@ -265,7 +265,7 @@ describe("Litefuse Pro billing", () => {
     expect(canceledCloudConfig?.stripe?.activeSubscriptionId).toBeNull();
     expect(
       getOrganizationPlanServerSide(canceledCloudConfig ?? undefined),
-    ).toBe("cloud:hobby");
+    ).toBe("cloud:developer");
   });
 
   it("persists cancellation scheduled in the Stripe portal", async () => {
@@ -322,7 +322,7 @@ describe("Litefuse Pro billing", () => {
     };
 
     await expect(getBillingStatus(org.id, stripe)).resolves.toMatchObject({
-      plan: "cloud:hobby",
+      plan: "cloud:developer",
       stripe: {
         activeSubscriptionId: null,
         subscriptionStatus: "canceled",
@@ -364,7 +364,7 @@ describe("Litefuse Pro billing", () => {
     await expect(
       getBillingStatus(org.id, undefined, new Date("2026-09-14T12:00:00.000Z")),
     ).resolves.toMatchObject({
-      plan: "cloud:hobby",
+      plan: "cloud:developer",
       billingCycle: {
         // The canceled Pro period ended on Nov 15. Developer usage now
         // resets on the next monthly occurrence of that cycle anchor.
@@ -416,7 +416,7 @@ describe("Litefuse Pro billing", () => {
       "prod_litefuse_teams",
     );
     expect(getOrganizationPlanServerSide(cloudConfig ?? undefined)).toBe(
-      "cloud:team",
+      "cloud:pro",
     );
   });
 
@@ -437,7 +437,7 @@ describe("Litefuse Pro billing", () => {
       expect(cloudConfig?.stripe?.resolvedPlan).toBeNull();
       expect(cloudConfig?.stripe?.activeSubscriptionId).toBeNull();
       expect(getOrganizationPlanServerSide(cloudConfig ?? undefined)).toBe(
-        "cloud:hobby",
+        "cloud:developer",
       );
     },
   );
@@ -620,7 +620,7 @@ describe("Litefuse Pro billing", () => {
     await expect(
       ownerCaller.billing.getBillingStatus({ orgId: ownerFixture.org.id }),
     ).resolves.toMatchObject({
-      plan: "cloud:hobby",
+      plan: "cloud:developer",
     });
 
     const memberFixture = await createBillingOrg(Role.MEMBER);
@@ -638,7 +638,7 @@ describe("Litefuse Pro billing", () => {
       where: { id: fixture.org.id },
       data: {
         cloudConfig: {
-          plan: "Enterprise",
+          plan: "Pro",
           stripe: { customerId: `cus_${uuidv4()}` },
         },
       },
@@ -650,7 +650,7 @@ describe("Litefuse Pro billing", () => {
     await expect(
       caller.billing.getBillingStatus({ orgId: fixture.org.id }),
     ).resolves.toMatchObject({
-      plan: "cloud:enterprise",
+      plan: "cloud:pro",
       isManualPlanOverride: true,
     });
   });

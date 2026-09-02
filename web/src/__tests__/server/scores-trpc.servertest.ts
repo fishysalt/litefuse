@@ -57,7 +57,7 @@ describe("scores trpc", () => {
             id: orgId,
             name: "Test Organization",
             role: "OWNER",
-            plan: "cloud:hobby",
+            plan: "cloud:developer",
             cloudConfig: undefined,
             projects: [
               {

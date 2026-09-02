@@ -115,9 +115,9 @@ async function createTestUser() {
 }
 
 describe("membersRouter.create - organization member limit enforcement", () => {
-  describe("cloud:hobby plan (2 member limit)", () => {
+  describe("cloud:developer plan (2 member limit)", () => {
     it("should allow adding a member when within limit", async () => {
-      const { org, caller } = await prepare("cloud:hobby");
+      const { org, caller } = await prepare("cloud:developer");
 
       // Org already has 1 member (owner), so we can add 1 more
       const newUser = await createTestUser();
@@ -140,7 +140,7 @@ describe("membersRouter.create - organization member limit enforcement", () => {
     });
 
     it("should throw FORBIDDEN when exceeding member limit with existing members", async () => {
-      const { org, caller } = await prepare("cloud:hobby");
+      const { org, caller } = await prepare("cloud:developer");
 
       // Add one more member to reach the limit (owner + 1 = 2)
       const user1 = await createTestUser();
@@ -165,7 +165,7 @@ describe("membersRouter.create - organization member limit enforcement", () => {
     });
 
     it("should throw FORBIDDEN when exceeding member limit with pending invitations", async () => {
-      const { org, caller, ownerUser } = await prepare("cloud:hobby");
+      const { org, caller, ownerUser } = await prepare("cloud:developer");
 
       // Create a pending invitation (owner + 1 invite = 2)
       await prisma.membershipInvitation.create({
@@ -190,9 +190,9 @@ describe("membersRouter.create - organization member limit enforcement", () => {
     });
   });
 
-  describe("cloud:core plan (unlimited members)", () => {
+  describe("cloud:pro plan (unlimited members)", () => {
     it("should allow adding 4 members without limit", async () => {
-      const { org, caller } = await prepare("cloud:core");
+      const { org, caller } = await prepare("cloud:pro");
 
       // Create and add 4 members
       for (let i = 0; i < 4; i++) {
@@ -216,8 +216,8 @@ describe("membersRouter.create - organization member limit enforcement", () => {
   });
 
   describe("invitation creation with limits", () => {
-    it("should allow creating invitation when within limit on cloud:hobby", async () => {
-      const { org, caller } = await prepare("cloud:hobby");
+    it("should allow creating invitation when within limit on cloud:developer", async () => {
+      const { org, caller } = await prepare("cloud:developer");
 
       // Org has 1 member (owner), so we can create 1 invitation
       const newEmail = `invite-${uuidv4().substring(0, 8)}@test.com`;
@@ -238,7 +238,7 @@ describe("membersRouter.create - organization member limit enforcement", () => {
     });
 
     it("should allow creating invitations without limit on paid plans", async () => {
-      const { org, caller } = await prepare("cloud:team");
+      const { org, caller } = await prepare("cloud:pro");
 
       // Create 4 invitations
       for (let i = 0; i < 4; i++) {

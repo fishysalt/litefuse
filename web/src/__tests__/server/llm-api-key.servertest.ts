@@ -28,7 +28,7 @@ describe("llmApiKey.all RPC", () => {
           {
             id: orgId,
             role: "OWNER",
-            plan: "cloud:hobby",
+            plan: "cloud:developer",
             cloudConfig: undefined,
             name: "Test Organization",
             metadata: {},

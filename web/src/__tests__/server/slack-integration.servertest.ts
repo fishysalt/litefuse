@@ -34,7 +34,7 @@ const prepare = async () => {
           id: org.id,
           name: org.name,
           role: "OWNER",
-          plan: "cloud:hobby",
+          plan: "cloud:developer",
           cloudConfig: undefined,
           metadata: {},
           projects: [
@@ -57,7 +57,7 @@ const prepare = async () => {
     },
     environment: {
       enableExperimentalFeatures: false,
-      selfHostedInstancePlan: "cloud:hobby",
+      selfHostedInstancePlan: "cloud:developer",
     },
   };
 

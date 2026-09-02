@@ -307,7 +307,7 @@ describe("Annotation Queues API Endpoints", () => {
     it("should return 405 if the user is on the Hobby plan and has reached the maximum number of annotation queues", async () => {
       const { auth: hobbyPlanAuth, projectId: hobbyProjectId } =
         await createOrgProjectAndApiKey({
-          plan: "Hobby",
+          plan: "Developer",
         });
 
       const config = await prisma.scoreConfig.create({
