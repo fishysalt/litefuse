@@ -3,12 +3,9 @@ import { prisma } from "@langfuse/shared/src/db";
 import { Role } from "@langfuse/shared";
 import { z } from "zod/v4";
 
-// Matches the public MembershipRole contract (Fern): NONE is not assignable
-// through the API. Use DELETE to revert a project membership to the
-// organization role.
 const ProjectMembershipBody = z.object({
   userId: z.string(),
-  role: z.enum([Role.OWNER, Role.ADMIN, Role.MEMBER, Role.VIEWER]),
+  role: z.enum(Role),
 });
 
 /**
