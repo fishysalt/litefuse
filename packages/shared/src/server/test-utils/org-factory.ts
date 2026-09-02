@@ -15,7 +15,7 @@ export function createBasicAuthHeader(
 
 export type CreateOrgProjectAndApiKeyOptions = {
   projectId?: string;
-  plan?: "Team" | "Hobby" | "Core" | "Pro" | "Enterprise";
+  plan?: "Developer" | "Pro";
 };
 export const createOrgProjectAndApiKey = async (
   props?: CreateOrgProjectAndApiKeyOptions,
@@ -26,7 +26,7 @@ export const createOrgProjectAndApiKey = async (
       id: v4(),
       name: v4(),
       cloudConfig: CloudConfigSchema.parse({
-        plan: props?.plan ?? "Team",
+        plan: props?.plan ?? "Pro",
       }),
     },
   });
