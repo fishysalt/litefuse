@@ -47,12 +47,9 @@ export function useProjectSettingsPages(): ProjectSettingsPage[] {
     typeof router.query.projectId === "string"
       ? router.query.projectId
       : undefined;
-  const showProtectedLabelsSettings = useHasEntitlement(
-    "prompt-protected-labels",
-  );
-  const showAuditLogsSettings =
-    useHasProjectAccess({ projectId, scope: "auditLogs:read" }) &&
-    useHasEntitlement("audit-logs");
+  // 当前版本只保留 admin-api：audit-logs / prompt-protected-labels 功能入口先隐藏
+  const showProtectedLabelsSettings = false;
+  const showAuditLogsSettings = false;
   const showExportsSettings = useHasProjectAccess({
     projectId,
     scope: "batchExports:read",

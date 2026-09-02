@@ -36,11 +36,8 @@ export function useOrganizationSettingsPages(): OrganizationSettingsPage[] {
   });
   const showBillingSettings =
     Boolean(env.NEXT_PUBLIC_LITEFUSE_CLOUD_REGION) && hasBillingAccess;
-  const showAuditLogsSettings =
-    useHasOrganizationAccess({
-      organizationId: organization?.id,
-      scope: "auditLogs:read",
-    }) && useHasEntitlement("audit-logs");
+  // 当前版本只保留 admin-api：audit-logs 功能入口先隐藏
+  const showAuditLogsSettings = false;
 
   if (!organization) return [];
 
