@@ -173,7 +173,6 @@ export const membersRouter = createTRPCRouter({
         role: input.orgRole,
       });
 
-      // Extended-role (paid plans only) entitlement check
       // check for entilement (project role)
       if (input.projectId && input.projectRole) {
         const entitled = hasEntitlement({
@@ -555,7 +554,6 @@ export const membersRouter = createTRPCRouter({
         role: membership.role, // old
       });
 
-      // Last-owner protection
       // check if this is the only remaining owner
       const otherOwners = await ctx.prisma.organizationMembership.count({
         where: {
@@ -644,7 +642,6 @@ export const membersRouter = createTRPCRouter({
         role: orgMembership.role,
       });
 
-      // Load the existing project membership for the role checks below
       const projectMembership = await ctx.prisma.projectMembership.findFirst({
         where: {
           projectId: input.projectId,
@@ -662,36 +659,27 @@ export const membersRouter = createTRPCRouter({
         });
       }
 
-      // NONE/null means "inherit the organization role": keep the project_memberships row and mark it NONE,
-      // and fall back to the org role when querying (see the CASE logic in userProjectRoleAuth.ts).
+      // If the project role is set to null, delete the project membership
       if (input.projectRole === null || input.projectRole === Role.NONE) {
-        await ctx.prisma.projectMembership.upsert({
-          where: {
-            projectId_userId: {
-              projectId: input.projectId,
-              userId: input.userId,
+        if (projectMembership) {
+          await ctx.prisma.projectMembership.delete({
+            where: {
+              projectId_userId: {
+                projectId: input.projectId,
+                userId: input.userId,
+              },
+              orgMembershipId: input.orgMembershipId,
             },
-            orgMembershipId: input.orgMembershipId,
-          },
-          update: {
-            role: Role.NONE,
-          },
-          create: {
-            projectId: input.projectId,
-            userId: input.userId,
-            role: Role.NONE,
-            orgMembershipId: input.orgMembershipId,
-          },
-        });
+          });
 
-        await auditLog({
-          session: ctx.session,
-          resourceType: "projectMembership",
-          resourceId: `${input.orgMembershipId}--${input.projectId}`,
-          action: "update",
-          before: projectMembership,
-        });
-
+          await auditLog({
+            session: ctx.session,
+            resourceType: "projectMembership",
+            resourceId: `${input.orgMembershipId}--${input.projectId}`,
+            action: "delete",
+            before: projectMembership,
+          });
+        }
         return {
           userId: input.userId,
         };

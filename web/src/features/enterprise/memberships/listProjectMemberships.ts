@@ -1,13 +1,10 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { Prisma } from "@langfuse/shared";
-import { getUserProjectRoles } from "@langfuse/shared/src/server";
+import { prisma } from "@langfuse/shared/src/db";
 
 /**
  * List project memberships (GET /api/public/projects/{id}/memberships).
- * Same semantics as the UI: all organization members (including OWNERs) with project-role overrides.
- * - OWNERs and members without a project role: inherit the organization role
- * - Members with an explicit project role: use the project role
- * - NONE is excluded
+ * Returns the explicit project-level memberships only (users whose access to
+ * this project overrides their organization role), scoped to the organization.
  */
 export async function listProjectMemberships(
   req: NextApiRequest,
@@ -15,20 +12,24 @@ export async function listProjectMemberships(
   projectId: string,
   orgId: string,
 ) {
-  const users = await getUserProjectRoles({
-    projectId,
-    orgId,
-    searchFilter: Prisma.empty,
-    filterCondition: [],
-    orderBy: Prisma.sql`ORDER BY all_eligible_users.name ASC NULLS LAST, all_eligible_users.email ASC NULLS LAST`,
+  const memberships = await prisma.projectMembership.findMany({
+    where: {
+      projectId,
+      organizationMembership: { orgId },
+    },
+    include: {
+      user: {
+        select: { id: true, email: true, name: true },
+      },
+    },
   });
 
   return res.status(200).json({
-    memberships: users.map((user) => ({
-      userId: user.id,
-      role: user.role,
-      email: user.email,
-      name: user.name,
+    memberships: memberships.map((membership) => ({
+      userId: membership.userId,
+      role: membership.role,
+      email: membership.user.email,
+      name: membership.user.name,
     })),
   });
 }

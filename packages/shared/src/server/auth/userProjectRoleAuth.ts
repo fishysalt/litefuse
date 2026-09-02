@@ -12,13 +12,10 @@ export function resolveProjectRole({
   projectMemberships: ProjectMembership[];
   orgMembershipRole: Role;
 }): Role {
-  const projectRole = projectMemberships.find(
-    (membership) => membership.projectId === projectId,
-  )?.role;
-  // NONE means "inherit the organization role": fall back to the org role instead of returning NONE
-  return projectRole && projectRole !== Role.NONE
-    ? projectRole
-    : orgMembershipRole;
+  return (
+    projectMemberships.find((membership) => membership.projectId === projectId)
+      ?.role ?? orgMembershipRole
+  );
 }
 
 /**
@@ -80,14 +77,13 @@ function generateUserProjectRolesQuery({
       ${sqlFilter}
       ${searchFilter}
       UNION
-      SELECT u.id, u.name, u.email,
-        CASE WHEN pm.role = 'NONE' THEN om.role ELSE pm.role END as role
+      SELECT u.id, u.name, u.email, pm.role as role
       FROM organization_memberships om
       INNER JOIN project_memberships pm ON om.id = pm.org_membership_id
       INNER JOIN users u ON om.user_id = u.id
       WHERE om.org_id = ${orgId}
         AND pm.project_id = ${projectId}
-        AND CASE WHEN pm.role = 'NONE' THEN om.role ELSE pm.role END != 'NONE'
+        AND pm.role != 'NONE'
       ${sqlFilter}
       ${searchFilter}
     )
