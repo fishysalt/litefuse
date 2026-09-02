@@ -3,6 +3,7 @@ import { logger } from "../logger";
 import { recordIncrement } from "../instrumentation";
 import { enqueueDorisSplitTableProvisioning } from "../redis/dorisSplitTableProvisioningQueue";
 import { publishSplitCacheInvalidation } from "./tableSplitCache";
+import { NO_TTL_START_DAYS } from "./splitTableTemplates";
 
 /**
  * Minimum per-project retention (days), Stage 1.8 / design §4.5. A split table
@@ -24,11 +25,11 @@ export const PAID_DEFAULT_RETENTION_DAYS = 3 * 365;
 /**
  * The effective split-table TTL (days) for a project, derived from PG at
  * provisioning time. Table split is now UNIVERSAL (every project); retention
- * stays a PAID feature, decoupled:
- *   - self-hosted deploy → null ("no TTL"): the deployer owns the infra, so
- *     there is no retention cap. provisioning materializes null as
- *     NO_TTL_START_DAYS (≈10y, never drops) and the group-load retention
- *     filter skips the cutoff entirely.
+ * stays gated to Cloud-paid / self-hosted-EE:
+ *   - Self-hosted → Project.retentionDays when the EE owner set one (only
+ *     self-hosted EE exposes the setting); unset (null/0) → NO_TTL_START_DAYS
+ *     (≈10y, never drops) — the group-load retention filter treats a 3650-day
+ *     horizon as effectively "no cutoff". OSS (no license) never sets it.
  *   - Cloud free org → FREE_RETENTION_DAYS (fixed 30d; Project.retentionDays ignored)
  *   - Cloud paid org → Project.retentionDays (user-set), else PAID_DEFAULT_RETENTION_DAYS
  * Floor-clamped (RETENTION_FLOOR_DAYS). Async (PG read) — call only in async
@@ -37,13 +38,7 @@ export const PAID_DEFAULT_RETENTION_DAYS = 3 * 365;
  */
 export const getSplitRetentionDays = async (
   projectId: string,
-): Promise<number | null> => {
-  // Self-hosted deployments (no NEXT_PUBLIC_LITEFUSE_CLOUD_REGION) keep data
-  // indefinitely — same semantics as the pre-split shared-table model.
-  if (!process.env.NEXT_PUBLIC_LITEFUSE_CLOUD_REGION) {
-    return null;
-  }
-
+): Promise<number> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: {
@@ -51,6 +46,16 @@ export const getSplitRetentionDays = async (
       organization: { select: { cloudConfig: true } },
     },
   });
+
+  // Self-hosted deployments (no NEXT_PUBLIC_LITEFUSE_CLOUD_REGION): honor the
+  // user-set Project.retentionDays (only self-hosted EE can set it); unset →
+  // NO_TTL_START_DAYS (≈never drops). OSS projects can't be set, so 3650 too.
+  if (!process.env.NEXT_PUBLIC_LITEFUSE_CLOUD_REGION) {
+    return project?.retentionDays ?? NO_TTL_START_DAYS;
+  }
+
+  // Cloud: free org keeps the fixed free window (cannot set); paid org uses its
+  // user-set retentionDays, falling back to the paid default.
   if (!project) return FREE_RETENTION_DAYS;
   const raw = isOrgPaid(project.organization.cloudConfig)
     ? (project.retentionDays ?? PAID_DEFAULT_RETENTION_DAYS)

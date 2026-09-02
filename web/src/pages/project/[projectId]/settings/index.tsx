@@ -15,7 +15,7 @@ import { PostHogLogo } from "@/src/components/PosthogLogo";
 import { MixpanelLogo } from "@/src/components/MixpanelLogo";
 import { Card } from "@/src/components/ui/card";
 import { TransferProjectButton } from "@/src/features/projects/components/TransferProjectButton";
-import { useHasEntitlement } from "@/src/features/entitlements/hooks";
+import { useHasEntitlement, usePlan } from "@/src/features/entitlements/hooks";
 import { useHasProjectAccess } from "@/src/features/rbac/utils/checkProjectAccess";
 import { useRouter } from "next/router";
 import { SettingsDangerZone } from "@/src/components/SettingsDangerZone";
@@ -42,7 +42,9 @@ type ProjectSettingsPage = {
 export function useProjectSettingsPages(): ProjectSettingsPage[] {
   const router = useRouter();
   const { project, organization } = useQueryProject();
-  const showRetentionSettings = useHasEntitlement("data-retention");
+  // Data retention is gated to self-hosted enterprise only (license litefuse_ee_).
+  // Cloud org plans (incl. pro) and self-hosted free must not see it.
+  const showRetentionSettings = usePlan() === "self-hosted:enterprise";
   const projectId =
     typeof router.query.projectId === "string"
       ? router.query.projectId

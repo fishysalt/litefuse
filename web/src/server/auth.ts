@@ -727,9 +727,13 @@ export async function getAuthOptions(): Promise<NextAuthOptions> {
             environment: {
               enableExperimentalFeatures:
                 env.LITEFUSE_ENABLE_EXPERIMENTAL_FEATURES === "true",
-              // EE license keys are not supported in the OSS build; there is
-              // no elevated self-hosted instance plan.
-              selfHostedInstancePlan: null,
+              // Self-hosted instance plan: enterprise when a litefuse_ee_
+              // license is configured. Exposed so EE-gated UI (e.g. data
+              // retention) can check precisely for self-hosted:enterprise
+              // without conflating with Cloud org plans.
+              selfHostedInstancePlan: resolveSelfHostedPlan(
+                env.LITEFUSE_EE_LICENSE_KEY,
+              ),
             },
             user:
               dbUser !== null
