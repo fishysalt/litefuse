@@ -1,5 +1,15 @@
 /** @jest-environment node */
 
+/**
+ * Public membership admin API (organization-scoped API key + "admin-api"
+ * entitlement; project memberships additionally need "rbac-project-roles").
+ *
+ * The organization under test carries cloudConfig.plan = "Pro" so it resolves
+ * to cloud:pro when the server runs with NEXT_PUBLIC_LITEFUSE_CLOUD_REGION,
+ * and to self-hosted:enterprise when it runs with LITEFUSE_EE_LICENSE_KEY.
+ * Both plans include the required entitlements.
+ */
+
 import {
   makeZodVerifiedAPICall,
   makeAPICall,
@@ -38,7 +48,7 @@ describe("Memberships APIs", () => {
     // Create a test organization
     const uniqueOrgName = `Test Org ${randomUUID().substring(0, 8)}`;
     const org = await prisma.organization.create({
-      data: { name: uniqueOrgName, cloudConfig: { plan: "Team" } },
+      data: { name: uniqueOrgName, cloudConfig: { plan: "Pro" } },
     });
     testOrgId = org.id;
 
@@ -91,21 +101,42 @@ describe("Memberships APIs", () => {
     });
   });
 
+  /**
+   * Ensure the test user is a MEMBER of the test organization. Upsert keeps
+   * every test self-contained regardless of the state previous tests left.
+   */
+  const ensureOrgMember = async () =>
+    prisma.organizationMembership.upsert({
+      where: {
+        orgId_userId: {
+          userId: testUserId,
+          orgId: testOrgId,
+        },
+      },
+      update: { role: Role.MEMBER },
+      create: {
+        userId: testUserId,
+        orgId: testOrgId,
+        role: Role.MEMBER,
+      },
+    });
+
   describe("Project Memberships", () => {
     describe("GET /api/public/projects/[projectId]/memberships", () => {
       it("should get all project memberships with valid API key", async () => {
         // First create an organization membership for the test user
-        const orgMembership = await prisma.organizationMembership.create({
-          data: {
-            userId: testUserId,
-            orgId: testOrgId,
-            role: Role.MEMBER,
-          },
-        });
+        const orgMembership = await ensureOrgMember();
 
         // Then create a project membership
-        await prisma.projectMembership.create({
-          data: {
+        await prisma.projectMembership.upsert({
+          where: {
+            projectId_userId: {
+              userId: testUserId,
+              projectId: testProjectId,
+            },
+          },
+          update: { role: Role.VIEWER },
+          create: {
             userId: testUserId,
             projectId: testProjectId,
             role: Role.VIEWER,
@@ -131,11 +162,12 @@ describe("Memberships APIs", () => {
           ),
         ).toBe(true);
 
+        // Explicit project role overrides the organization role
         const membership = response.body.memberships.find(
           (m) => m.userId === testUserId,
         );
         expect(membership?.role).toBe(Role.VIEWER);
-      });
+      }, 30000); // first request compiles the route on a cold dev server
 
       it("should return 403 when using a non-organization API key", async () => {
         // Create a project API key
@@ -160,6 +192,9 @@ describe("Memberships APIs", () => {
           ),
         );
         expect(result.status).toBe(403);
+        expect(result.body.error).toContain(
+          "Organization-scoped API key required",
+        );
 
         // Clean up
         await prisma.apiKey.delete({
@@ -168,25 +203,23 @@ describe("Memberships APIs", () => {
           },
         });
       });
+
+      it("should return 404 when project does not belong to the organization", async () => {
+        const result = await makeAPICall(
+          "GET",
+          `/api/public/projects/${randomUUID()}/memberships`,
+          undefined,
+          createBasicAuthHeader(testApiKey, testApiSecretKey),
+        );
+        expect(result.status).toBe(404);
+        expect(result.body.error).toContain("Project not found");
+      });
     });
 
     describe("PUT /api/public/projects/[projectId]/memberships", () => {
       it("should create a new project membership with valid API key", async () => {
         // First ensure the user has an organization membership
-        await prisma.organizationMembership.upsert({
-          where: {
-            orgId_userId: {
-              userId: testUserId,
-              orgId: testOrgId,
-            },
-          },
-          update: {},
-          create: {
-            userId: testUserId,
-            orgId: testOrgId,
-            role: Role.MEMBER,
-          },
-        });
+        await ensureOrgMember();
 
         // Delete any existing project membership
         await prisma.projectMembership.deleteMany({
@@ -225,6 +258,8 @@ describe("Memberships APIs", () => {
       });
 
       it("should update an existing project membership with valid API key", async () => {
+        await ensureOrgMember();
+
         const response = await makeZodVerifiedAPICall(
           MembershipResponseSchema,
           "PUT",
@@ -272,6 +307,9 @@ describe("Memberships APIs", () => {
           createBasicAuthHeader(testApiKey, testApiSecretKey),
         );
         expect(result.status).toBe(404);
+        expect(result.body.error).toContain(
+          "User is not a member of this organization",
+        );
 
         // Clean up
         await prisma.user.delete({
@@ -280,25 +318,28 @@ describe("Memberships APIs", () => {
           },
         });
       });
+
+      it("should return 400 when role is invalid", async () => {
+        await ensureOrgMember();
+
+        const result = await makeAPICall(
+          "PUT",
+          `/api/public/projects/${testProjectId}/memberships`,
+          {
+            userId: testUserId,
+            role: "SUPERUSER",
+          },
+          createBasicAuthHeader(testApiKey, testApiSecretKey),
+        );
+        expect(result.status).toBe(400);
+        expect(result.body.error).toContain("Invalid request body");
+      });
     });
 
     describe("DELETE /api/public/projects/[projectId]/memberships", () => {
       it("should delete an existing project membership with valid API key", async () => {
         // First ensure the user has an organization membership
-        const orgMembership = await prisma.organizationMembership.upsert({
-          where: {
-            orgId_userId: {
-              userId: testUserId,
-              orgId: testOrgId,
-            },
-          },
-          update: {},
-          create: {
-            userId: testUserId,
-            orgId: testOrgId,
-            role: Role.MEMBER,
-          },
-        });
+        const orgMembership = await ensureOrgMember();
 
         // Create a project membership
         await prisma.projectMembership.upsert({
@@ -355,6 +396,27 @@ describe("Memberships APIs", () => {
         });
         expect(membershipAfter).toBeNull();
       });
+
+      it("should return 404 when project membership does not exist", async () => {
+        await ensureOrgMember();
+        await prisma.projectMembership.deleteMany({
+          where: {
+            userId: testUserId,
+            projectId: testProjectId,
+          },
+        });
+
+        const result = await makeAPICall(
+          "DELETE",
+          `/api/public/projects/${testProjectId}/memberships`,
+          {
+            userId: testUserId,
+          },
+          createBasicAuthHeader(testApiKey, testApiSecretKey),
+        );
+        expect(result.status).toBe(404);
+        expect(result.body.error).toContain("Project membership not found");
+      });
     });
   });
 
@@ -362,20 +424,7 @@ describe("Memberships APIs", () => {
     describe("GET /api/public/organizations/memberships", () => {
       it("should get all organization memberships with valid API key", async () => {
         // First ensure the membership exists
-        await prisma.organizationMembership.upsert({
-          where: {
-            orgId_userId: {
-              userId: testUserId,
-              orgId: testOrgId,
-            },
-          },
-          update: {},
-          create: {
-            userId: testUserId,
-            orgId: testOrgId,
-            role: Role.MEMBER,
-          },
-        });
+        await ensureOrgMember();
 
         const response = await makeZodVerifiedAPICall(
           MembershipsListSchema,
@@ -394,6 +443,39 @@ describe("Memberships APIs", () => {
             (membership) => membership.userId === testUserId,
           ),
         ).toBe(true);
+      });
+
+      it("should return 403 when using a project-scoped API key", async () => {
+        const projectApiKey = await createAndAddApiKeysToDb({
+          prisma,
+          entityId: testProjectId,
+          scope: "PROJECT",
+          note: "Test API Key for Memberships API",
+          predefinedKeys: {
+            publicKey: `pk-lf-project-${randomUUID().substring(0, 8)}`,
+            secretKey: `sk-lf-project-${randomUUID().substring(0, 8)}`,
+          },
+        });
+
+        const result = await makeAPICall(
+          "GET",
+          `/api/public/organizations/memberships`,
+          undefined,
+          createBasicAuthHeader(
+            projectApiKey.publicKey,
+            projectApiKey.secretKey,
+          ),
+        );
+        expect(result.status).toBe(403);
+        expect(result.body.error).toContain(
+          "Organization-scoped API key required",
+        );
+
+        await prisma.apiKey.delete({
+          where: {
+            id: projectApiKey.id,
+          },
+        });
       });
     });
 
@@ -436,6 +518,8 @@ describe("Memberships APIs", () => {
       });
 
       it("should update an existing organization membership with valid API key", async () => {
+        await ensureOrgMember();
+
         const response = await makeZodVerifiedAPICall(
           MembershipResponseSchema,
           "PUT",
@@ -477,12 +561,12 @@ describe("Memberships APIs", () => {
           createBasicAuthHeader(testApiKey, testApiSecretKey),
         );
         expect(result.status).toBe(404);
+        expect(result.body.error).toContain("User not found");
       });
-    });
 
-    describe("DELETE /api/public/organizations/memberships", () => {
-      it("should delete an existing organization membership with valid API key", async () => {
-        // First ensure the membership exists
+      it("should return 403 when demoting the last owner of the organization", async () => {
+        // The test user is the only member, so making them OWNER makes them
+        // the last owner.
         await prisma.organizationMembership.upsert({
           where: {
             orgId_userId: {
@@ -490,13 +574,46 @@ describe("Memberships APIs", () => {
               orgId: testOrgId,
             },
           },
-          update: {},
+          update: { role: Role.OWNER },
           create: {
             userId: testUserId,
             orgId: testOrgId,
-            role: Role.MEMBER,
+            role: Role.OWNER,
           },
         });
+
+        const result = await makeAPICall(
+          "PUT",
+          `/api/public/organizations/memberships`,
+          {
+            userId: testUserId,
+            role: Role.MEMBER,
+          },
+          createBasicAuthHeader(testApiKey, testApiSecretKey),
+        );
+        expect(result.status).toBe(403);
+        expect(result.body.error).toContain(
+          "Cannot remove the last owner of an organization",
+        );
+
+        // Verify the role was not changed
+        const membership = await prisma.organizationMembership.findUnique({
+          where: {
+            orgId_userId: {
+              userId: testUserId,
+              orgId: testOrgId,
+            },
+          },
+        });
+        expect(membership?.role).toBe(Role.OWNER);
+      });
+    });
+
+    describe("DELETE /api/public/organizations/memberships", () => {
+      it("should delete an existing organization membership with valid API key", async () => {
+        // First ensure the membership exists (as a non-owner, so that the
+        // last-owner protection does not apply)
+        await ensureOrgMember();
 
         // Verify membership exists before deletion
         const membershipBefore = await prisma.organizationMembership.findUnique(
@@ -535,6 +652,58 @@ describe("Memberships APIs", () => {
           },
         });
         expect(membershipAfter).toBeNull();
+      });
+
+      it("should return 403 when deleting the last owner of the organization", async () => {
+        await prisma.organizationMembership.upsert({
+          where: {
+            orgId_userId: {
+              userId: testUserId,
+              orgId: testOrgId,
+            },
+          },
+          update: { role: Role.OWNER },
+          create: {
+            userId: testUserId,
+            orgId: testOrgId,
+            role: Role.OWNER,
+          },
+        });
+
+        const result = await makeAPICall(
+          "DELETE",
+          `/api/public/organizations/memberships`,
+          {
+            userId: testUserId,
+          },
+          createBasicAuthHeader(testApiKey, testApiSecretKey),
+        );
+        expect(result.status).toBe(403);
+        expect(result.body.error).toContain(
+          "Cannot remove the last owner of an organization",
+        );
+
+        // Verify the membership still exists
+        const membership = await prisma.organizationMembership.findUnique({
+          where: {
+            orgId_userId: {
+              userId: testUserId,
+              orgId: testOrgId,
+            },
+          },
+        });
+        expect(membership).not.toBeNull();
+      });
+
+      it("should return 400 when userId is missing", async () => {
+        const result = await makeAPICall(
+          "DELETE",
+          `/api/public/organizations/memberships`,
+          {},
+          createBasicAuthHeader(testApiKey, testApiSecretKey),
+        );
+        expect(result.status).toBe(400);
+        expect(result.body.error).toContain("Invalid request body");
       });
     });
   });

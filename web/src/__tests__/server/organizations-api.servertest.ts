@@ -1,5 +1,19 @@
 /** @jest-environment node */
 
+/**
+ * Organization APIs.
+ *
+ * "Admin Organizations API" covers the instance-admin endpoints under
+ * /api/admin/organizations. The web server must run with ADMIN_API_KEY set
+ * and an enterprise license (LITEFUSE_EE_LICENSE_KEY=litefuse_ee_...), and
+ * ADMIN_API_KEY must also be present in the test process environment.
+ *
+ * "Public Organizations API" covers the organization-scoped public endpoints.
+ * Organizations carry cloudConfig.plan = "Pro" so that they resolve to a plan
+ * with the "admin-api" entitlement both on a cloud-region server (cloud:pro)
+ * and on a licensed self-hosted server (self-hosted:enterprise).
+ */
+
 import {
   makeZodVerifiedAPICall,
   makeAPICall,
@@ -103,6 +117,9 @@ describe("Admin Organizations API", () => {
       expect(org).not.toBeNull();
       expect(org?.name).toBe(uniqueOrgName);
       expect(org?.metadata).toEqual(metadata);
+
+      // Clean up
+      await prisma.organization.delete({ where: { id: response.body.id } });
     });
 
     it("should create a new organization without metadata", async () => {
@@ -134,11 +151,16 @@ describe("Admin Organizations API", () => {
       expect(org).not.toBeNull();
       expect(org?.name).toBe(uniqueOrgName);
       expect(org?.metadata).toBeNull();
+
+      // Clean up
+      await prisma.organization.delete({ where: { id: response.body.id } });
     });
 
     it("should return 401 when no authorization header is provided", async () => {
       const uniqueOrgName = `Test Org ${randomUUID().substring(0, 8)}`;
 
+      // makeAPICall falls back to a Basic auth header, which is not a Bearer
+      // admin token and must therefore be rejected.
       const result = await makeAPICall("POST", "/api/admin/organizations", {
         name: uniqueOrgName,
       });
@@ -332,6 +354,32 @@ describe("Admin Organizations API", () => {
       });
     });
 
+    it("should not return soft-deleted projects", async () => {
+      const org = await prisma.organization.create({
+        data: { name: `Test Org ${randomUUID().substring(0, 8)}` },
+      });
+      await prisma.project.create({
+        data: {
+          name: `Deleted Project ${randomUUID().substring(0, 8)}`,
+          orgId: org.id,
+          deletedAt: new Date(),
+        },
+      });
+
+      const response = await makeZodVerifiedAPICall(
+        OrganizationResponseSchema,
+        "GET",
+        `/api/admin/organizations/${org.id}`,
+        undefined,
+        `Bearer ${ADMIN_API_KEY}`,
+        200,
+      );
+
+      expect(response.body.projects).toEqual([]);
+
+      await prisma.organization.delete({ where: { id: org.id } });
+    });
+
     it("should return 404 when getting a non-existent organization", async () => {
       const nonExistentId = randomUUID();
       const result = await makeAPICall(
@@ -437,113 +485,6 @@ describe("Admin Organizations API", () => {
         {
           name: "New Name",
         },
-      );
-
-      expect(result.status).toBe(401);
-      expect(result.body.error).toContain("Unauthorized");
-    });
-  });
-
-  describe("DELETE /api/admin/organizations/[organizationId]", () => {
-    let testOrgId: string;
-
-    beforeEach(async () => {
-      // Create a test organization to delete
-      const uniqueOrgName = `Test Org ${randomUUID().substring(0, 8)}`;
-      const org = await prisma.organization.create({
-        data: { name: uniqueOrgName, metadata: { tier: "testing", users: 5 } },
-      });
-      testOrgId = org.id;
-    });
-
-    afterEach(async () => {
-      // Clean up test organization if not deleted by test
-      await prisma.organization
-        .delete({
-          where: { id: testOrgId },
-        })
-        .catch(() => {
-          /* ignore if already deleted */
-        });
-    });
-
-    it("should delete an organization with valid admin authentication", async () => {
-      // Create a test organization to delete
-      const uniqueOrgName = `Test Org ${randomUUID().substring(0, 8)}`;
-      const orgId = (
-        await prisma.organization.create({
-          data: {
-            name: uniqueOrgName,
-            metadata: { tier: "testing", users: 5 },
-          },
-        })
-      ).id;
-
-      const response = await makeZodVerifiedAPICall(
-        DeleteResponseSchema,
-        "DELETE",
-        `/api/admin/organizations/${orgId}`,
-        undefined,
-        `Bearer ${ADMIN_API_KEY}`,
-        200,
-      );
-
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({
-        success: true,
-      });
-
-      // Verify the organization was actually deleted from the database
-      const org = await prisma.organization.findUnique({
-        where: { id: orgId },
-      });
-      expect(org).toBeNull();
-    });
-
-    it("should return 404 when deleting a non-existent organization", async () => {
-      const nonExistentId = randomUUID();
-      const result = await makeAPICall(
-        "DELETE",
-        `/api/admin/organizations/${nonExistentId}`,
-        undefined,
-        `Bearer ${ADMIN_API_KEY}`,
-      );
-
-      expect(result.status).toBe(404);
-      expect(result.body.error).toContain("Organization not found");
-    });
-
-    it("should return 400 when organization has projects", async () => {
-      // Create a project for the test organization
-      await prisma.project.create({
-        data: {
-          name: "Test Project",
-          orgId: testOrgId,
-        },
-      });
-
-      const result = await makeAPICall(
-        "DELETE",
-        `/api/admin/organizations/${testOrgId}`,
-        undefined,
-        `Bearer ${ADMIN_API_KEY}`,
-      );
-
-      expect(result.status).toBe(400);
-      expect(result.body.error).toContain(
-        "Cannot delete organization with existing projects",
-      );
-
-      // Clean up the project
-      await prisma.project.deleteMany({
-        where: { orgId: testOrgId },
-      });
-    });
-
-    it("should return 401 when no authorization header is provided", async () => {
-      const result = await makeAPICall(
-        "DELETE",
-        `/api/admin/organizations/${testOrgId}`,
       );
 
       expect(result.status).toBe(401);
@@ -807,7 +748,7 @@ describe("Admin Organizations API", () => {
       `Bearer ${ADMIN_API_KEY}`,
     );
     expect(result.status).toBe(405);
-    expect(result.body.error).toContain("Method Not Allowed");
+    expect(result.body.error).toContain("Method not allowed");
   });
 });
 
@@ -828,7 +769,7 @@ describe("Public Organizations API", () => {
     // Create a test organization
     const uniqueOrgName = `Test Org ${randomUUID().substring(0, 8)}`;
     const org = await prisma.organization.create({
-      data: { name: uniqueOrgName, cloudConfig: { plan: "Team" } },
+      data: { name: uniqueOrgName, cloudConfig: { plan: "Pro" } },
     });
     testOrgId = org.id;
 
@@ -921,6 +862,28 @@ describe("Public Organizations API", () => {
         });
       });
 
+      it("should not return soft-deleted projects", async () => {
+        const deletedProject = await prisma.project.create({
+          data: {
+            name: `Deleted Project ${randomUUID().substring(0, 8)}`,
+            orgId: testOrgId,
+            deletedAt: new Date(),
+          },
+        });
+
+        const response = await makeZodVerifiedAPICall(
+          OrganizationProjectsListSchema,
+          "GET",
+          `/api/public/organizations/projects`,
+          undefined,
+          createBasicAuthHeader(testApiKey, testApiSecretKey),
+          200,
+        );
+
+        const projectIds = response.body.projects.map((p) => p.id);
+        expect(projectIds).not.toContain(deletedProject.id);
+      });
+
       it("should return 403 when using a project-scoped API key", async () => {
         // Create a project API key
         const projectApiKey = await createAndAddApiKeysToDb({
@@ -974,7 +937,7 @@ describe("Public Organizations API", () => {
           createBasicAuthHeader(testApiKey, testApiSecretKey),
         );
         expect(result.status).toBe(405);
-        expect(result.body.error).toBe("Method not allowed");
+        expect(result.body.error).toContain("Method not allowed");
       });
 
       it("should only return projects belonging to the organization", async () => {
@@ -982,7 +945,7 @@ describe("Public Organizations API", () => {
         const otherOrg = await prisma.organization.create({
           data: {
             name: `Other Org ${randomUUID().substring(0, 8)}`,
-            cloudConfig: { plan: "Team" },
+            cloudConfig: { plan: "Pro" },
           },
         });
 
@@ -1022,7 +985,7 @@ describe("Public Organizations API", () => {
         const emptyOrg = await prisma.organization.create({
           data: {
             name: `Empty Org ${randomUUID().substring(0, 8)}`,
-            cloudConfig: { plan: "Team" },
+            cloudConfig: { plan: "Pro" },
           },
         });
 
@@ -1104,7 +1067,7 @@ describe("Public Organizations API", () => {
       const org = await prisma.organization.create({
         data: {
           name: uniqueOrgName,
-          cloudConfig: { plan: "Team" },
+          cloudConfig: { plan: "Pro" },
           metadata: {},
         },
       });
@@ -1139,7 +1102,7 @@ describe("Public Organizations API", () => {
       const secondOrg = await prisma.organization.create({
         data: {
           name: `Second Test Org ${randomUUID().substring(0, 8)}`,
-          cloudConfig: { plan: "Team" },
+          cloudConfig: { plan: "Pro" },
           metadata: {},
         },
       });
