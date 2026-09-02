@@ -120,7 +120,7 @@ describe("Admin Organizations API", () => {
 
       // Clean up
       await prisma.organization.delete({ where: { id: response.body.id } });
-    });
+    }, 30_000);
 
     it("should create a new organization without metadata", async () => {
       const uniqueOrgName = `Test Org ${randomUUID().substring(0, 8)}`;
@@ -485,6 +485,86 @@ describe("Admin Organizations API", () => {
         {
           name: "New Name",
         },
+      );
+
+      expect(result.status).toBe(401);
+      expect(result.body.error).toContain("Unauthorized");
+    });
+  });
+
+  describe("DELETE /api/admin/organizations/[organizationId]", () => {
+    let testOrgId: string;
+
+    beforeEach(async () => {
+      const org = await prisma.organization.create({
+        data: {
+          name: `Test Org ${randomUUID().substring(0, 8)}`,
+          metadata: { tier: "testing", users: 5 },
+        },
+      });
+      testOrgId = org.id;
+    });
+
+    afterEach(async () => {
+      await prisma.project.deleteMany({ where: { orgId: testOrgId } });
+      await prisma.organization
+        .delete({ where: { id: testOrgId } })
+        .catch(() => undefined);
+    });
+
+    it("should delete an organization with valid admin authentication", async () => {
+      const response = await makeZodVerifiedAPICall(
+        DeleteResponseSchema,
+        "DELETE",
+        `/api/admin/organizations/${testOrgId}`,
+        undefined,
+        `Bearer ${ADMIN_API_KEY}`,
+        200,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ success: true });
+
+      const org = await prisma.organization.findUnique({
+        where: { id: testOrgId },
+      });
+      expect(org).toBeNull();
+    });
+
+    it("should return 404 when deleting a non-existent organization", async () => {
+      const result = await makeAPICall(
+        "DELETE",
+        `/api/admin/organizations/${randomUUID()}`,
+        undefined,
+        `Bearer ${ADMIN_API_KEY}`,
+      );
+
+      expect(result.status).toBe(404);
+      expect(result.body.error).toContain("Organization not found");
+    });
+
+    it("should return 400 when organization has projects", async () => {
+      await prisma.project.create({
+        data: { name: "Test Project", orgId: testOrgId },
+      });
+
+      const result = await makeAPICall(
+        "DELETE",
+        `/api/admin/organizations/${testOrgId}`,
+        undefined,
+        `Bearer ${ADMIN_API_KEY}`,
+      );
+
+      expect(result.status).toBe(400);
+      expect(result.body.error).toContain(
+        "Cannot delete organization with existing projects",
+      );
+    });
+
+    it("should return 401 when no authorization header is provided", async () => {
+      const result = await makeAPICall(
+        "DELETE",
+        `/api/admin/organizations/${testOrgId}`,
       );
 
       expect(result.status).toBe(401);

@@ -4,6 +4,7 @@ import { requireInstanceAdmin } from "@/src/features/enterprise/auth/requireInst
 import { routeByMethod } from "@/src/features/enterprise/http";
 import { getOrganization } from "@/src/features/enterprise/organizations/getOrganization";
 import { updateOrganization } from "@/src/features/enterprise/organizations/updateOrganization";
+import { deleteOrganization } from "@/src/features/enterprise/organizations/deleteOrganization";
 
 export default async function handler(
   req: NextApiRequest,
@@ -23,6 +24,7 @@ export default async function handler(
     return routeByMethod(req, res, {
       GET: () => getOrganization(req, res, organizationId),
       PUT: () => updateOrganization(req, res, organizationId),
+      DELETE: () => deleteOrganization(req, res, organizationId),
     });
   } catch (e) {
     logger.error("Failed to process organization request", e);
