@@ -1,5 +1,4 @@
 import { prisma } from "../../db";
-import { env } from "../../env";
 import { logger } from "../logger";
 import { recordIncrement } from "../instrumentation";
 import { enqueueDorisSplitTableProvisioning } from "../redis/dorisSplitTableProvisioningQueue";
@@ -15,22 +14,21 @@ import { publishSplitCacheInvalidation } from "./tableSplitCache";
  */
 export const RETENTION_FLOOR_DAYS = 7;
 
-/** Cloud free-tier split-table TTL (days), fixed. On Cloud, retention is a PAID
- * feature — a free org's projects keep this fixed short window regardless of
- * Project.retentionDays. Cloud-only; never applied to self-hosted deployments. */
+/** Free-tier split-table TTL (days), fixed. Retention is a PAID feature — a free
+ * org's projects keep this fixed short window regardless of Project.retentionDays. */
 export const FREE_RETENTION_DAYS = 30;
 
-/** Cloud paid default TTL (days) when a paid org has set no explicit Project.retentionDays. */
+/** Paid default TTL (days) when a paid org has set no explicit Project.retentionDays. */
 export const PAID_DEFAULT_RETENTION_DAYS = 3 * 365;
 
 /**
  * The effective split-table TTL (days) for a project, derived from PG at
- * provisioning time. Table split is now UNIVERSAL (every project); retention is
- * decoupled and depends on the deployment:
- *   - self-hosted → Project.retentionDays (set via the data-retention
- *     entitlement, i.e. an EE license), else null = no TTL. The Cloud free /
- *     paid split below is a billing concept with no self-hosted counterpart,
- *     so it must never be applied here.
+ * provisioning time. Table split is now UNIVERSAL (every project); retention
+ * stays a PAID feature, decoupled:
+ *   - self-hosted deploy → null ("no TTL"): the deployer owns the infra, so
+ *     there is no retention cap. provisioning materializes null as
+ *     NO_TTL_START_DAYS (≈10y, never drops) and the group-load retention
+ *     filter skips the cutoff entirely.
  *   - Cloud free org → FREE_RETENTION_DAYS (fixed 30d; Project.retentionDays ignored)
  *   - Cloud paid org → Project.retentionDays (user-set), else PAID_DEFAULT_RETENTION_DAYS
  * Floor-clamped (RETENTION_FLOOR_DAYS). Async (PG read) — call only in async
@@ -40,6 +38,12 @@ export const PAID_DEFAULT_RETENTION_DAYS = 3 * 365;
 export const getSplitRetentionDays = async (
   projectId: string,
 ): Promise<number | null> => {
+  // Self-hosted deployments (no NEXT_PUBLIC_LITEFUSE_CLOUD_REGION) keep data
+  // indefinitely — same semantics as the pre-split shared-table model.
+  if (!process.env.NEXT_PUBLIC_LITEFUSE_CLOUD_REGION) {
+    return null;
+  }
+
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: {
@@ -47,15 +51,6 @@ export const getSplitRetentionDays = async (
       organization: { select: { cloudConfig: true } },
     },
   });
-
-  if (!env.NEXT_PUBLIC_LITEFUSE_CLOUD_REGION) {
-    // Self-hosted: Project.retentionDays is the single source; unset = keep
-    // indefinitely (same semantics as the pre-split shared-table model).
-    const raw = project?.retentionDays;
-    if (!raw) return null;
-    return raw < RETENTION_FLOOR_DAYS ? RETENTION_FLOOR_DAYS : raw;
-  }
-
   if (!project) return FREE_RETENTION_DAYS;
   const raw = isOrgPaid(project.organization.cloudConfig)
     ? (project.retentionDays ?? PAID_DEFAULT_RETENTION_DAYS)
