@@ -25,6 +25,7 @@ import { BatchActionsSettingsPage } from "@/src/features/batch-actions/component
 // AuditLogsSettingsPage was an EE feature; the project-level Audit Logs page
 // is gated off in the OSS build (was already commented out below).
 import { ModelsSettings } from "@/src/features/models/components/ModelSettings";
+import ConfigureRetention from "@/src/features/projects/components/ConfigureRetention";
 import ContainerPage from "@/src/components/layouts/container-page";
 import ProtectedLabelsSettings from "@/src/features/prompts/components/ProtectedLabelsSettings";
 import { Slack } from "lucide-react";
@@ -42,6 +43,7 @@ type ProjectSettingsPage = {
 export function useProjectSettingsPages(): ProjectSettingsPage[] {
   const router = useRouter();
   const { project, organization } = useQueryProject();
+  const showRetentionSettings = useHasEntitlement("data-retention");
   const showProtectedLabelsSettings = useHasEntitlement(
     "prompt-protected-labels",
   );
@@ -53,6 +55,7 @@ export function useProjectSettingsPages(): ProjectSettingsPage[] {
   return getProjectSettingsPages({
     project,
     organization,
+    showRetentionSettings,
     showLLMConnectionsSettings: true,
     showProtectedLabelsSettings,
   });
@@ -61,11 +64,13 @@ export function useProjectSettingsPages(): ProjectSettingsPage[] {
 export const getProjectSettingsPages = ({
   project,
   organization,
+  showRetentionSettings,
   showLLMConnectionsSettings,
   showProtectedLabelsSettings,
 }: {
   project: { id: string; name: string; metadata: Record<string, unknown> };
   organization: { id: string; name: string; metadata: Record<string, unknown> };
+  showRetentionSettings: boolean;
   showLLMConnectionsSettings: boolean;
   showProtectedLabelsSettings: boolean;
 }): ProjectSettingsPage[] => [
@@ -77,6 +82,7 @@ export const getProjectSettingsPages = ({
       <div className="flex flex-col gap-6">
         <HostNameProject />
         <RenameProject />
+        {showRetentionSettings && <ConfigureRetention />}
         <div>
           <Header title="Debug Information" />
           <JSONView

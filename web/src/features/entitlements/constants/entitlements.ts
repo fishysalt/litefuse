@@ -136,13 +136,7 @@ export const entitlementAccess: Record<
     },
   },
   oss: {
-    entitlements: [
-      ...selfHostedAllPlansEntitlements,
-      // The OSS build ships its own data retention cleaner
-      // (worker/src/features/batch-data-retention-cleaner), so retention
-      // configuration must be available on the base self-hosted plan.
-      "data-retention",
-    ],
+    entitlements: selfHostedAllPlansEntitlements,
     entitlementLimits: {
       "annotation-queue-count": false,
       "organization-member-count": false,

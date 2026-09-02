@@ -10,6 +10,7 @@ import { projectNameSchema } from "@/src/features/auth/lib/projectNameSchema";
 import { auditLog } from "@/src/features/audit-logs/auditLog";
 import { throwIfNoOrganizationAccess } from "@/src/features/rbac/utils/checkOrganizationAccess";
 import { throwIfExceedsLimit } from "@/src/features/entitlements/server/hasEntitlementLimit";
+import { throwIfNoEntitlement } from "@/src/features/entitlements/server/hasEntitlement";
 import { ApiAuthService } from "@/src/features/public-api/server/apiAuth";
 import {
   QueueJobs,
@@ -197,6 +198,13 @@ export const projectsRouter = createTRPCRouter({
         projectId: input.projectId,
         scope: "project:update",
       });
+      if (input.retention !== null && input.retention > 0) {
+        throwIfNoEntitlement({
+          entitlement: "data-retention",
+          sessionUser: ctx.session.user,
+          projectId: input.projectId,
+        });
+      }
 
       const project = await ctx.prisma.project.update({
         where: {
