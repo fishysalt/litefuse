@@ -3,11 +3,11 @@ import { Prisma } from "@langfuse/shared";
 import { getUserProjectRoles } from "@langfuse/shared/src/server";
 
 /**
- * 列出项目成员（GET /api/public/projects/{id}/memberships）。
- * 语义与 UI 一致：所有组织成员（含 OWNER）+ 项目角色覆盖。
- * - OWNER 或无项目角色的成员：继承组织角色
- * - 有显式项目角色的成员：用项目角色
- * - NONE 排除
+ * List project memberships (GET /api/public/projects/{id}/memberships).
+ * Same semantics as the UI: all organization members (including OWNERs) with project-role overrides.
+ * - OWNERs and members without a project role: inherit the organization role
+ * - Members with an explicit project role: use the project role
+ * - NONE is excluded
  */
 export async function listProjectMemberships(
   req: NextApiRequest,

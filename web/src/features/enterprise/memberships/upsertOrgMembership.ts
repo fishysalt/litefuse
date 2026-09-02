@@ -9,8 +9,8 @@ const OrgMembershipBody = z.object({
 });
 
 /**
- * 创建或更新组织成员（PUT /api/public/organizations/memberships）。
- * 校验 userId + role，upsert organizationMembership。
+ * Create or update an organization membership (PUT /api/public/organizations/memberships).
+ * Validates userId + role, then upserts organizationMembership.
  */
 export async function upsertOrgMembership(
   req: NextApiRequest,
@@ -32,8 +32,8 @@ export async function upsertOrgMembership(
     return res.status(404).json({ error: "User not found" });
   }
 
-  // 最后 OWNER 保护（与 UI membersRouter.updateOrgMembership 一致）：
-  // 如果把唯一的 OWNER 降为非 OWNER，拒绝，防止组织失去所有者。
+  // Last-OWNER protection (matches the UI's membersRouter.updateOrgMembership):
+  // reject demoting the only OWNER to a non-OWNER role, so the organization never ends up ownerless.
   const existing = await prisma.organizationMembership.findUnique({
     where: { orgId_userId: { orgId, userId: parsed.data.userId } },
   });

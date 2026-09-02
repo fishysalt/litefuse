@@ -12,8 +12,8 @@ const CreateProjectApiKeyBody = z.object({
 });
 
 /**
- * 创建项目级 API key（POST /api/public/projects/{id}/apiKeys）。
- * 支持可选预定义 key（publicKey + secretKey 必须成对，且以 pk-lf-/sk-lf- 开头）。
+ * Create a project-level API key (POST /api/public/projects/{id}/apiKeys).
+ * Supports optional predefined keys (publicKey + secretKey must be provided together and start with pk-lf-/sk-lf-).
  */
 export async function createProjectApiKey(
   req: NextApiRequest,

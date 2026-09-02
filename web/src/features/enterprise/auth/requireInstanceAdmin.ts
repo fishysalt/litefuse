@@ -4,13 +4,13 @@ import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/ha
 import { resolveSelfHostedPlan } from "@/src/features/enterprise/plan/resolvePlan";
 
 /**
- * Instance 管理鉴权中间件（admin 端点，与 public 的 requireAdminApi 不同）。
+ * Instance-admin auth middleware (admin endpoints; distinct from the public requireAdminApi).
  *
- * 两道关卡：
- *   1. Bearer ADMIN_API_KEY 校验（AdminApiAuthService）→ 失败 401/403
- *   2. 实例级 plan 门控（self-hosted license 解析出的 plan 含 admin-api）→ 否则 403
+ * Two checks:
+ *   1. Verify the Bearer ADMIN_API_KEY (AdminApiAuthService) → 401/403 on failure
+ *   2. Instance-level plan gate (the plan resolved from the self-hosted license must include admin-api) → otherwise 403
  *
- * 通过返回 true；失败已写入响应并返回 false。
+ * Returns true on success; on failure the response has already been written and false is returned.
  */
 export function requireInstanceAdmin(
   req: NextApiRequest,

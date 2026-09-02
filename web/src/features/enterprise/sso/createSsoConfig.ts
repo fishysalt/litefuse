@@ -8,8 +8,8 @@ import { isMultiTenantSsoAvailable } from "@/src/features/enterprise/sso/ssoAvai
 import { ssoProviderSchema } from "@/src/features/enterprise/sso/ssoConfigSchema";
 
 /**
- * 创建多租户 SSO 配置（POST /api/auth/add-sso-config）。
- * 仅 Cloud 部署可用；鉴权走 ADMIN_API_KEY，clientSecret 加密后入库。
+ * Create a multi-tenant SSO config (POST /api/auth/add-sso-config).
+ * Cloud deployments only; authenticated via ADMIN_API_KEY, and clientSecret is encrypted before storage.
  */
 export async function createSsoConfig(
   req: NextApiRequest,
@@ -54,7 +54,7 @@ export async function createSsoConfig(
 
     const { domain, authProvider, authConfig } = body.data;
 
-    // 查重：同一域名只允许一份 SSO 配置
+    // Duplicate check: only one SSO config is allowed per domain
     const existingConfig = await prisma.ssoConfig.findUnique({
       where: { domain },
     });

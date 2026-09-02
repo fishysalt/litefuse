@@ -3,7 +3,7 @@ import { prisma } from "@langfuse/shared/src/db";
 import { logger } from "@langfuse/shared/src/server";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { requireAdminApi } from "@/src/features/enterprise/auth/requireAdminApi";
-import { routeByMethod } from "@/src/features/enterprise/http";
+import { allowMethods, routeByMethod } from "@/src/features/enterprise/http";
 import { deleteProjectApiKey } from "@/src/features/enterprise/apiKeys/deleteProjectApiKey";
 
 export default async function handler(
@@ -19,10 +19,12 @@ export default async function handler(
       .json({ message: "Invalid project ID or API key ID" });
   }
 
+  if (!allowMethods(req, res, ["DELETE"])) return;
+
   const scope = await requireAdminApi(req, res);
   if (!scope) return;
 
-  // 验证项目存在且属于当前组织
+  // Verify the project exists and belongs to the current organization
   const project = await prisma.project.findFirst({
     where: { id: projectId, orgId: scope.orgId, deletedAt: null },
   });

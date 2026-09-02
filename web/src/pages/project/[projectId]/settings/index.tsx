@@ -49,7 +49,7 @@ export function useProjectSettingsPages(): ProjectSettingsPage[] {
     typeof router.query.projectId === "string"
       ? router.query.projectId
       : undefined;
-  // 当前版本只保留 admin-api：audit-logs / prompt-protected-labels 功能入口先隐藏
+  // This release only ships admin-api: hide the audit-logs / prompt-protected-labels entry points for now
   const showProtectedLabelsSettings = false;
   const showAuditLogsSettings = false;
   const showExportsSettings = useHasProjectAccess({

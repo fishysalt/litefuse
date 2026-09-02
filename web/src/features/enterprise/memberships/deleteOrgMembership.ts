@@ -8,8 +8,8 @@ const DeleteOrgMembershipBody = z.object({
 });
 
 /**
- * 删除组织成员（DELETE /api/public/organizations/memberships）。
- * 用 deleteMany 避免“成员不存在”时报错。
+ * Delete an organization membership (DELETE /api/public/organizations/memberships).
+ * Uses deleteMany so a missing membership does not throw.
  */
 export async function deleteOrgMembership(
   req: NextApiRequest,
@@ -24,8 +24,8 @@ export async function deleteOrgMembership(
     });
   }
 
-  // 最后 OWNER 保护（与 UI membersRouter.deleteOrgMembership 一致）：
-  // 不允许删除组织中唯一的 OWNER，防止组织失去所有者。
+  // Last-OWNER protection (matches the UI's membersRouter.deleteOrgMembership):
+  // do not allow deleting the only OWNER of the organization, so it never ends up ownerless.
   const existing = await prisma.organizationMembership.findUnique({
     where: { orgId_userId: { orgId, userId: parsed.data.userId } },
   });

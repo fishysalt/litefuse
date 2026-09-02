@@ -2,7 +2,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
 
 /**
- * 查询单个组织（GET /api/admin/organizations/{id}，Instance 管理）。
+ * Get a single organization (GET /api/admin/organizations/{id}, instance admin).
  */
 export async function getOrganization(
   req: NextApiRequest,

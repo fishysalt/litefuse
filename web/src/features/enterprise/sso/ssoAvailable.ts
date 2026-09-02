@@ -1,8 +1,8 @@
 import { env } from "@/src/env.mjs";
 
 /**
- * 多租户 SSO 是否可用：仅在 Cloud 部署（设置了 region）时启用。
- * 自托管部署下为 false，不加载自定义 SSO 配置。
+ * Whether multi-tenant SSO is available: enabled only on Cloud deployments (region is set).
+ * False on self-hosted deployments, where custom SSO configs are not loaded.
  */
 export const isMultiTenantSsoAvailable = Boolean(
   env.NEXT_PUBLIC_LITEFUSE_CLOUD_REGION,

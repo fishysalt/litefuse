@@ -2,8 +2,8 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
 
 /**
- * 列出组织成员（GET /api/public/organizations/memberships）。
- * 调用方已通过鉴权，orgId 来自组织级 key 的 scope。
+ * List organization memberships (GET /api/public/organizations/memberships).
+ * The caller is already authenticated; orgId comes from the organization-level key's scope.
  */
 export async function listOrgMemberships(
   req: NextApiRequest,
@@ -20,7 +20,7 @@ export async function listOrgMemberships(
   });
 
   return res.status(200).json({
-    memberships: memberships.map((m: any) => ({
+    memberships: memberships.map((m) => ({
       userId: m.userId,
       role: m.role,
       email: m.user.email,

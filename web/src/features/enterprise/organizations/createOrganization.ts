@@ -5,7 +5,7 @@ import { auditLog } from "@/src/features/audit-logs/auditLog";
 import { organizationNameSchema } from "@/src/features/organizations/utils/organizationNameSchema";
 
 /**
- * 创建组织（POST /api/admin/organizations，Instance 管理）。
+ * Create an organization (POST /api/admin/organizations, instance admin).
  */
 export async function createOrganization(
   req: NextApiRequest,

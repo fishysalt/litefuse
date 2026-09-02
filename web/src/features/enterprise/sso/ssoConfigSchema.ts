@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
 
-// 各 SSO provider 的 zod 校验 schema。
-// authProvider 与 authConfig 字段名遵循 NextAuth 的标准约定，字段值做校验约束。
+// Zod validation schemas for each SSO provider.
+// authProvider and authConfig field names follow NextAuth's standard conventions; field values are validated.
 
 const baseSsoConfig = z.object({
   domain: z.string().refine((v) => v === v.toLowerCase(), {

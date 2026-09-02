@@ -2,7 +2,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
 
 /**
- * 列出项目级 API key（GET /api/public/projects/{id}/apiKeys）。
+ * List project-level API keys (GET /api/public/projects/{id}/apiKeys).
  */
 export async function listProjectApiKeys(
   req: NextApiRequest,

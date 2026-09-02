@@ -5,9 +5,8 @@ import { auditLog } from "@/src/features/audit-logs/auditLog";
 import { ApiAuthService } from "@/src/features/public-api/server/apiAuth";
 
 /**
- * 删除组织级 API key。
- * - public 入口：DELETE /api/public/organizations/apiKeys/{id}
- * - Instance 入口：DELETE /api/admin/organizations/{id}/apiKeys/{keyId}
+ * Delete an organization-level API key.
+ * Instance-admin entry: DELETE /api/admin/organizations/{id}/apiKeys/{keyId}
  */
 export async function deleteOrgApiKey(
   req: NextApiRequest,

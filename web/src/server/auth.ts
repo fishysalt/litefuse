@@ -114,7 +114,7 @@ const staticProviders: Provider[] = [
         );
       }
 
-      // 域名配置了自定义 SSO 时，强制走 SSO 登录（禁止密码登录）
+      // When the domain has a custom SSO config, force SSO sign-in (password sign-in is disallowed)
       const ssoProviderId = domain
         ? await resolveSsoProviderIdForDomain(domain)
         : null;
@@ -748,7 +748,9 @@ export async function getAuthOptions(): Promise<NextAuthOptions> {
                     image: dbUser.image,
                     admin: dbUser.admin,
                     v4BetaEnabled: dbUser.v4BetaEnabled,
-                    canCreateOrganizations: canCreateOrganizations(dbUser.email),
+                    canCreateOrganizations: canCreateOrganizations(
+                      dbUser.email,
+                    ),
                     organizations: dbUser.organizationMemberships.map(
                       (orgMembership) => {
                         const parsedCloudConfig = CloudConfigSchema.safeParse(
@@ -825,7 +827,7 @@ export async function getAuthOptions(): Promise<NextAuthOptions> {
           span.setAttributes({
             "auth.email": email,
           });
-          // 域名强制 SSO：域名配置了自定义 SSO 时，必须用该 provider 登录
+          // Domain-enforced SSO: when the domain has a custom SSO config, sign-in must use that provider
           const userDomain = email.split("@")[1].toLowerCase();
           const ssoProviderId = await resolveSsoProviderIdForDomain(userDomain);
           if (ssoProviderId && account?.provider !== ssoProviderId) {
@@ -842,7 +844,7 @@ export async function getAuthOptions(): Promise<NextAuthOptions> {
             return `${env.NEXT_PUBLIC_BASE_PATH ?? ""}/auth/enterprise-sso-required?${params.toString()}`;
           }
 
-          // 校验 provider 只用于其关联的域名
+          // Verify the provider is only used for its associated domain
           if (account?.provider) {
             const { isMultiTenantSsoProvider, domain: ssoDomain } =
               await resolveMultiTenantSsoConfig({

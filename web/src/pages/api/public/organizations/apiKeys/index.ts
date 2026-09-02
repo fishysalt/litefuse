@@ -4,7 +4,6 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { requireAdminApi } from "@/src/features/enterprise/auth/requireAdminApi";
 import { routeByMethod } from "@/src/features/enterprise/http";
 import { listOrgApiKeys } from "@/src/features/enterprise/apiKeys/listOrgApiKeys";
-import { createOrgApiKey } from "@/src/features/enterprise/apiKeys/createOrgApiKey";
 
 export default async function handler(
   req: NextApiRequest,
@@ -18,7 +17,6 @@ export default async function handler(
   try {
     return routeByMethod(req, res, {
       GET: () => listOrgApiKeys(req, res, scope.orgId),
-      POST: () => createOrgApiKey(req, res, scope.orgId, scope.apiKeyId),
     });
   } catch (error) {
     logger.error(

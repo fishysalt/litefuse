@@ -1,12 +1,12 @@
 import { type Plan } from "@langfuse/shared";
 
 /**
- * 自托管实例的 plan 判定：根据 EE license key 前缀映射到 plan。
+ * Plan resolution for self-hosted instances: maps the EE license key prefix to a plan.
  * - litefuse_ee_ → self-hosted:enterprise
- * 无 license 或前缀不识别时返回 null（表示回退 oss 基础 plan）。
+ * Returns null when there is no license or the prefix is unrecognized (falls back to the base oss plan).
  *
- * 与 Cloud 分支（读 cloudConfig.plan）共同构成完整的 plan 解析逻辑，
- * 见 @/src/features/entitlements/server/getPlan 的接入点。
+ * Together with the Cloud branch (which reads cloudConfig.plan) this forms the complete plan resolution logic;
+ * see @/src/features/entitlements/server/getPlan for the integration point.
  */
 export function resolveSelfHostedPlan(licenseKey?: string): Plan | null {
   if (!licenseKey) return null;

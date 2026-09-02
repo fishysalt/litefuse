@@ -4,13 +4,13 @@ import { ApiAuthService } from "@/src/features/public-api/server/apiAuth";
 import { type NextApiRequest, type NextApiResponse } from "next";
 
 /**
- * 组织级 key 鉴权中间件（SCIM 类端点，不检查 entitlement）。
+ * Organization-level key auth middleware (SCIM-style endpoints; no entitlement check).
  *
- * 只走两道关卡：
- *   1. Basic Auth 解析并校验 key → 失败 401
- *   2. 必须是组织级 key（accessLevel === "organization"）→ 否则 403
+ * Only two checks:
+ *   1. Parse and verify the key from Basic Auth → 401 on failure
+ *   2. Must be an organization-level key (accessLevel === "organization") → otherwise 403
  *
- * 通过后返回 scope；失败时已写入响应并返回 null。
+ * Returns the scope on success; on failure the response has already been written and null is returned.
  */
 export async function requireOrganizationKey(
   req: NextApiRequest,

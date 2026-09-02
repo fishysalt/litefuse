@@ -15,7 +15,7 @@ export function resolveProjectRole({
   const projectRole = projectMemberships.find(
     (membership) => membership.projectId === projectId,
   )?.role;
-  // NONE 表示"继承组织角色"，回退到组织角色（而非返回 NONE）
+  // NONE means "inherit the organization role": fall back to the org role instead of returning NONE
   return projectRole && projectRole !== Role.NONE
     ? projectRole
     : orgMembershipRole;

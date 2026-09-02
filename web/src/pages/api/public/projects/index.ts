@@ -19,14 +19,14 @@ export default async function handler(
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  // POST：创建项目（组织级 key + admin-api entitlement）
+  // POST: create a project (organization-level key + admin-api entitlement)
   if (req.method === "POST") {
     const scope = await requireAdminApi(req, res);
     if (!scope) return;
     return createProject(req, res, scope);
   }
 
-  // GET：按 project key 查项目（保留原逻辑）
+  // GET: look up the project by project key (original logic preserved)
   const authCheck = await new ApiAuthService(
     prisma,
     redis,

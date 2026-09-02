@@ -33,7 +33,7 @@ type TokenEndpointAuthMethod =
   | "self_signed_tls_client_auth"
   | "none";
 
-// SSO 配置本地缓存
+// Local cache of SSO configs
 let ssoConfigCache: {
   data: SsoProviderConfig[];
   failedToFetch: boolean;
@@ -46,7 +46,7 @@ const DB_MAX_WAIT = 5 * 1000;
 const DB_TIMEOUT = 5 * 1000;
 
 /**
- * 从数据库加载所有 SSO 配置（带本地缓存），并解析为 schema 对象。
+ * Load all SSO configs from the database (with local caching) and parse them into schema objects.
  */
 async function loadSsoConfigs(): Promise<SsoProviderConfig[]> {
   if (!isMultiTenantSsoAvailable) return [];
@@ -95,7 +95,7 @@ async function loadSsoConfigs(): Promise<SsoProviderConfig[]> {
 }
 
 /**
- * 构建 NextAuth providers 列表（供 auth 配置使用）。
+ * Build the NextAuth providers list (used by the auth config).
  */
 export async function buildSsoProviders(): Promise<Provider[]> {
   if (!isMultiTenantSsoAvailable) return [];
@@ -109,7 +109,7 @@ export async function buildSsoProviders(): Promise<Provider[]> {
 }
 
 /**
- * 是否配置了任意自定义 SSO。
+ * Whether any custom SSO is configured.
  */
 export async function hasSsoConfig(): Promise<boolean> {
   if (!isMultiTenantSsoAvailable) return false;
@@ -117,7 +117,7 @@ export async function hasSsoConfig(): Promise<boolean> {
 }
 
 /**
- * 按域名查找对应的 SSO providerId（供 signIn(providerId) 使用）。
+ * Look up the SSO providerId for a domain (used by signIn(providerId)).
  */
 export async function resolveSsoProviderIdForDomain(
   domain: string,
@@ -131,7 +131,7 @@ export async function resolveSsoProviderIdForDomain(
 }
 
 /**
- * 生成自定义 SSO 的 providerId（domain.authProvider）。
+ * Build the providerId for a custom SSO config (domain.authProvider).
  */
 const buildAuthProviderId = (config: SsoProviderConfig): string => {
   if (!config.authConfig) return config.authProvider;
@@ -139,7 +139,7 @@ const buildAuthProviderId = (config: SsoProviderConfig): string => {
 };
 
 /**
- * 按 token endpoint auth method 生成 NextAuth client 配置。
+ * Build the NextAuth client config for the given token endpoint auth method.
  */
 const toClientConfig = (authConfig: {
   tokenEndpointAuthMethod?: TokenEndpointAuthMethod;
@@ -155,12 +155,10 @@ const toClientConfig = (authConfig: {
     : {};
 
 /**
- * 把数据库 SSO 配置转换为 NextAuth Provider 实例。
- * 未使用自定义凭据的配置返回 null（沿用全局社交登录）。
+ * Convert a database SSO config into a NextAuth Provider instance.
+ * Returns null for configs without custom credentials (they fall back to the global social login).
  */
-const toNextAuthProvider = (
-  config: SsoProviderConfig,
-): Provider | null => {
+const toNextAuthProvider = (config: SsoProviderConfig): Provider | null => {
   if (!config.authConfig) return null;
 
   const providerId = buildAuthProviderId(config);
@@ -288,7 +286,7 @@ const toNextAuthProvider = (
 };
 
 /**
- * 按 providerId 查找多租户 SSO 配置（登录流程使用）。
+ * Look up a multi-tenant SSO config by providerId (used by the sign-in flow).
  */
 export const resolveMultiTenantSsoConfig = async ({
   providerId,

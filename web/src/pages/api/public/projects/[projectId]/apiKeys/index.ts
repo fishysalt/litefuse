@@ -3,7 +3,7 @@ import { prisma } from "@langfuse/shared/src/db";
 import { logger } from "@langfuse/shared/src/server";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { requireAdminApi } from "@/src/features/enterprise/auth/requireAdminApi";
-import { routeByMethod } from "@/src/features/enterprise/http";
+import { allowMethods, routeByMethod } from "@/src/features/enterprise/http";
 import { listProjectApiKeys } from "@/src/features/enterprise/apiKeys/listProjectApiKeys";
 import { createProjectApiKey } from "@/src/features/enterprise/apiKeys/createProjectApiKey";
 
@@ -18,10 +18,12 @@ export default async function handler(
     return res.status(400).json({ message: "Invalid project ID" });
   }
 
+  if (!allowMethods(req, res, ["GET", "POST"])) return;
+
   const scope = await requireAdminApi(req, res);
   if (!scope) return;
 
-  // 验证项目存在且属于当前组织
+  // Verify the project exists and belongs to the current organization
   const project = await prisma.project.findFirst({
     where: { id: projectId, orgId: scope.orgId, deletedAt: null },
   });
@@ -37,10 +39,7 @@ export default async function handler(
       POST: () => createProjectApiKey(req, res, projectId, scope),
     });
   } catch (error) {
-    logger.error(
-      `Error handling project API keys for ${req.method}`,
-      error,
-    );
+    logger.error(`Error handling project API keys for ${req.method}`, error);
     return res.status(500).json({ message: "Internal server error" });
   }
 }

@@ -10,9 +10,8 @@ const CreateOrgApiKeyBody = z.object({
 });
 
 /**
- * 创建组织级 API key。
- * - public 入口：POST /api/public/organizations/apiKeys（actorId 传 scope.apiKeyId）
- * - Instance 入口：POST /api/admin/organizations/{id}/apiKeys（actorId 传固定标识）
+ * Create an organization-level API key.
+ * Instance-admin entry: POST /api/admin/organizations/{id}/apiKeys (actorId is a fixed identifier used for the audit log)
  */
 export async function createOrgApiKey(
   req: NextApiRequest,

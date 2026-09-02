@@ -1,13 +1,17 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
-import { logger, enqueueDorisSplitTableProvisioning, type ApiAccessScope } from "@langfuse/shared/src/server";
+import {
+  logger,
+  enqueueDorisSplitTableProvisioning,
+  type ApiAccessScope,
+} from "@langfuse/shared/src/server";
 import { projectNameSchema } from "@/src/features/auth/lib/projectNameSchema";
 import { projectRetentionSchema } from "@/src/features/auth/lib/projectRetentionSchema";
 import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/hasEntitlement";
 
 /**
- * 更新项目（PUT /api/public/projects/{id}）。
- * where 同时约束 id 与 orgId，防止跨组织操作。
+ * Update a project (PUT /api/public/projects/{id}).
+ * The where clause constrains both id and orgId to prevent cross-organization operations.
  */
 export async function updateProject(
   req: NextApiRequest,
@@ -74,9 +78,9 @@ export async function updateProject(
       },
     });
 
-    // Retention 单源于 Project.retentionDays：改了 retention 要让 split 表的
-    // dynamic_partition TTL 跟着变（幂等 ALTER，无控制行时 no-op）。
-    // 与 UI 的 setRetention（projectsRouter）保持一致。
+    // Retention has a single source of truth in Project.retentionDays: changing it must also update
+    // the split tables' dynamic_partition TTL (idempotent ALTER; no-op when there is no control row).
+    // Matches the UI's setRetention (projectsRouter).
     if (retention !== undefined) {
       await enqueueDorisSplitTableProvisioning(projectId).catch((e) =>
         logger.error(

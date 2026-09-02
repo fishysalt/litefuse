@@ -1,11 +1,15 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
-import { logger, redis, type ApiAccessScope } from "@langfuse/shared/src/server";
+import {
+  logger,
+  redis,
+  type ApiAccessScope,
+} from "@langfuse/shared/src/server";
 import { auditLog } from "@/src/features/audit-logs/auditLog";
 import { ApiAuthService } from "@/src/features/public-api/server/apiAuth";
 
 /**
- * 删除项目级 API key（DELETE /api/public/projects/{id}/apiKeys/{keyId}）。
+ * Delete a project-level API key (DELETE /api/public/projects/{id}/apiKeys/{keyId}).
  */
 export async function deleteProjectApiKey(
   req: NextApiRequest,

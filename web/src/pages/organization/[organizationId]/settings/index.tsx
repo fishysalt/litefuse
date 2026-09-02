@@ -36,7 +36,7 @@ export function useOrganizationSettingsPages(): OrganizationSettingsPage[] {
   });
   const showBillingSettings =
     Boolean(env.NEXT_PUBLIC_LITEFUSE_CLOUD_REGION) && hasBillingAccess;
-  // 当前版本只保留 admin-api：audit-logs 功能入口先隐藏
+  // This release only ships admin-api: hide the audit-logs entry point for now
   const showAuditLogsSettings = false;
 
   if (!organization) return [];

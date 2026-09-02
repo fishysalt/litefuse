@@ -4,7 +4,7 @@ import { logger } from "@langfuse/shared/src/server";
 import { organizationNameSchema } from "@/src/features/organizations/utils/organizationNameSchema";
 
 /**
- * 更新组织（PUT /api/admin/organizations/{id}，Instance 管理）。
+ * Update an organization (PUT /api/admin/organizations/{id}, instance admin).
  */
 export async function updateOrganization(
   req: NextApiRequest,

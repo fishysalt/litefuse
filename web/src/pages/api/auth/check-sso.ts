@@ -1,6 +1,6 @@
 /**
- * 检查给定域名是否配置了自定义 SSO provider。
- * 无配置或 SSO 不可用时返回 404。
+ * Check whether a custom SSO provider is configured for the given domain.
+ * Returns 404 when none is configured or SSO is unavailable.
  */
 import { resolveSsoProviderIdForDomain } from "@/src/features/enterprise/sso/ssoProviders";
 import type { NextApiRequest, NextApiResponse } from "next";

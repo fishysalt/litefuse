@@ -5,15 +5,15 @@ import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/ha
 import { type NextApiRequest, type NextApiResponse } from "next";
 
 /**
- * 组织管理 API 鉴权中间件（admin-api 类端点）。
+ * Auth middleware for organization admin API endpoints (admin-api).
  *
- * 依次通过三道关卡：
- *   1. Basic Auth 解析并校验 key → 失败 401
- *   2. 必须是组织级 key（accessLevel === "organization"）→ 否则 403
- *   3. 组织的 plan 必须含 admin-api entitlement → 否则 403
+ * Runs three checks in order:
+ *   1. Parse and verify the key from Basic Auth → 401 on failure
+ *   2. Must be an organization-level key (accessLevel === "organization") → otherwise 403
+ *   3. The organization's plan must include the admin-api entitlement → otherwise 403
  *
- * 全部通过后返回 scope（含 orgId / plan），业务函数用它做资源归属过滤（防跨组织）。
- * 任一关卡失败时，本函数已写入响应并返回 null，调用方直接 return 即可。
+ * On success returns the scope (with orgId / plan), which business functions use to filter resource ownership (prevents cross-organization access).
+ * If any check fails, this function has already written the response and returns null; the caller can simply return.
  */
 export async function requireAdminApi(
   req: NextApiRequest,

@@ -2,7 +2,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
 
 /**
- * 列出所有组织（GET /api/admin/organizations，Instance 管理）。
+ * List all organizations (GET /api/admin/organizations, instance admin).
  */
 export async function listOrganizations(
   req: NextApiRequest,
@@ -28,7 +28,7 @@ export async function listOrganizations(
   });
 
   return res.status(200).json({
-    organizations: organizations.map((org: any) => ({
+    organizations: organizations.map((org) => ({
       ...org,
       metadata: org.metadata ?? {},
       projects: org.projects,

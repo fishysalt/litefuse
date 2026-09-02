@@ -9,8 +9,8 @@ const ProjectMembershipBody = z.object({
 });
 
 /**
- * 创建或更新项目成员（PUT /api/public/projects/{id}/memberships）。
- * 先确认用户已在该组织（organizationMembership），再 upsert projectMembership。
+ * Create or update a project membership (PUT /api/public/projects/{id}/memberships).
+ * Confirms the user is already in the organization (organizationMembership), then upserts projectMembership.
  */
 export async function upsertProjectMembership(
   req: NextApiRequest,

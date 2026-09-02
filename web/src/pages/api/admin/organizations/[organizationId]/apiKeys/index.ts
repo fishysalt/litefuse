@@ -1,3 +1,4 @@
+import { prisma } from "@langfuse/shared/src/db";
 import { logger } from "@langfuse/shared/src/server";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { requireInstanceAdmin } from "@/src/features/enterprise/auth/requireInstanceAdmin";
@@ -6,7 +7,7 @@ import { listOrgApiKeys } from "@/src/features/enterprise/apiKeys/listOrgApiKeys
 import { createOrgApiKey } from "@/src/features/enterprise/apiKeys/createOrgApiKey";
 
 /**
- * Instance 管理：组织级 API key 的列表 / 创建。
+ * Instance admin: list / create organization-level API keys.
  * GET /api/admin/organizations/{id}/apiKeys
  * POST /api/admin/organizations/{id}/apiKeys
  */
@@ -22,6 +23,15 @@ export default async function handler(
     }
 
     if (!requireInstanceAdmin(req, res)) {
+      return;
+    }
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true },
+    });
+    if (!organization) {
+      res.status(404).json({ error: "Organization not found" });
       return;
     }
 

@@ -173,7 +173,7 @@ export const membersRouter = createTRPCRouter({
         role: input.orgRole,
       });
 
-      // 扩展角色（付费专属）校验
+      // Extended-role (paid plans only) entitlement check
       // check for entilement (project role)
       if (input.projectId && input.projectRole) {
         const entitled = hasEntitlement({
@@ -555,7 +555,7 @@ export const membersRouter = createTRPCRouter({
         role: membership.role, // old
       });
 
-      // 扩展角色（付费专属）校验
+      // Last-owner protection
       // check if this is the only remaining owner
       const otherOwners = await ctx.prisma.organizationMembership.count({
         where: {
@@ -644,7 +644,7 @@ export const membersRouter = createTRPCRouter({
         role: orgMembership.role,
       });
 
-      // 扩展角色（付费专属）校验
+      // Load the existing project membership for the role checks below
       const projectMembership = await ctx.prisma.projectMembership.findFirst({
         where: {
           projectId: input.projectId,
@@ -662,8 +662,8 @@ export const membersRouter = createTRPCRouter({
         });
       }
 
-      // NONE/null 表示"继承组织角色"：保留 project_memberships 记录并标记为 NONE，
-      // 查询时回退到组织角色（见 userProjectRoleAuth.ts 的 CASE 逻辑）。
+      // NONE/null means "inherit the organization role": keep the project_memberships row and mark it NONE,
+      // and fall back to the org role when querying (see the CASE logic in userProjectRoleAuth.ts).
       if (input.projectRole === null || input.projectRole === Role.NONE) {
         await ctx.prisma.projectMembership.upsert({
           where: {

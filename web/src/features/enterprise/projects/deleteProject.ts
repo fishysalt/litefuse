@@ -12,8 +12,8 @@ import { auditLog } from "@/src/features/audit-logs/auditLog";
 import { ApiAuthService } from "@/src/features/public-api/server/apiAuth";
 
 /**
- * 删除项目（DELETE /api/public/projects/{id}）。
- * 失效缓存 key → 删项目级 key → 软删项目 → 审计 → 投递异步删除队列。
+ * Delete a project (DELETE /api/public/projects/{id}).
+ * Invalidate cached keys → delete project-level keys → soft-delete the project → audit log → enqueue async deletion.
  */
 export async function deleteProject(
   req: NextApiRequest,
@@ -23,17 +23,16 @@ export async function deleteProject(
 ) {
   try {
     // API keys need to be deleted from cache. Otherwise, they will still be valid.
-    await new ApiAuthService(
-      prisma,
-      redis,
-    ).invalidateCachedProjectApiKeys(projectId);
+    await new ApiAuthService(prisma, redis).invalidateCachedProjectApiKeys(
+      projectId,
+    );
 
     // Delete API keys from DB
     await prisma.apiKey.deleteMany({
       where: { projectId, scope: "PROJECT" },
     });
 
-    // Mark project as deleted (id + orgId 约束，防跨组织)
+    // Mark project as deleted (constrained by id + orgId to prevent cross-organization access)
     const project = await prisma.project.update({
       where: { id: projectId, orgId: scope.orgId },
       data: { deletedAt: new Date() },

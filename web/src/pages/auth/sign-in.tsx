@@ -102,7 +102,7 @@ type CredentialsSubmitAction = "standard" | "demo";
 // Also used in src/pages/auth/sign-up.tsx
 
 export const getServerSideProps: GetServerSideProps<PageProps> = async () => {
-  // 动态检测是否配置了多租户 SSO（Enterprise SSO）
+  // Dynamically detect whether multi-tenant SSO (Enterprise SSO) is configured
   const sso: boolean = await hasSsoConfig();
   return {
     props: {
@@ -256,7 +256,7 @@ export function SSOButtons({
               label="Enterprise SSO"
               onClick={() => {
                 capture("sign_in:button_click", { provider: "sso" });
-                window.location.href = "/auth/enterprise-sso-required";
+                window.location.href = `${env.NEXT_PUBLIC_BASE_PATH ?? ""}/auth/enterprise-sso-required`;
               }}
             />
           )}

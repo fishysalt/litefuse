@@ -1,19 +1,33 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 
-type MethodHandler = (
-  req: NextApiRequest,
-  res: NextApiResponse,
-) => unknown;
+type MethodHandler = (req: NextApiRequest, res: NextApiResponse) => unknown;
 
 /**
- * 方法白名单 + 分发。
+ * Early method allowlist check. Returns true when the request method is one of
+ * `allowed`; otherwise writes a 405 and returns false so the caller can bail out
+ * before doing auth or database work.
+ */
+export function allowMethods(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  allowed: readonly string[],
+): boolean {
+  if (allowed.includes(req.method ?? "")) return true;
+  res.status(405).json({
+    error: `Method not allowed. Allowed methods: ${allowed.join(", ")}`,
+  });
+  return false;
+}
+
+/**
+ * Method allowlist + dispatch.
  *
- * 传入 { method: handler } 映射，自动做两件事：
- *   1. 方法不在映射里 → 405（错误信息自动列出允许的方法）
- *   2. 方法在映射里 → 调用对应 handler
+ * Given a { method: handler } map:
+ *   1. method not in the map → 405 (the error lists the allowed methods)
+ *   2. method in the map → invoke the matching handler
  *
- * 好处：未来新增 HTTP 方法（如 PATCH）只需在映射里加一个 entry，
- * 白名单随之自动扩展，无需同时修改白名单数组和 switch 分支。
+ * Adding a new HTTP method later only needs one new map entry; there is no
+ * separate allowlist array or switch to keep in sync.
  */
 export function routeByMethod(
   req: NextApiRequest,

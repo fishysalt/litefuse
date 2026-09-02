@@ -7,8 +7,8 @@ const DeleteProjectMembershipBody = z.object({
 });
 
 /**
- * 删除项目成员（DELETE /api/public/projects/{id}/memberships）。
- * 先校验成员存在且属于当前组织，再删除。
+ * Delete a project membership (DELETE /api/public/projects/{id}/memberships).
+ * Verifies the membership exists and belongs to the current organization before deleting.
  */
 export async function deleteProjectMembership(
   req: NextApiRequest,

@@ -3,7 +3,7 @@ import { prisma } from "@langfuse/shared/src/db";
 import { logger } from "@langfuse/shared/src/server";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { requireAdminApi } from "@/src/features/enterprise/auth/requireAdminApi";
-import { routeByMethod } from "@/src/features/enterprise/http";
+import { allowMethods, routeByMethod } from "@/src/features/enterprise/http";
 import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/hasEntitlement";
 import { listProjectMemberships } from "@/src/features/enterprise/memberships/listProjectMemberships";
 import { upsertProjectMembership } from "@/src/features/enterprise/memberships/upsertProjectMembership";
@@ -20,10 +20,12 @@ export default async function handler(
     return res.status(400).json({ error: "projectId is required" });
   }
 
+  if (!allowMethods(req, res, ["GET", "PUT", "DELETE"])) return;
+
   const scope = await requireAdminApi(req, res);
   if (!scope) return;
 
-  // 项目成员管理额外要求 rbac-project-roles entitlement
+  // Project membership management additionally requires the rbac-project-roles entitlement
   if (
     !hasEntitlementBasedOnPlan({
       plan: scope.plan,
@@ -35,7 +37,7 @@ export default async function handler(
     });
   }
 
-  // 验证项目属于当前组织
+  // Verify the project belongs to the current organization
   const project = await prisma.project.findFirst({
     where: { id: projectId, orgId: scope.orgId, deletedAt: null },
   });

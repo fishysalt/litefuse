@@ -1,3 +1,4 @@
+import { prisma } from "@langfuse/shared/src/db";
 import { logger } from "@langfuse/shared/src/server";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { requireInstanceAdmin } from "@/src/features/enterprise/auth/requireInstanceAdmin";
@@ -5,7 +6,7 @@ import { routeByMethod } from "@/src/features/enterprise/http";
 import { deleteOrgApiKey } from "@/src/features/enterprise/apiKeys/deleteOrgApiKey";
 
 /**
- * Instance 管理：删除组织级 API key。
+ * Instance admin: delete an organization-level API key.
  * DELETE /api/admin/organizations/{id}/apiKeys/{keyId}
  */
 export default async function handler(
@@ -23,8 +24,18 @@ export default async function handler(
       return;
     }
 
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true },
+    });
+    if (!organization) {
+      res.status(404).json({ error: "Organization not found" });
+      return;
+    }
+
     return routeByMethod(req, res, {
-      DELETE: () => deleteOrgApiKey(req, res, organizationId, apiKeyId, "admin-api"),
+      DELETE: () =>
+        deleteOrgApiKey(req, res, organizationId, apiKeyId, "admin-api"),
     });
   } catch (e) {
     logger.error("Failed to process organization API key request", e);
