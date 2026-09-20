@@ -220,20 +220,45 @@ export default async function handler(
         });
       }
 
-      // An existing account is a *link*, not a conflict: the existing resource is
-      // returned instead of a 409. This is what makes an IdP retry or a
-      // re-assignment after deprovisioning land on the same account.
-      //
       // The user row is global (users.email is unique across the instance), so a
       // userName that already exists in *another* organization is reused as-is:
       // the email, the password and the SSO bindings are never overwritten, the
-      // user is simply added to this organization below.
+      // user is simply added to this organization below. Only a user who is
+      // *already a member of this organization* is a duplicate (checked next).
       //
       // Display name resolution matches PATCH/PUT: `displayName` wins, then
       // `name.formatted`, then given/family joined together. It is only applied
       // to an existing account when the request actually carries a name.
       const requestedName = parseRequestedName({ displayName, name });
       const existingUser = userByExternalId ?? userByUserName;
+
+      // A duplicate is "this account is already a member of this organization",
+      // and it is rejected without executing anything: the check runs before the
+      // first write, so a repeated create cannot touch the account (name, email),
+      // the membership or its role. Role changes belong to PATCH/PUT, which is
+      // where the last-OWNER guard lives - a create must never be able to bypass
+      // it. Matches upstream Langfuse (`User with this userName already exists`).
+      if (existingUser) {
+        const existingMembership =
+          await prisma.organizationMembership.findUnique({
+            where: {
+              orgId_userId: {
+                orgId: authCheck.scope.orgId,
+                userId: existingUser.id,
+              },
+            },
+          });
+        if (existingMembership) {
+          logger.warn(
+            `SCIM create: user ${existingUser.id} (${existingUser.email}) already exists in org ${authCheck.scope.orgId}`,
+          );
+          return res.status(409).json({
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+            detail: "User with this userName already exists",
+            status: 409,
+          });
+        }
+      }
 
       if (existingUser && existingUser.email !== normalizedUserName) {
         logger.warn(
@@ -263,30 +288,9 @@ export default async function handler(
         });
       }
 
-      // The membership is the "active" flag. An existing membership is returned
-      // as-is: role changes arrive through PATCH/PUT, and a create must not be
-      // able to bypass the last-OWNER guard there.
-      const existingMembership = await prisma.organizationMembership.findUnique(
-        {
-          where: {
-            orgId_userId: {
-              orgId: authCheck.scope.orgId,
-              userId: user.id,
-            },
-          },
-        },
-      );
-
-      if (existingMembership) {
-        return res.status(201).json(
-          toScimUser({
-            user,
-            role: existingMembership.role,
-            active: true,
-          }),
-        );
-      }
-
+      // The duplicate check above already guaranteed that this organization does
+      // not have this user yet, so the membership is always created here. The
+      // membership is the "active" flag.
       const orgMembership = await prisma.organizationMembership.create({
         data: {
           userId: user.id,
