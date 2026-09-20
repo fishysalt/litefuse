@@ -85,6 +85,40 @@ export function parseRequestedRole(input: unknown): Role | null {
 }
 
 /**
+ * True when the request carries no usable role at all: absent, `null`, an empty
+ * string, an empty array, or an array whose entries are all empty (`""`, `{}`,
+ * `{"value":null}`, `{"value":""}`).
+ *
+ * Such a value means "leave the role alone" instead of "set it to something
+ * invalid": an IdP that drives `roles` from a group sends an empty list whenever
+ * the user is in no mapped group, and failing that update would be a false alarm.
+ * A *non-empty* value that still cannot be parsed stays an error - which is why
+ * this has to be told apart from `parseRequestedRole` returning `null` (it
+ * returns `null` for both cases).
+ */
+export function isEmptyRoleValue(input: unknown): boolean {
+  const isEmptyEntry = (entry: unknown): boolean => {
+    if (entry === undefined || entry === null) return true;
+    if (typeof entry === "string") return entry.trim().length === 0;
+    if (typeof entry === "object") {
+      const value = (entry as { value?: unknown }).value;
+      return (
+        value === undefined ||
+        value === null ||
+        (typeof value === "string" && value.trim().length === 0)
+      );
+    }
+    // Numbers, booleans, … are not "empty", they are malformed: let the caller
+    // reject them instead of silently ignoring the attribute.
+    return false;
+  };
+
+  if (input === undefined || input === null) return true;
+  const list = Array.isArray(input) ? input : [input];
+  return list.length === 0 || list.every(isEmptyEntry);
+}
+
+/**
  * Resolve the display name from the shapes SCIM clients use:
  *
  *   "displayName": "Alice Riddler"                     // top level, preferred

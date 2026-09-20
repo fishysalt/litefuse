@@ -1,6 +1,7 @@
 import { ApiAuthService } from "@/src/features/public-api/server/apiAuth";
 import { cors, runMiddleware } from "@/src/features/public-api/server/cors";
 import {
+  isEmptyRoleValue,
   parseRequestedName,
   parseRequestedRole,
   toScimUser,
@@ -12,6 +13,48 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 
 const LAST_OWNER_MESSAGE =
   "Cannot remove the last owner of an organization. Assign new owner or delete organization.";
+
+const UNSUPPORTED_OPERATION_MESSAGE =
+  "Unsupported operation or invalid value in request body. Only 'replace' with 'active' / 'roles' / 'emails' / 'name' / 'displayName' fields are supported.";
+
+/** 400 for an operation that carries no attribute we understand. */
+function writeUnsupportedOperation(res: NextApiResponse, op: unknown) {
+  logger.error(UNSUPPORTED_OPERATION_MESSAGE, op);
+  return res.status(400).json({
+    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    detail: UNSUPPORTED_OPERATION_MESSAGE,
+    status: 400,
+  });
+}
+
+/**
+ * 400 for an `active` that is present but not a boolean (`"false"`, `0`, `{}`…).
+ * `null` is treated as "no value" and never reaches this.
+ */
+function writeInvalidActive(res: NextApiResponse, active: unknown) {
+  const detail = `Invalid value for active: ${JSON.stringify(active)}, must be a boolean`;
+  logger.warn(`SCIM patch: ${detail}`);
+  return res.status(400).json({
+    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    detail,
+    status: 400,
+  });
+}
+
+/**
+ * 400 for a `roles` value that is present and non-empty but cannot be resolved to
+ * a role. An empty value is not an error - it means "leave the role alone", see
+ * `isEmptyRoleValue`.
+ */
+function writeInvalidRoles(res: NextApiResponse, roles: unknown) {
+  const detail = `Invalid roles provided: ${JSON.stringify(roles)}, must be one of OWNER, ADMIN, MEMBER, VIEWER, NONE`;
+  logger.warn(`SCIM patch: ${detail}`);
+  return res.status(400).json({
+    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    detail,
+    status: 400,
+  });
+}
 
 /**
  * Last-OWNER protection, mirroring the invariant that the tRPC membersRouter and
@@ -471,62 +514,107 @@ async function handlePatch(
         displayName?: unknown;
       };
 
+      // RFC 7644 lets an operation's `value` be a partial resource, so a single
+      // operation may legitimately carry several attributes at once, e.g.
+      // {"active":true,"roles":["ADMIN"]} or a combined name + role update.
+      // **Every attribute present is applied.** An earlier version used an
+      // ordered if-chain with a `continue` in each branch, which silently dropped
+      // every attribute after the first match.
+      //
+      // The operation is resolved first and applied afterwards, so a request that
+      // ends in 400 never leaves a half-applied change behind.
+      //
+      // Empty values mean "leave this attribute alone" (same rule PUT uses):
+      // `roles: []` / `null` / `""` keeps the current role rather than failing.
+      // A *non-empty* but unknown role name is still rejected.
+      let nameRequested = false;
+      let requestedName: string | null = null;
+      let membershipChange: boolean | undefined; // true = provision, false = deprovision
+      let requestedRole: Role | null = null;
+      const activePresent = value.active !== undefined;
+      const rolesPresent = value.roles !== undefined;
+      const hasRoleValue = rolesPresent && !isEmptyRoleValue(value.roles);
+
       // Display name / name. Unlike the other attributes this never rejects the
-      // request: a name we cannot make sense of is skipped with a warning so a
-      // combined patch (e.g. name + email) cannot fail as a whole.
+      // request: an empty or unparsable name is skipped with a warning, so a
+      // combined patch cannot fail as a whole.
       if (value.displayName !== undefined || value.name !== undefined) {
-        const requestedName = parseRequestedName({
+        nameRequested = true;
+        requestedName = parseRequestedName({
           displayName: value.displayName,
           name: value.name,
           subAttribute,
           currentName: user.name,
         });
+      }
+
+      if (typeof value.active === "boolean") {
+        membershipChange = value.active;
+        // Activating together with a role is applied in one write instead of
+        // creating a NONE membership and updating it right after.
+        if (value.active && hasRoleValue) {
+          requestedRole = parseRequestedRole(value.roles);
+          if (!requestedRole) return writeInvalidRoles(res, value.roles);
+        }
+        // `active:false` deletes the membership, so a role in the same operation
+        // has nothing left to apply to - `active` wins.
+      } else if (activePresent && value.active !== null) {
+        // `null` means "no value", i.e. leave the membership alone; any other
+        // non-boolean is a type error. Ignoring it silently would answer 200 for
+        // a request that meant to deactivate somebody, which is the one failure
+        // mode that must stay visible.
+        return writeInvalidActive(res, value.active);
+      } else if (hasRoleValue) {
+        // Roles without `active`: a role only exists on a membership, so this
+        // provisions the user like `active:true` would.
+        membershipChange = true;
+        requestedRole = parseRequestedRole(value.roles);
+        if (!requestedRole) return writeInvalidRoles(res, value.roles);
+      }
+
+      // An operation is rejected only when it carries no attribute we know at all.
+      // An attribute that is present but empty (`roles: []`, `active: null`) counts
+      // as recognised and simply changes nothing.
+      if (
+        !nameRequested &&
+        !activePresent &&
+        !rolesPresent &&
+        value.emails === undefined
+      ) {
+        return writeUnsupportedOperation(res, op);
+      }
+
+      // ---- apply (membership → name → emails) ----
+      // The membership goes first: it is the only step that can still be rejected
+      // at runtime (last-OWNER protection), and nothing should be written before
+      // that decision is made.
+      if (membershipChange === true) {
+        if (
+          !(await provisionMembership({
+            res,
+            user,
+            orgId,
+            apiKeyId,
+            role: requestedRole ?? undefined,
+          }))
+        )
+          return;
+      } else if (membershipChange === false) {
+        if (!(await deprovisionMembership({ res, user, orgId, apiKeyId })))
+          return;
+      }
+
+      if (nameRequested) {
         if (requestedName) {
           await updateUserName({ user, name: requestedName });
         } else {
           logger.warn(
-            "Ignoring unsupported name value in SCIM patch",
+            "Ignoring empty or unsupported name value in SCIM patch",
             JSON.stringify(op),
           );
         }
-        continue;
       }
 
-      // Provision / deprovision based on the active flag. PATCH PatchOp values
-      // only carry `active` (no roles), so provisioning never changes an
-      // existing member's role: it creates a NONE membership when missing and is
-      // a no-op otherwise.
-      if (typeof value.active === "boolean") {
-        if (value.active) {
-          if (!(await provisionMembership({ res, user, orgId, apiKeyId })))
-            return;
-        } else {
-          if (!(await deprovisionMembership({ res, user, orgId, apiKeyId })))
-            return;
-        }
-        continue;
-      }
-
-      // Update the org role when the patch carries roles. Okta profile/group
-      // updates send {"op":"replace","value":{"roles":[...]}} where roles are
-      // either plain strings or [{"value":"ADMIN",...}]; the path form sends a
-      // single scalar. parseRequestedRole normalizes all of them.
-      if (value.roles !== undefined) {
-        const requestedRole = parseRequestedRole(value.roles);
-        if (requestedRole) {
-          if (
-            !(await provisionMembership({
-              res,
-              user,
-              orgId,
-              apiKeyId,
-              role: requestedRole,
-            }))
-          )
-            return;
-          continue;
-        }
-      }
       // `emails` is **read-only**: the address is the identity key of the account
       // (`userName` == `users.email`), so a request that wants to change it means
       // "this is somebody else" and has to go through create/deprovision instead.
@@ -536,19 +624,10 @@ async function handlePatch(
         logger.info(
           `Ignoring emails update for user ${user.id}: the email address is the account key and is read-only via SCIM`,
         );
-        continue;
       }
+      continue;
     }
-    logger.error(
-      "Unsupported operation or invalid value in request body. Only 'replace' with 'active' / 'roles' / 'emails' / 'name' / 'displayName' fields are supported.",
-      op,
-    );
-    return res.status(400).json({
-      schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-      detail:
-        "Unsupported operation or invalid value in request body. Only 'replace' with 'active' / 'roles' / 'emails' / 'name' / 'displayName' fields are supported.",
-      status: 400,
-    });
+    return writeUnsupportedOperation(res, op);
   }
   // Respond with the state that resulted from the patch.
   return respondWithResultingUser(req, res, user, orgId);
