@@ -7,7 +7,12 @@ import {
   toScimUser,
 } from "@/src/features/public-api/server/scimUser";
 import { auditLog } from "@/src/features/audit-logs/auditLog";
-import { prisma, type Role, type User } from "@langfuse/shared/src/db";
+import {
+  prisma,
+  type Prisma,
+  type Role,
+  type User,
+} from "@langfuse/shared/src/db";
 import { logger, redis } from "@langfuse/shared/src/server";
 import { type NextApiRequest, type NextApiResponse } from "next";
 
@@ -17,14 +22,55 @@ const LAST_OWNER_MESSAGE =
 const UNSUPPORTED_OPERATION_MESSAGE =
   "Unsupported operation or invalid value in request body. Only 'replace' with 'active' / 'roles' / 'emails' / 'name' / 'displayName' fields are supported.";
 
+/** The Prisma client a request's writes run on - a transaction while applying. */
+type Db = Prisma.TransactionClient;
+
+/** RFC 7643 error body. */
+function scimErrorBody(status: number, detail: string) {
+  return {
+    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    detail,
+    status,
+  };
+}
+
+/**
+ * A rejection that has to abort the whole write path.
+ *
+ * It is *thrown* rather than written to the response so it can travel out of the
+ * Prisma transaction that applies a request: the transaction then rolls back
+ * every statement of that request and the caller renders the response. That is
+ * what makes a multi-operation PATCH all-or-nothing - a rejected operation may
+ * not leave the earlier ones applied.
+ */
+class ScimWriteRejected extends Error {
+  constructor(
+    readonly status: number,
+    readonly detail: string,
+  ) {
+    super(detail);
+    this.name = "ScimWriteRejected";
+  }
+}
+
+/**
+ * Map a rejection thrown inside a transaction to its SCIM response, or `null`
+ * when the error is not one of ours (i.e. it should keep propagating).
+ */
+function asScimRejection(
+  error: unknown,
+): { status: number; detail: string } | null {
+  return error instanceof ScimWriteRejected
+    ? { status: error.status, detail: error.detail }
+    : null;
+}
+
 /** 400 for an operation that carries no attribute we understand. */
 function writeUnsupportedOperation(res: NextApiResponse, op: unknown) {
   logger.error(UNSUPPORTED_OPERATION_MESSAGE, op);
-  return res.status(400).json({
-    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-    detail: UNSUPPORTED_OPERATION_MESSAGE,
-    status: 400,
-  });
+  return res
+    .status(400)
+    .json(scimErrorBody(400, UNSUPPORTED_OPERATION_MESSAGE));
 }
 
 /**
@@ -34,11 +80,7 @@ function writeUnsupportedOperation(res: NextApiResponse, op: unknown) {
 function writeInvalidActive(res: NextApiResponse, active: unknown) {
   const detail = `Invalid value for active: ${JSON.stringify(active)}, must be a boolean`;
   logger.warn(`SCIM patch: ${detail}`);
-  return res.status(400).json({
-    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-    detail,
-    status: 400,
-  });
+  return res.status(400).json(scimErrorBody(400, detail));
 }
 
 /**
@@ -49,11 +91,7 @@ function writeInvalidActive(res: NextApiResponse, active: unknown) {
 function writeInvalidRoles(res: NextApiResponse, roles: unknown) {
   const detail = `Invalid roles provided: ${JSON.stringify(roles)}, must be one of OWNER, ADMIN, MEMBER, VIEWER, NONE`;
   logger.warn(`SCIM patch: ${detail}`);
-  return res.status(400).json({
-    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-    detail,
-    status: 400,
-  });
+  return res.status(400).json(scimErrorBody(400, detail));
 }
 
 /**
@@ -68,10 +106,11 @@ function writeInvalidRoles(res: NextApiResponse, roles: unknown) {
  *   - `"OWNER"`   → the user keeps/gets the OWNER role
  *   - any other role, or `null` for deprovisioning → the OWNER role is dropped
  *
- * Returns true when the request was rejected and the 403 response is written.
+ * Throws `ScimWriteRejected` (403) instead of writing the response, so the
+ * enclosing transaction rolls back before the caller answers.
  */
 async function rejectIfLastOwner(
-  res: NextApiResponse,
+  tx: Db,
   {
     orgId,
     userId,
@@ -81,28 +120,23 @@ async function rejectIfLastOwner(
     userId: string;
     nextRole: Role | null | undefined;
   },
-): Promise<boolean> {
-  if (nextRole === undefined || nextRole === "OWNER") return false;
+): Promise<void> {
+  if (nextRole === undefined || nextRole === "OWNER") return;
 
-  const membership = await prisma.organizationMembership.findUnique({
+  const membership = await tx.organizationMembership.findUnique({
     where: { orgId_userId: { orgId, userId } },
   });
-  if (membership?.role !== "OWNER") return false;
+  if (membership?.role !== "OWNER") return;
 
-  const owners = await prisma.organizationMembership.count({
+  const owners = await tx.organizationMembership.count({
     where: { orgId, role: "OWNER" },
   });
-  if (owners > 1) return false;
+  if (owners > 1) return;
 
   logger.warn(
     `Refused to remove last OWNER ${userId} from org ${orgId} via SCIM`,
   );
-  res.status(403).json({
-    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-    detail: LAST_OWNER_MESSAGE,
-    status: 403,
-  });
-  return true;
+  throw new ScimWriteRejected(403, LAST_OWNER_MESSAGE);
 }
 
 /**
@@ -115,69 +149,71 @@ async function rejectIfLastOwner(
  *   reset a member back to NONE.
  *
  * An audit-log entry is written only when the state actually changes, so a sync
- * that re-sends the same payload does not flood the audit log.
- *
- * Returns false when the request was rejected and the response is written.
+ * that re-sends the same payload does not flood the audit log. It is written on
+ * the same client as the membership, so it commits or rolls back with it.
  */
-async function provisionMembership({
-  res,
-  user,
-  orgId,
-  apiKeyId,
-  role,
-}: {
-  res: NextApiResponse;
-  user: User;
-  orgId: string;
-  apiKeyId: string;
-  role?: Role;
-}): Promise<boolean> {
-  const existing = await prisma.organizationMembership.findUnique({
+async function provisionMembership(
+  tx: Db,
+  {
+    user,
+    orgId,
+    apiKeyId,
+    role,
+  }: {
+    user: User;
+    orgId: string;
+    apiKeyId: string;
+    role?: Role;
+  },
+): Promise<void> {
+  const existing = await tx.organizationMembership.findUnique({
     where: { orgId_userId: { orgId, userId: user.id } },
   });
 
   if (existing) {
-    if (role === undefined || existing.role === role) return true;
+    if (role === undefined || existing.role === role) return;
 
-    if (
-      await rejectIfLastOwner(res, { orgId, userId: user.id, nextRole: role })
-    )
-      return false;
+    await rejectIfLastOwner(tx, { orgId, userId: user.id, nextRole: role });
 
-    const updated = await prisma.organizationMembership.update({
+    const updated = await tx.organizationMembership.update({
       where: { orgId_userId: { orgId, userId: user.id } },
       data: { role },
     });
-    await auditLog({
-      apiKeyId,
-      orgId,
-      resourceType: "orgMembership",
-      resourceId: updated.id,
-      action: "update",
-      before: existing,
-      after: updated,
-    });
+    await auditLog(
+      {
+        apiKeyId,
+        orgId,
+        resourceType: "orgMembership",
+        resourceId: updated.id,
+        action: "update",
+        before: existing,
+        after: updated,
+      },
+      tx,
+    );
     logger.info(
       `Updated role for user ${user.id} in org ${orgId} to ${role} via SCIM`,
     );
-    return true;
+    return;
   }
 
-  const created = await prisma.organizationMembership.create({
+  const created = await tx.organizationMembership.create({
     data: { userId: user.id, orgId, role: role ?? "NONE" },
   });
-  await auditLog({
-    apiKeyId,
-    orgId,
-    resourceType: "orgMembership",
-    resourceId: created.id,
-    action: "create",
-    after: created,
-  });
+  await auditLog(
+    {
+      apiKeyId,
+      orgId,
+      resourceType: "orgMembership",
+      resourceId: created.id,
+      action: "create",
+      after: created,
+    },
+    tx,
+  );
   logger.info(
     `Provisioned user ${user.id} in org ${orgId} with role ${created.role} via SCIM`,
   );
-  return true;
 }
 
 /**
@@ -187,45 +223,45 @@ async function provisionMembership({
  * The audit entry captures the project memberships Postgres cascade-deletes with
  * this row, so the log preserves which projects the user could access. Nothing is
  * audited for a no-op (already absent), keeping IdP re-syncs quiet.
- *
- * Returns false when the request was rejected and the response is written.
  */
-async function deprovisionMembership({
-  res,
-  user,
-  orgId,
-  apiKeyId,
-}: {
-  res: NextApiResponse;
-  user: User;
-  orgId: string;
-  apiKeyId: string;
-}): Promise<boolean> {
-  const membership = await prisma.organizationMembership.findUnique({
+async function deprovisionMembership(
+  tx: Db,
+  {
+    user,
+    orgId,
+    apiKeyId,
+  }: {
+    user: User;
+    orgId: string;
+    apiKeyId: string;
+  },
+): Promise<void> {
+  const membership = await tx.organizationMembership.findUnique({
     where: { orgId_userId: { orgId, userId: user.id } },
     include: { ProjectMemberships: true },
   });
   // Already absent: idempotent success, nothing to audit.
-  if (!membership) return true;
+  if (!membership) return;
 
-  if (await rejectIfLastOwner(res, { orgId, userId: user.id, nextRole: null }))
-    return false;
+  await rejectIfLastOwner(tx, { orgId, userId: user.id, nextRole: null });
 
-  const removed = await prisma.organizationMembership.deleteMany({
+  const removed = await tx.organizationMembership.deleteMany({
     where: { id: membership.id },
   });
-  if (removed.count === 0) return true;
+  if (removed.count === 0) return;
 
-  await auditLog({
-    apiKeyId,
-    orgId,
-    resourceType: "orgMembership",
-    resourceId: membership.id,
-    action: "delete",
-    before: membership,
-  });
+  await auditLog(
+    {
+      apiKeyId,
+      orgId,
+      resourceType: "orgMembership",
+      resourceId: membership.id,
+      action: "delete",
+      before: membership,
+    },
+    tx,
+  );
   logger.info(`Deprovisioned user ${user.id} from org ${orgId} via SCIM`);
-  return true;
 }
 
 /**
@@ -235,16 +271,19 @@ async function deprovisionMembership({
  * There is no uniqueness constraint on names, so this cannot fail - it just
  * skips the write when the value is unchanged.
  */
-async function updateUserName({
-  user,
-  name,
-}: {
-  user: User;
-  name: string;
-}): Promise<void> {
+async function updateUserName(
+  tx: Db,
+  {
+    user,
+    name,
+  }: {
+    user: User;
+    name: string;
+  },
+): Promise<void> {
   if (name === user.name) return;
 
-  const updated = await prisma.user.update({
+  const updated = await tx.user.update({
     where: { id: user.id },
     data: { name },
   });
@@ -487,7 +526,29 @@ async function handlePatch(
     });
   }
 
-  // Process each operation
+  // ---- phase 1: resolve and validate every operation, without writing ----
+  //
+  // A PATCH is applied atomically: all operations are validated first and only
+  // then applied inside a single transaction. So an invalid operation aborts the
+  // whole request and writes nothing at all - a rejected operation must not leave
+  // the earlier ones applied.
+  //
+  // Empty values are *not* invalid: `roles: []` / `null` / `""` and `active: null`
+  // mean "leave this attribute alone" and simply change nothing.
+  type ResolvedOperation = {
+    op: unknown;
+    nameRequested: boolean;
+    requestedName: string | null;
+    membershipChange: boolean | undefined; // true = provision, false = deprovision
+    requestedRole: Role | null;
+    emailsPresent: boolean;
+  };
+  const resolved: ResolvedOperation[] = [];
+  // A name sub-path (`name.givenName`) merges with the name that is in effect when
+  // that operation is applied, so the projection has to follow the operations in
+  // order instead of always reading the stored name.
+  let projectedName = user.name;
+
   for (const op of body.Operations) {
     // RFC 7644 allows two equivalent shapes for a replace operation:
     //   {"op":"replace","path":"active","value":false}   (path form)
@@ -505,130 +566,145 @@ async function handlePatch(
       if (attribute) opValue = { [attribute]: op.value };
     }
 
-    if (op.op === "replace" && opValue && typeof opValue === "object") {
-      const value = opValue as {
-        active?: unknown;
-        roles?: unknown;
-        emails?: unknown;
-        name?: unknown;
-        displayName?: unknown;
-      };
+    if (!(op.op === "replace" && opValue && typeof opValue === "object")) {
+      return writeUnsupportedOperation(res, op);
+    }
 
-      // RFC 7644 lets an operation's `value` be a partial resource, so a single
-      // operation may legitimately carry several attributes at once, e.g.
-      // {"active":true,"roles":["ADMIN"]} or a combined name + role update.
-      // **Every attribute present is applied.** An earlier version used an
-      // ordered if-chain with a `continue` in each branch, which silently dropped
-      // every attribute after the first match.
-      //
-      // The operation is resolved first and applied afterwards, so a request that
-      // ends in 400 never leaves a half-applied change behind.
-      //
-      // Empty values mean "leave this attribute alone" (same rule PUT uses):
-      // `roles: []` / `null` / `""` keeps the current role rather than failing.
-      // A *non-empty* but unknown role name is still rejected.
-      let nameRequested = false;
-      let requestedName: string | null = null;
-      let membershipChange: boolean | undefined; // true = provision, false = deprovision
-      let requestedRole: Role | null = null;
-      const activePresent = value.active !== undefined;
-      const rolesPresent = value.roles !== undefined;
-      const hasRoleValue = rolesPresent && !isEmptyRoleValue(value.roles);
+    const value = opValue as {
+      active?: unknown;
+      roles?: unknown;
+      emails?: unknown;
+      name?: unknown;
+      displayName?: unknown;
+    };
 
-      // Display name / name. Unlike the other attributes this never rejects the
-      // request: an empty or unparsable name is skipped with a warning, so a
-      // combined patch cannot fail as a whole.
-      if (value.displayName !== undefined || value.name !== undefined) {
-        nameRequested = true;
-        requestedName = parseRequestedName({
-          displayName: value.displayName,
-          name: value.name,
-          subAttribute,
-          currentName: user.name,
-        });
-      }
+    // RFC 7644 lets an operation's `value` be a partial resource, so a single
+    // operation may legitimately carry several attributes at once, e.g.
+    // {"active":true,"roles":["ADMIN"]} or a combined name + role update.
+    // **Every attribute present is applied.** An earlier version used an ordered
+    // if-chain with a `continue` in each branch, which silently dropped every
+    // attribute after the first match.
+    let nameRequested = false;
+    let requestedName: string | null = null;
+    let membershipChange: boolean | undefined; // true = provision, false = deprovision
+    let requestedRole: Role | null = null;
+    const activePresent = value.active !== undefined;
+    const rolesPresent = value.roles !== undefined;
+    const hasRoleValue = rolesPresent && !isEmptyRoleValue(value.roles);
 
-      if (typeof value.active === "boolean") {
-        membershipChange = value.active;
-        // Activating together with a role is applied in one write instead of
-        // creating a NONE membership and updating it right after.
-        if (value.active && hasRoleValue) {
-          requestedRole = parseRequestedRole(value.roles);
-          if (!requestedRole) return writeInvalidRoles(res, value.roles);
-        }
-        // `active:false` deletes the membership, so a role in the same operation
-        // has nothing left to apply to - `active` wins.
-      } else if (activePresent && value.active !== null) {
-        // `null` means "no value", i.e. leave the membership alone; any other
-        // non-boolean is a type error. Ignoring it silently would answer 200 for
-        // a request that meant to deactivate somebody, which is the one failure
-        // mode that must stay visible.
-        return writeInvalidActive(res, value.active);
-      } else if (hasRoleValue) {
-        // Roles without `active`: a role only exists on a membership, so this
-        // provisions the user like `active:true` would.
-        membershipChange = true;
+    // Display name / name. Unlike the other attributes this never rejects the
+    // request: an empty or unparsable name is skipped with a warning, so a
+    // combined patch cannot fail as a whole.
+    if (value.displayName !== undefined || value.name !== undefined) {
+      nameRequested = true;
+      requestedName = parseRequestedName({
+        displayName: value.displayName,
+        name: value.name,
+        subAttribute,
+        currentName: projectedName,
+      });
+      if (requestedName) projectedName = requestedName;
+    }
+
+    if (typeof value.active === "boolean") {
+      membershipChange = value.active;
+      // Activating together with a role is applied in one write instead of
+      // creating a NONE membership and updating it right after.
+      if (value.active && hasRoleValue) {
         requestedRole = parseRequestedRole(value.roles);
         if (!requestedRole) return writeInvalidRoles(res, value.roles);
       }
+      // `active:false` deletes the membership, so a role in the same operation
+      // has nothing left to apply to - `active` wins.
+    } else if (activePresent && value.active !== null) {
+      // `null` means "no value", i.e. leave the membership alone; any other
+      // non-boolean is a type error. Ignoring it silently would answer 200 for a
+      // request that meant to deactivate somebody, which is the one failure mode
+      // that must stay visible.
+      return writeInvalidActive(res, value.active);
+    } else if (hasRoleValue) {
+      // Roles without `active`: a role only exists on a membership, so this
+      // provisions the user like `active:true` would.
+      membershipChange = true;
+      requestedRole = parseRequestedRole(value.roles);
+      if (!requestedRole) return writeInvalidRoles(res, value.roles);
+    }
 
-      // An operation is rejected only when it carries no attribute we know at all.
-      // An attribute that is present but empty (`roles: []`, `active: null`) counts
-      // as recognised and simply changes nothing.
-      if (
-        !nameRequested &&
-        !activePresent &&
-        !rolesPresent &&
-        value.emails === undefined
-      ) {
-        return writeUnsupportedOperation(res, op);
-      }
+    // An operation is rejected only when it carries no attribute we know at all.
+    // An attribute that is present but empty (`roles: []`, `active: null`) counts
+    // as recognised and simply changes nothing.
+    if (
+      !nameRequested &&
+      !activePresent &&
+      !rolesPresent &&
+      value.emails === undefined
+    ) {
+      return writeUnsupportedOperation(res, op);
+    }
 
-      // ---- apply (membership → name → emails) ----
-      // The membership goes first: it is the only step that can still be rejected
-      // at runtime (last-OWNER protection), and nothing should be written before
-      // that decision is made.
-      if (membershipChange === true) {
-        if (
-          !(await provisionMembership({
-            res,
+    resolved.push({
+      op,
+      nameRequested,
+      requestedName,
+      membershipChange,
+      requestedRole,
+      emailsPresent: value.emails !== undefined,
+    });
+  }
+
+  // ---- phase 2: apply every operation in one transaction ----
+  //
+  // Order within an operation is membership → name → emails: the membership is the
+  // only step that can still be rejected while applying (last-OWNER protection),
+  // and that rejection must not leave a name update behind. Everything the request
+  // writes - memberships, the name and the audit entries - commits or rolls back
+  // as one.
+  try {
+    await prisma.$transaction(async (tx) => {
+      for (const step of resolved) {
+        if (step.membershipChange === true) {
+          await provisionMembership(tx, {
             user,
             orgId,
             apiKeyId,
-            role: requestedRole ?? undefined,
-          }))
-        )
-          return;
-      } else if (membershipChange === false) {
-        if (!(await deprovisionMembership({ res, user, orgId, apiKeyId })))
-          return;
-      }
+            role: step.requestedRole ?? undefined,
+          });
+        } else if (step.membershipChange === false) {
+          await deprovisionMembership(tx, { user, orgId, apiKeyId });
+        }
 
-      if (nameRequested) {
-        if (requestedName) {
-          await updateUserName({ user, name: requestedName });
-        } else {
-          logger.warn(
-            "Ignoring empty or unsupported name value in SCIM patch",
-            JSON.stringify(op),
+        if (step.nameRequested) {
+          if (step.requestedName) {
+            await updateUserName(tx, { user, name: step.requestedName });
+          } else {
+            logger.warn(
+              "Ignoring empty or unsupported name value in SCIM patch",
+              JSON.stringify(step.op),
+            );
+          }
+        }
+
+        // `emails` is **read-only**: the address is the identity key of the account
+        // (`userName` == `users.email`), so a request that wants to change it means
+        // "this is somebody else" and has to go through create/deprovision instead.
+        // Accepted as a no-op (200) rather than rejected, so a combined IdP update
+        // cannot fail as a whole; the same is true for PUT below.
+        if (step.emailsPresent) {
+          logger.info(
+            `Ignoring emails update for user ${user.id}: the email address is the account key and is read-only via SCIM`,
           );
         }
       }
-
-      // `emails` is **read-only**: the address is the identity key of the account
-      // (`userName` == `users.email`), so a request that wants to change it means
-      // "this is somebody else" and has to go through create/deprovision instead.
-      // Accepted as a no-op (200) rather than rejected, so a combined IdP update
-      // cannot fail as a whole; the same is true for PUT below.
-      if (value.emails !== undefined) {
-        logger.info(
-          `Ignoring emails update for user ${user.id}: the email address is the account key and is read-only via SCIM`,
-        );
-      }
-      continue;
-    }
-    return writeUnsupportedOperation(res, op);
+    });
+  } catch (error) {
+    // The transaction has rolled back; render the rejection it aborted with.
+    const rejection = asScimRejection(error);
+    if (!rejection) throw error;
+    return res
+      .status(rejection.status)
+      .json(scimErrorBody(rejection.status, rejection.detail));
   }
+
   // Respond with the state that resulted from the patch.
   return respondWithResultingUser(req, res, user, orgId);
 }
@@ -684,56 +760,65 @@ async function handlePut(
     );
   }
 
-  // Display name / name, same rules as PATCH: `displayName` wins, `name.formatted`
-  // is next, given/family are joined as a fallback.
-  if (body.displayName !== undefined || body.name !== undefined) {
-    const requestedName = parseRequestedName({
-      displayName: body.displayName,
-      name: body.name,
-      currentName: user.name,
-    });
-    if (requestedName) await updateUserName({ user, name: requestedName });
-  }
-
-  // Handle active status for provisioning/deprovisioning
-  if (typeof body.active === "boolean") {
-    if (body.active) {
-      // Determine role from roles if provided; when absent do NOT touch the
-      // existing role (a full-resource update must not downgrade an existing
-      // member to NONE just because the payload carried no roles).
-      // parseRequestedRole accepts the string-array AND the complex
-      // [{"value":"ADMIN"}] form that Okta sends.
-      const roleWasSupplied =
-        body.roles !== undefined &&
-        body.roles !== null &&
-        (!Array.isArray(body.roles) || body.roles.length > 0);
-      const requestedRole = parseRequestedRole(body.roles);
-      if (roleWasSupplied && !requestedRole) {
-        // Unknown role name: keep the current role rather than failing the whole
-        // update, but log it so the misconfigured mapping is visible.
-        logger.warn(
-          `SCIM PUT for user ${user.id} carried unsupported roles ${JSON.stringify(
-            body.roles,
-          )}, keeping the current role`,
-        );
+  // Everything this request writes goes into one transaction, so a rejected
+  // membership change (last-OWNER protection) cannot leave a name update behind.
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Display name / name, same rules as PATCH: `displayName` wins,
+      // `name.formatted` is next, given/family are joined as a fallback.
+      if (body.displayName !== undefined || body.name !== undefined) {
+        const requestedName = parseRequestedName({
+          displayName: body.displayName,
+          name: body.name,
+          currentName: user.name,
+        });
+        if (requestedName)
+          await updateUserName(tx, { user, name: requestedName });
       }
 
-      // Provision the user, applying the requested role when one was supplied.
-      if (
-        !(await provisionMembership({
-          res,
-          user,
-          orgId,
-          apiKeyId,
-          role: requestedRole ?? undefined,
-        }))
-      )
-        return;
-    } else {
-      // Deprovision the user by removing them from the organization.
-      if (!(await deprovisionMembership({ res, user, orgId, apiKeyId })))
-        return;
-    }
+      // Handle active status for provisioning/deprovisioning
+      if (typeof body.active === "boolean") {
+        if (body.active) {
+          // Determine role from roles if provided; when absent do NOT touch the
+          // existing role (a full-resource update must not downgrade an existing
+          // member to NONE just because the payload carried no roles).
+          // parseRequestedRole accepts the string-array AND the complex
+          // [{"value":"ADMIN"}] form that Okta sends.
+          const roleWasSupplied =
+            body.roles !== undefined &&
+            body.roles !== null &&
+            (!Array.isArray(body.roles) || body.roles.length > 0);
+          const requestedRole = parseRequestedRole(body.roles);
+          if (roleWasSupplied && !requestedRole) {
+            // Unknown role name: keep the current role rather than failing the
+            // whole update, but log it so the misconfigured mapping is visible.
+            logger.warn(
+              `SCIM PUT for user ${user.id} carried unsupported roles ${JSON.stringify(
+                body.roles,
+              )}, keeping the current role`,
+            );
+          }
+
+          // Provision the user, applying the requested role when one was supplied.
+          await provisionMembership(tx, {
+            user,
+            orgId,
+            apiKeyId,
+            role: requestedRole ?? undefined,
+          });
+        } else {
+          // Deprovision the user by removing them from the organization.
+          await deprovisionMembership(tx, { user, orgId, apiKeyId });
+        }
+      }
+    });
+  } catch (error) {
+    // The transaction has rolled back; render the rejection it aborted with.
+    const rejection = asScimRejection(error);
+    if (!rejection) throw error;
+    return res
+      .status(rejection.status)
+      .json(scimErrorBody(rejection.status, rejection.detail));
   }
 
   // PUT applies `displayName` / `name` (in place), `active` and `roles`.
@@ -757,7 +842,19 @@ async function handleDelete(
 ) {
   // Removes the organization membership only; the user row (and therefore their
   // SSO bindings) survives. Refuses to remove the last OWNER.
-  if (!(await deprovisionMembership({ res, user, orgId, apiKeyId }))) return;
+  //
+  // A delete carries a single piece of information rather than a set of
+  // attributes, so there is nothing to roll back and it stays outside a
+  // transaction: the membership and its audit entry are written as before.
+  try {
+    await deprovisionMembership(prisma, { user, orgId, apiKeyId });
+  } catch (error) {
+    const rejection = asScimRejection(error);
+    if (!rejection) throw error;
+    return res
+      .status(rejection.status)
+      .json(scimErrorBody(rejection.status, rejection.detail));
+  }
 
   // Return empty response with 204 No Content.
   // With NextJS 15, we can't return NextApiResponse objects anymore
