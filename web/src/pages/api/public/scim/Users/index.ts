@@ -4,7 +4,10 @@ import { prisma } from "@langfuse/shared/src/db";
 import { logger, redis } from "@langfuse/shared/src/server";
 
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { hashPassword } from "@/src/features/auth-credentials/lib/credentialsServerUtils";
+import {
+  hashPassword,
+  isValidPassword,
+} from "@/src/features/auth-credentials/lib/credentialsServerUtils";
 import {
   parseRequestedName,
   parseRequestedRole,
@@ -205,6 +208,26 @@ export default async function handler(
         role = requestedRole;
       }
 
+      // `password` is optional and only ever written for a newly created account.
+      // It is the only credential SCIM can set, so it has to satisfy the platform
+      // minimum - the same `isValidPassword` the sign-up and password-reset paths
+      // enforce through `createUserEmailPassword` / `updateUserPassword`. A value
+      // that fails it rejects the whole create before anything is written, so a
+      // rejected request never leaves a half-created account behind.
+      let passwordToStore: string | null = null;
+      if (password !== undefined && password !== null && password !== "") {
+        if (typeof password !== "string" || !isValidPassword(password)) {
+          logger.warn("Invalid password provided for SCIM user creation");
+          return res.status(400).json({
+            schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+            detail:
+              "Invalid password: must be a string of at least 8 characters",
+            status: 400,
+          });
+        }
+        passwordToStore = password;
+      }
+
       // Resolve the target account. `externalId` comes first - it is the id we
       // handed out in an earlier response, so a client that keeps its own link
       // identifies the account directly instead of by `userName`. `userName`
@@ -299,7 +322,9 @@ export default async function handler(
           data: {
             email: normalizedUserName,
             name: requestedName ?? undefined,
-            password: password ? await hashPassword(password) : undefined,
+            password: passwordToStore
+              ? await hashPassword(passwordToStore)
+              : undefined,
           },
         });
       }
