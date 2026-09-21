@@ -65,9 +65,25 @@ export default async function handler(
     try {
       const { filter, startIndex = 1, count = 100 } = req.query;
 
-      // Parse startIndex and count to integers
-      const parsedStartIndex = parseInt(startIndex as string, 10) || 1;
-      const parsedCount = parseInt(count as string, 10) || 100;
+      // RFC 7644 3.4.2.4 defines the boundaries of both parameters, and they have
+      // to be clamped here instead of being handed to the database:
+      // - `startIndex` is 1-based and a value below 1 is interpreted as 1. The
+      //   previous `parseInt(...) || 1` could not do that - `-1` is truthy, so it
+      //   survived and produced `skip: -2`, which made Prisma throw and turned a
+      //   paginated request into a 500.
+      // - `count` is non-negative and a negative value is interpreted as 0. A
+      //   negative `take` additionally means "take from the end" in Prisma, so it
+      //   silently returned the last page instead of an empty one.
+      // - `count: 0` returns no resources while still reporting `totalResults`.
+      // A value that is not a number at all falls back to the defaults.
+      const requestedStartIndex = parseInt(startIndex as string, 10);
+      const parsedStartIndex = Number.isNaN(requestedStartIndex)
+        ? 1
+        : Math.max(1, requestedStartIndex);
+      const requestedCount = parseInt(count as string, 10);
+      const parsedCount = Number.isNaN(requestedCount)
+        ? 100
+        : Math.max(0, requestedCount);
 
       let whereClause = {};
       if (filter && typeof filter === "string") {
