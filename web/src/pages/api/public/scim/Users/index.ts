@@ -11,6 +11,7 @@ import {
 import {
   parseRequestedName,
   parseRequestedRole,
+  scimErrorBody,
   toScimUser,
 } from "@/src/features/public-api/server/scimUser";
 import { auditLog } from "@/src/features/audit-logs/auditLog";
@@ -222,12 +223,14 @@ export default async function handler(
       if (password !== undefined && password !== null && password !== "") {
         if (typeof password !== "string" || !isValidPassword(password)) {
           logger.warn("Invalid password provided for SCIM user creation");
-          return res.status(400).json({
-            schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-            detail:
-              "Invalid password: must be a string of at least 8 characters",
-            status: 400,
-          });
+          return res
+            .status(400)
+            .json(
+              scimErrorBody(
+                400,
+                "Invalid password: must be a string of at least 8 characters",
+              ),
+            );
         }
         passwordToStore = password;
       }
