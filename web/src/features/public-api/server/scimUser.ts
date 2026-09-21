@@ -200,14 +200,30 @@ export function parseRequestedName({
  * organization role. `emails` is emitted for completeness but never written
  * (see the SCIM docs, 3.3).
  */
+/**
+ * The later of two timestamps. The SCIM User resource is the account *plus* its
+ * organization membership (`active` and `roles` are derived from the latter), so
+ * the resource was last modified whenever either of them changed.
+ */
+function laterOf(a: Date, b?: Date | null): Date {
+  return b && b > a ? b : a;
+}
+
 export function toScimUser({
   user,
   role,
   active,
+  membershipUpdatedAt,
 }: {
   user: User;
   role: Role | null;
   active: boolean;
+  /**
+   * `updatedAt` of the organization membership this representation is scoped to.
+   * Needed for `meta.lastModified`: a role change only touches that row, so
+   * reporting the account timestamp alone would claim the resource never changed.
+   */
+  membershipUpdatedAt?: Date | null;
 }) {
   const trimmedName = user.name?.trim();
   return {
@@ -239,7 +255,10 @@ export function toScimUser({
     meta: {
       resourceType: "User",
       created: user.createdAt?.toISOString(),
-      lastModified: user.updatedAt?.toISOString(),
+      lastModified: laterOf(
+        user.updatedAt,
+        membershipUpdatedAt,
+      ).toISOString(),
     },
   };
 }

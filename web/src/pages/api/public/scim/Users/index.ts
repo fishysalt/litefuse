@@ -128,6 +128,9 @@ export default async function handler(
         select: {
           id: true,
           role: true,
+          // `updatedAt` feeds `meta.lastModified`: a role change only touches this
+          // row, so the account timestamp alone would look unmodified.
+          updatedAt: true,
           user: true,
         },
       });
@@ -139,6 +142,7 @@ export default async function handler(
           user: userMap.user,
           role: userMap.role,
           active: true,
+          membershipUpdatedAt: userMap.updatedAt,
         }),
       );
 
@@ -352,7 +356,14 @@ export default async function handler(
       );
 
       // Return the created resource in the same representation as GET/PATCH/PUT.
-      return res.status(201).json(toScimUser({ user, role, active: true }));
+      return res.status(201).json(
+        toScimUser({
+          user,
+          role,
+          active: true,
+          membershipUpdatedAt: orgMembership.updatedAt,
+        }),
+      );
     } catch (error) {
       logger.error("Failed to create SCIM user", error);
       return res.status(500).json({
