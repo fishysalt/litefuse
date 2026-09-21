@@ -7,6 +7,7 @@ import {
   scimErrorBody,
   toScimUser,
 } from "@/src/features/public-api/server/scimUser";
+import { rejectUnlessScimIsEntitled } from "@/src/features/public-api/server/scimAccess";
 import { auditLog } from "@/src/features/audit-logs/auditLog";
 import {
   prisma,
@@ -327,6 +328,18 @@ export default async function handler(
         "Invalid API key. Organization-scoped API key required for this operation.",
       status: 403,
     });
+  }
+
+  // SCIM provisioning is an organization administration capability, so it needs
+  // the same `admin-api` entitlement as the other org admin endpoints.
+  if (
+    rejectUnlessScimIsEntitled({
+      res,
+      plan: authCheck.scope.plan,
+      route: "/api/public/scim/Users/[id]",
+    })
+  ) {
+    return;
   }
 
   logger.info(
