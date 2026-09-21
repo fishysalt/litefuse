@@ -429,11 +429,26 @@ async function handleGet(
     });
   }
 
+  // Re-read the account before rendering it: PATCH and PUT answer through this
+  // handler, and by then the row they loaded at request start is stale - the
+  // name write (and with it `updatedAt`, which drives `meta.lastModified`) has
+  // already happened. Reporting the pre-write copy would tell a syncing client
+  // that nothing changed.
+  const current =
+    (await prisma.user.findUnique({ where: { id: user.id } })) ?? user;
+
   // Transform to SCIM format
   // With NextJS 15, we can't return NextApiResponse objects anymore
-  res
-    .status(200)
-    .json(toScimUser({ user, role: orgMembership.role, active: true }));
+  res.status(200).json(
+    toScimUser({
+      user: current,
+      role: orgMembership.role,
+      active: true,
+      // `roles`/`active` live on the membership, whose `updatedAt` moves on every
+      // role change even though the account row is not touched.
+      membershipUpdatedAt: orgMembership.updatedAt,
+    }),
+  );
 }
 
 /**
@@ -452,15 +467,28 @@ async function respondWithResultingUser(
   res: NextApiResponse,
   user: User,
   orgId: string,
+  /**
+   * Set when this request removed the membership (`active: false`). The row is
+   * gone by now, so its `updatedAt` cannot be read back - the removal itself is
+   * the last modification of the resource.
+   */
+  membershipRemovedAt?: Date,
 ) {
   const membership = await prisma.organizationMembership.findFirst({
     where: { orgId: orgId, userId: user.id },
   });
 
   if (!membership) {
-    return res
-      .status(200)
-      .json(toScimUser({ user, role: null, active: false }));
+    const current =
+      (await prisma.user.findUnique({ where: { id: user.id } })) ?? user;
+    return res.status(200).json(
+      toScimUser({
+        user: current,
+        role: null,
+        active: false,
+        membershipUpdatedAt: membershipRemovedAt,
+      }),
+    );
   }
 
   // With NextJS 15, we can't return NextApiResponse objects anymore
@@ -659,6 +687,9 @@ async function handlePatch(
   // and that rejection must not leave a name update behind. Everything the request
   // writes - memberships, the name and the audit entries - commits or rolls back
   // as one.
+  // Deprovisioning deletes the membership row, so the moment it happened is only
+  // known here - the response reports it as `meta.lastModified`.
+  let membershipRemovedAt: Date | undefined;
   try {
     await prisma.$transaction(async (tx) => {
       for (const step of resolved) {
@@ -671,6 +702,7 @@ async function handlePatch(
           });
         } else if (step.membershipChange === false) {
           await deprovisionMembership(tx, { user, orgId, apiKeyId });
+          membershipRemovedAt = new Date();
         }
 
         if (step.nameRequested) {
@@ -706,7 +738,7 @@ async function handlePatch(
   }
 
   // Respond with the state that resulted from the patch.
-  return respondWithResultingUser(req, res, user, orgId);
+  return respondWithResultingUser(req, res, user, orgId, membershipRemovedAt);
 }
 
 // PUT - Update user details
@@ -762,43 +794,49 @@ async function handlePut(
 
   // Everything this request writes goes into one transaction, so a rejected
   // membership change (last-OWNER protection) cannot leave a name update behind.
-  try {
-    await prisma.$transaction(async (tx) => {
-      // Display name / name, same rules as PATCH: `displayName` wins,
-      // `name.formatted` is next, given/family are joined as a fallback.
-      if (body.displayName !== undefined || body.name !== undefined) {
-        const requestedName = parseRequestedName({
+  //
+  // The request is resolved before anything is written: an `active` that is not a
+  // boolean leaves the membership alone, and a `roles` value that is present but
+  // cannot be resolved to a role rejects the whole update instead of being logged
+  // and ignored. POST and PATCH already answer 400 for an unknown role name; PUT
+  // now does too.
+  const requestedName =
+    body.displayName !== undefined || body.name !== undefined
+      ? parseRequestedName({
           displayName: body.displayName,
           name: body.name,
           currentName: user.name,
-        });
-        if (requestedName)
-          await updateUserName(tx, { user, name: requestedName });
+        })
+      : null;
+
+  const activeSupplied = typeof body.active === "boolean";
+  let requestedRole: Role | null = null;
+  if (activeSupplied && body.active) {
+    // When `roles` is omitted the existing role is left untouched: a
+    // full-resource update must not downgrade a member to NONE just because the
+    // payload carried no roles. `parseRequestedRole` accepts the string-array AND
+    // the complex [{"value":"ADMIN"}] form that Okta sends.
+    const roleWasSupplied =
+      body.roles !== undefined &&
+      body.roles !== null &&
+      (!Array.isArray(body.roles) || body.roles.length > 0);
+    if (roleWasSupplied) {
+      requestedRole = parseRequestedRole(body.roles);
+      if (!requestedRole) return writeInvalidRoles(res, body.roles);
+    }
+  }
+
+  // Deprovisioning deletes the membership row, so the moment it happened is only
+  // known here - the response reports it as `meta.lastModified`.
+  let membershipRemovedAt: Date | undefined;
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (requestedName) {
+        await updateUserName(tx, { user, name: requestedName });
       }
 
-      // Handle active status for provisioning/deprovisioning
-      if (typeof body.active === "boolean") {
+      if (activeSupplied) {
         if (body.active) {
-          // Determine role from roles if provided; when absent do NOT touch the
-          // existing role (a full-resource update must not downgrade an existing
-          // member to NONE just because the payload carried no roles).
-          // parseRequestedRole accepts the string-array AND the complex
-          // [{"value":"ADMIN"}] form that Okta sends.
-          const roleWasSupplied =
-            body.roles !== undefined &&
-            body.roles !== null &&
-            (!Array.isArray(body.roles) || body.roles.length > 0);
-          const requestedRole = parseRequestedRole(body.roles);
-          if (roleWasSupplied && !requestedRole) {
-            // Unknown role name: keep the current role rather than failing the
-            // whole update, but log it so the misconfigured mapping is visible.
-            logger.warn(
-              `SCIM PUT for user ${user.id} carried unsupported roles ${JSON.stringify(
-                body.roles,
-              )}, keeping the current role`,
-            );
-          }
-
           // Provision the user, applying the requested role when one was supplied.
           await provisionMembership(tx, {
             user,
@@ -809,6 +847,7 @@ async function handlePut(
         } else {
           // Deprovision the user by removing them from the organization.
           await deprovisionMembership(tx, { user, orgId, apiKeyId });
+          membershipRemovedAt = new Date();
         }
       }
     });
@@ -829,7 +868,7 @@ async function handlePut(
   // Return the resulting state, identical to GET/PATCH. PUT with active=false
   // deprovisions the user; the shared helper then answers 200 with active:false
   // instead of a misleading 404.
-  return respondWithResultingUser(req, res, user, orgId);
+  return respondWithResultingUser(req, res, user, orgId, membershipRemovedAt);
 }
 
 // DELETE - Remove user from organization
