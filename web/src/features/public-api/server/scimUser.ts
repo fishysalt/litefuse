@@ -20,6 +20,22 @@ export const SCIM_LIST_SCHEMA =
 export const SCIM_PATCH_SCHEMA =
   "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 
+/**
+ * RFC 7644 section 3.12 error message. The three members are the ones the
+ * specification defines for a SCIM error (`schemas` carrying the error URN,
+ * a human-readable `detail` and the numeric `status`), so the shape is fixed by
+ * the protocol - only the wording of `detail` is ours.
+ *
+ * Kept in one place so every SCIM endpoint answers with the same body.
+ */
+export function scimErrorBody(status: number, detail: string) {
+  return {
+    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    detail,
+    status,
+  };
+}
+
 /** Roles Litefuse accepts, i.e. the `Role` enum of the organization membership. */
 export const SCIM_ROLE_VALUES = [
   "OWNER",

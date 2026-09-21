@@ -4,6 +4,7 @@ import {
   isEmptyRoleValue,
   parseRequestedName,
   parseRequestedRole,
+  scimErrorBody,
   toScimUser,
 } from "@/src/features/public-api/server/scimUser";
 import { auditLog } from "@/src/features/audit-logs/auditLog";
@@ -24,15 +25,6 @@ const UNSUPPORTED_OPERATION_MESSAGE =
 
 /** The Prisma client a request's writes run on - a transaction while applying. */
 type Db = Prisma.TransactionClient;
-
-/** RFC 7643 error body. */
-function scimErrorBody(status: number, detail: string) {
-  return {
-    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-    detail,
-    status,
-  };
-}
 
 /**
  * A rejection that has to abort the whole write path.
