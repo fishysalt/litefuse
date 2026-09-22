@@ -3382,7 +3382,7 @@
     "modelName": "kimi-k3",
     "matchPattern": "(?i)^(kimi-k3)$",
     "createdAt": "2026-08-31T00:00:00.000Z",
-    "updatedAt": "2026-09-21T00:00:00.000Z",
+    "updatedAt": "2026-09-22T00:00:00.000Z",
     "pricingTiers": [
       {
         "id": "87964e8e-3c75-41b8-9ff7-683dbfb6e23c_tier_default",
@@ -3391,8 +3391,10 @@
         "priority": 0,
         "conditions": [],
         "prices": {
-          "input": 0.000002983,
-          "output": 0.0000149149
+          "input": 0.000003,
+          "output": 0.000015,
+          "input_cached_tokens": 0.0000003,
+          "input_cache_read": 0.0000003
         }
       }
     ]
@@ -3792,7 +3794,7 @@
     "modelName": "ernie-5.1",
     "matchPattern": "(?i)^(ernie-5.1)$",
     "createdAt": "2026-08-31T00:00:00.000Z",
-    "updatedAt": "2026-09-21T00:00:00.000Z",
+    "updatedAt": "2026-09-22T00:00:00.000Z",
     "pricingTiers": [
       {
         "id": "f93ca2ae-2d96-4325-8a3f-f5be2a8eaace_tier_default",
@@ -3801,8 +3803,8 @@
         "priority": 0,
         "conditions": [],
         "prices": {
-          "input": 5.966e-7,
-          "output": 0.0000026847
+          "input": 5.556e-7,
+          "output": 0.0000025
         }
       }
     ]
