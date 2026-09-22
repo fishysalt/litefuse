@@ -1,6 +1,7 @@
 import { ApiAuthService } from "@/src/features/public-api/server/apiAuth";
 import { cors, runMiddleware } from "@/src/features/public-api/server/cors";
 import {
+  EMPTY_ROLES_DETAIL,
   isEmptyRoleValue,
   parseRequestedName,
   parseRequestedRole,
@@ -78,13 +79,27 @@ function writeInvalidActive(res: NextApiResponse, active: unknown) {
 
 /**
  * 400 for a `roles` value that is present and non-empty but cannot be resolved to
- * a role. An empty value is not an error - it means "leave the role alone", see
- * `isEmptyRoleValue`.
+ * a role.
  */
 function writeInvalidRoles(res: NextApiResponse, roles: unknown) {
   const detail = `Invalid roles provided: ${JSON.stringify(roles)}, must be one of OWNER, ADMIN, MEMBER, VIEWER, NONE`;
   logger.warn(`SCIM patch: ${detail}`);
   return res.status(400).json(scimErrorBody(400, detail));
+}
+
+/**
+ * 400 for a `roles` value that is present but carries nothing (`[]`, `null`,
+ * `""`, `[{"value":""}]`, `[null]`). Rejecting it rather than ignoring it is
+ * deliberate: the request said something about the role and we cannot tell what
+ * it meant, so guessing would either hide a misconfigured mapping (ignore) or
+ * silently drop a member's permissions (`NONE`). `NONE` itself stays a valid,
+ * explicit value.
+ */
+function writeEmptyRoles(res: NextApiResponse, roles: unknown) {
+  logger.warn(
+    `SCIM write refused: empty roles value ${JSON.stringify(roles)} on /api/public/scim/Users/[id]`,
+  );
+  return res.status(400).json(scimErrorBody(400, EMPTY_ROLES_DETAIL));
 }
 
 /**
@@ -500,10 +515,14 @@ async function respondWithResultingUser(
   return handleGet(req, res, user, orgId);
 }
 
-// PATCH - Partial update. Supports replacing `active` (provision/deprovision)
-// and `roles` (organization role). Payload example (path-less form, as sent by
-// Okta): "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],
+// PATCH - Partial update. Supports replacing `active` (provision/deprovision),
+// `roles` (organization role) and the name. Payload example (path-less form, as
+// sent by Okta): "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],
 // \"Operations\":[{\"op\":\"replace\",\"value\":{\"active\":false}}]}"
+//
+// A `roles` value that is present but empty (`[]`, `null`, `""`, `[null]`) is
+// refused (400) and rolls the whole request back. `NONE` is a valid role, so
+// "remove all permissions but stay a member" is `roles: ["NONE"]`.
 async function handlePatch(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -623,7 +642,15 @@ async function handlePatch(
     let requestedRole: Role | null = null;
     const activePresent = value.active !== undefined;
     const rolesPresent = value.roles !== undefined;
-    const hasRoleValue = rolesPresent && !isEmptyRoleValue(value.roles);
+
+    // A `roles` value that is present but carries nothing is refused, and because
+    // this runs in the validation phase nothing is written: the whole PATCH is
+    // rejected. `NONE` is a real role, so "no permission" has to be asked for
+    // explicitly with `["NONE"]` - an empty value is a request we cannot act on.
+    if (rolesPresent && isEmptyRoleValue(value.roles)) {
+      return writeEmptyRoles(res, value.roles);
+    }
+    const hasRoleValue = rolesPresent;
 
     // Display name / name. Unlike the other attributes this never rejects the
     // request: an empty or unparsable name is skipped with a warning, so a
@@ -801,10 +828,18 @@ async function handlePut(
   // membership change (last-OWNER protection) cannot leave a name update behind.
   //
   // The request is resolved before anything is written: an `active` that is not a
-  // boolean leaves the membership alone, and a `roles` value that is present but
-  // cannot be resolved to a role rejects the whole update instead of being logged
-  // and ignored. POST and PATCH already answer 400 for an unknown role name; PUT
-  // now does too.
+  // boolean leaves the membership alone, a `roles` value that is present but empty
+  // rejects the whole update, and one that is present but cannot be resolved to a
+  // role rejects it as well - neither is logged and ignored any more. POST and
+  // PATCH answer 400 for both cases; PUT does too.
+  //
+  // `roles` being *absent* still means "leave the role alone": a full-resource
+  // update must not downgrade a member to NONE just because the IdP payload
+  // carries no roles.
+  if (body.roles !== undefined && isEmptyRoleValue(body.roles)) {
+    return writeEmptyRoles(res, body.roles);
+  }
+
   const requestedName =
     body.displayName !== undefined || body.name !== undefined
       ? parseRequestedName({
@@ -816,19 +851,11 @@ async function handlePut(
 
   const activeSupplied = typeof body.active === "boolean";
   let requestedRole: Role | null = null;
-  if (activeSupplied && body.active) {
-    // When `roles` is omitted the existing role is left untouched: a
-    // full-resource update must not downgrade a member to NONE just because the
-    // payload carried no roles. `parseRequestedRole` accepts the string-array AND
-    // the complex [{"value":"ADMIN"}] form that Okta sends.
-    const roleWasSupplied =
-      body.roles !== undefined &&
-      body.roles !== null &&
-      (!Array.isArray(body.roles) || body.roles.length > 0);
-    if (roleWasSupplied) {
-      requestedRole = parseRequestedRole(body.roles);
-      if (!requestedRole) return writeInvalidRoles(res, body.roles);
-    }
+  if (activeSupplied && body.active && body.roles !== undefined) {
+    // `parseRequestedRole` accepts the string-array AND the complex
+    // [{"value":"ADMIN"}] form that Okta sends.
+    requestedRole = parseRequestedRole(body.roles);
+    if (!requestedRole) return writeInvalidRoles(res, body.roles);
   }
 
   // Deprovisioning deletes the membership row, so the moment it happened is only

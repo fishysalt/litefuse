@@ -9,6 +9,8 @@ import {
   isValidPassword,
 } from "@/src/features/auth-credentials/lib/credentialsServerUtils";
 import {
+  EMPTY_ROLES_DETAIL,
+  isEmptyRoleValue,
   parseRequestedName,
   parseRequestedRole,
   scimErrorBody,
@@ -210,18 +212,29 @@ export default async function handler(
       const normalizedUserName = userName.toLowerCase();
 
       // Okta sends roles as [{"value":"ADMIN"}], other clients as ["ADMIN"].
-      // An absent or empty list keeps the NONE default, an unknown role name is
-      // rejected so a misconfigured mapping does not silently become NONE.
+      // Omitting `roles` keeps the NONE default (a create that maps no role must
+      // still succeed), an unknown role name is rejected so a misconfigured
+      // mapping does not silently become NONE, and a value that is present but
+      // empty is rejected too - see EMPTY_ROLES_DETAIL.
       let role: Role = "NONE";
+      if (roles !== undefined && isEmptyRoleValue(roles)) {
+        logger.warn("Empty roles provided for SCIM user creation", roles);
+        return res
+          .status(400)
+          .json(scimErrorBody(400, EMPTY_ROLES_DETAIL));
+      }
       if (roles && Array.isArray(roles) && roles.length > 0) {
         const requestedRole = parseRequestedRole(roles);
         if (!requestedRole) {
           logger.warn("Invalid roles provided for SCIM user creation", roles);
-          return res.status(400).json({
-            schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-            detail: `Invalid roles provided: ${JSON.stringify(roles)}, must be one of OWNER, ADMIN, MEMBER, VIEWER, NONE`,
-            status: 400,
-          });
+          return res
+            .status(400)
+            .json(
+              scimErrorBody(
+                400,
+                `Invalid roles provided: ${JSON.stringify(roles)}, must be one of OWNER, ADMIN, MEMBER, VIEWER, NONE`,
+              ),
+            );
         }
         role = requestedRole;
       }
