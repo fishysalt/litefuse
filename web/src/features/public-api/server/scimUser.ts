@@ -101,15 +101,32 @@ export function parseRequestedRole(input: unknown): Role | null {
 }
 
 /**
- * True when the request carries no usable role at all: absent, `null`, an empty
- * string, an empty array, or an array whose entries are all empty (`""`, `{}`,
+ * Wording for a `roles` value that is present but carries nothing.
+ *
+ * `NONE` is a real role (a member of the organization without any permission),
+ * so it is *not* the empty value: a request that wants no permission must say
+ * `roles: ["NONE"]`. An empty value is a request that failed to produce a role
+ * at all, and it is refused instead of being guessed at - silently treating it as
+ * "leave the role alone" hides a misconfigured mapping, and treating it as `NONE`
+ * would quietly strip a member's permissions.
+ */
+export const EMPTY_ROLES_DETAIL =
+  "Invalid roles provided: the value must not be empty. Send one of OWNER, ADMIN, MEMBER, VIEWER or NONE - NONE is a valid role and means a member without permissions.";
+
+/**
+ * True when the request carries no usable role at all: `null`, an empty string,
+ * an empty array, or an array whose entries are all empty (`""`, `{}`,
  * `{"value":null}`, `{"value":""}`).
  *
- * Such a value means "leave the role alone" instead of "set it to something
- * invalid": an IdP that drives `roles` from a group sends an empty list whenever
- * the user is in no mapped group, and failing that update would be a false alarm.
- * A *non-empty* value that still cannot be parsed stays an error - which is why
- * this has to be told apart from `parseRequestedRole` returning `null` (it
+ * A value like this is rejected by every write endpoint (see
+ * `EMPTY_ROLES_DETAIL`); the attribute being *absent* is a different thing and
+ * keeps its per-endpoint meaning (POST defaults to `NONE`, PATCH/PUT leave the
+ * role untouched). Callers must therefore test `roles !== undefined` **before**
+ * calling this - passing `undefined` here also returns true, which is what the
+ * "is this value empty" question means in isolation.
+ *
+ * A *non-empty* value that still cannot be parsed stays an error too - which is
+ * why this has to be told apart from `parseRequestedRole` returning `null` (it
  * returns `null` for both cases).
  */
 export function isEmptyRoleValue(input: unknown): boolean {
