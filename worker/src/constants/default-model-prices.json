@@ -427,7 +427,7 @@
     "modelName": "gpt-3.5-turbo-0301",
     "matchPattern": "(?i)^(openai/)?(gpt-)(35|3.5)(-turbo-0301)$",
     "createdAt": "2024-01-24T10:19:21.693Z",
-    "updatedAt": "2026-09-21T00:00:00.000Z",
+    "updatedAt": "2026-09-22T00:00:00.000Z",
     "tokenizerConfig": {
       "tokensPerName": -1,
       "tokenizerModel": "gpt-3.5-turbo-0301",
@@ -442,8 +442,8 @@
         "priority": 0,
         "conditions": [],
         "prices": {
-          "input": 0.000015,
-          "output": 0.00002
+          "input": 0.0000015,
+          "output": 0.000002
         }
       }
     ]
