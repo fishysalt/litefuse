@@ -96,3 +96,4 @@ export * from "./utils/IORepresentation";
 
 // analytics integrations (client-safe)
 export * from "./features/analytics-integrations";
+export * from "./features/evals/validateEvaluatorFilters";

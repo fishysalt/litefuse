@@ -135,3 +135,4 @@ export * from "./utils/headerUtils";
 export * from "./utils/formatAuthProvider";
 export * from "./traceDeletionProcessor";
 export * from "./analytics-integrations/types";
+export * from "./prismaFilter";
