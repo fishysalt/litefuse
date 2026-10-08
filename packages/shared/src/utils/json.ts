@@ -416,3 +416,7 @@ export const parseJsonPrioritised = (
     return json;
   }
 };
+
+// --- Copied from upstream utils/json.ts ---
+export const parseJsonIfString = (value: unknown): unknown =>
+  typeof value === "string" ? parseJsonPrioritised(value) : value;

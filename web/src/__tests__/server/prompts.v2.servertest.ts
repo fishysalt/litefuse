@@ -11,7 +11,10 @@ import {
   PromptType,
 } from "@langfuse/shared";
 import { parsePromptDependencyTags } from "@langfuse/shared";
-import { generateId, nanoid } from "ai";
+// `nanoid` comes from the nanoid package rather than the `ai` SDK: this was the
+// only place web pulled `ai` in, and keeping it would pin a second major
+// version of `ai` in the workspace (@ai-sdk/typesafe-ai needs ai@7).
+import { nanoid } from "nanoid";
 
 import { type PromptsMetaResponse } from "@/src/features/prompts/server/actions/getPromptsMeta";
 import {
@@ -544,7 +547,7 @@ describe("/api/public/v2/prompts API Endpoint", () => {
 
     it("should create and fetch a chat prompt with message placeholders", async () => {
       const { auth } = await createOrgProjectAndApiKey();
-      const promptName = `prompt-name-message-placeholders${generateId()}`;
+      const promptName = `prompt-name-message-placeholders${nanoid()}`;
       const commitMessage = "feat: add message placeholders support";
       const chatMessages = [
         {

@@ -44,6 +44,17 @@ export const EVALUATOR_BLOCK_METADATA: Record<
   EvaluatorBlockReason,
   EvaluatorBlockMetadata
 > = {
+  // Copied from upstream (reasons the decision-model execution path can raise).
+  LLM_CONNECTION_BILLING_EXHAUSTED: {
+    message:
+      "Evaluator paused: the LLM provider reported exhausted credits or an exceeded spend budget. Add credits or raise the limit in your provider account, then reactivate the evaluator.",
+    shortLabel: "Provider credits exhausted",
+  },
+  LLM_CONNECTION_ENDPOINT_UNREACHABLE: {
+    message:
+      "Evaluator paused: the LLM connection's endpoint hostname could not be resolved. Fix the base URL of the LLM connection used by this evaluator, then reactivate it.",
+    shortLabel: "Endpoint unreachable",
+  },
   LLM_CONNECTION_AUTH_INVALID: {
     message:
       "Evaluator paused: LLM authentication failed. Update the LLM connection used by this evaluator and then reactivate it.",

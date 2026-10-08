@@ -65,3 +65,43 @@ export class LLMCompletionError extends Error {
 export function isLLMCompletionError(e: any): e is LLMCompletionError {
   return e instanceof Error && e.name === LLMCompletionErrorName;
 }
+
+// --- Copied from upstream server/llm/errors.ts ---
+const LLM_VALIDATION_ERROR_MARKER = Symbol.for(
+  "litefuse.error.LLMValidationError",
+);
+
+export type LLMValidationErrorCode =
+  | "invalid-connection"
+  | "invalid-request"
+  | "endpoint-unreachable";
+
+/**
+ * A deterministic validation failure owned by Litefuse, before or around the
+ * provider call. Provider failures remain native AI SDK errors.
+ */
+export class LLMValidationError extends Error {
+  private readonly [LLM_VALIDATION_ERROR_MARKER] = true;
+
+  readonly code: LLMValidationErrorCode;
+  readonly statusCode = 400;
+
+  constructor(params: {
+    code: LLMValidationErrorCode;
+    message: string;
+    cause?: unknown;
+  }) {
+    super(params.message, { cause: params.cause });
+    this.name = "LLMValidationError";
+    this.code = params.code;
+  }
+
+  static isInstance(error: unknown): error is LLMValidationError {
+    return (
+      error !== null &&
+      typeof error === "object" &&
+      LLM_VALIDATION_ERROR_MARKER in error &&
+      (error as Record<symbol, unknown>)[LLM_VALIDATION_ERROR_MARKER] === true
+    );
+  }
+}

@@ -534,3 +534,19 @@ export type TraceSinkParams = {
    */
   onGenerationComplete?: (details: GenerationDetails) => void;
 };
+
+// --- Copied from upstream server/llm/types.ts ---
+export type ProcessedTraceEvent = {
+  type: string;
+  timestamp: string;
+  body: Record<string, unknown>;
+};
+
+export type InternalTraceWriteInput = {
+  rootSpanId: string;
+  eventInputs: import("./internalTraceEvents").InternalTraceEventInput[];
+};
+
+export type InternalTraceWriter = (
+  params: InternalTraceWriteInput,
+) => Promise<void>;

@@ -5,6 +5,7 @@ import { ObservationLevel, ObservationType } from "../../domain";
 import { SingleValueOption } from "../../tableDefinitions";
 import { ColumnDefinition } from "../../tableDefinitions";
 import { formatColumnOptions } from "../../tableDefinitions/typeHelpers";
+import { parseJsonIfString } from "../../utils/json";
 
 const flexibleUsageCostSchema = z.record(
   z.string(),
@@ -98,7 +99,8 @@ export type ObservationEvalFilterColumnInternal =
 export type ObservationEvalMappingColumnInternal = keyof Pick<
   ObservationForEval,
   "input" | "output" | "metadata" | "experiment_item_expected_output"
->;
+>
+  | "tool_calls";
 
 export interface ObservationEvalVariableColumn {
   /** Column identifier (must match an ObservationForEval field name) */
@@ -362,3 +364,76 @@ export function mapEventEvalFilterColumnIdToField(
   }
   return observation[columnMapping.internal];
 }
+
+// --- Copied from upstream features/evals/observationForEval.ts ---
+export const toolCallForEvalSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  arguments: z.unknown(),
+  type: z.string(),
+  index: z.number(),
+});
+
+export type ToolCallForEval = z.infer<typeof toolCallForEvalSchema>;
+
+/**
+ * zipObservationToolCalls for camelCase records with loosely typed arrays
+ * (tRPC/domain shapes: events batchIO, legacy observations.byId). Malformed
+ * names map to "" instead of being dropped — filtering would shift the zip
+ * and misattribute every later call's name.
+ */
+
+export function zipToolCallsFromRecord(record: object): ToolCallForEval[] {
+  const { toolCalls, toolCallNames } = record as {
+    toolCalls?: unknown;
+    toolCallNames?: unknown;
+  };
+
+  return zipObservationToolCalls({
+    tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
+    tool_call_names: Array.isArray(toolCallNames)
+      ? toolCallNames.map((name) => (typeof name === "string" ? name : ""))
+      : [],
+  });
+}
+
+/**
+ * Zips the parallel arrays back into named tool call objects.
+ * `tool_call_names` is authoritative for count and order: ingestion writes
+ * both arrays in lockstep (`convertCallsToArrays`), and stored entries carry
+ * no name. `arguments` arrives double-encoded (a JSON string inside the entry
+ * JSON) and is parsed to an object; unparsable values stay raw strings.
+ */
+
+export function zipObservationToolCalls(
+  observation: Pick<ObservationForEval, "tool_calls" | "tool_call_names">,
+): ToolCallForEval[] {
+  return observation.tool_call_names.map((name, i) => {
+    const parsed = parseJsonIfString(observation.tool_calls[i]);
+    const entry =
+      typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+
+    return {
+      id: typeof entry.id === "string" ? entry.id : "",
+      name,
+      arguments: parseJsonIfString(entry.arguments) ?? {},
+      type: typeof entry.type === "string" ? entry.type : "",
+      index: typeof entry.index === "number" ? entry.index : 0,
+    };
+  });
+}
+
+export type CodeEvalTemplateVariable =
+  (typeof CODE_EVAL_TEMPLATE_VARIABLES)[number];
+
+// --- Copied from upstream features/evals/observationForEval.ts ---
+export const CODE_EVAL_TEMPLATE_VARIABLES = [
+  "input",
+  "output",
+  "metadata",
+  "toolCalls",
+  "experimentItemExpectedOutput",
+  "experimentItemMetadata",
+] as const;

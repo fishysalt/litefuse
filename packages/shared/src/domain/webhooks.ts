@@ -51,3 +51,9 @@ export const GitHubDispatchWebhookOutboundSchema = z.object({
 export type GitHubDispatchWebhookOutput = z.infer<
   typeof GitHubDispatchWebhookOutboundSchema
 >;
+
+// --- Outbound webhook headers (copied from upstream domain/webhooks.ts) ---
+export const WebhookContentTypeHeader = "content-type";
+export const WebhookSignatureHeader = "x-langfuse-signature";
+export const WebhookUserAgentHeader = "user-agent";
+export const LangfuseUserAgent = "Langfuse/1.0";
