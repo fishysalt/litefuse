@@ -1,4 +1,4 @@
-import { LLMAdapter } from "@langfuse/shared";
+import { LLMAdapter, typeSafeModels } from "@langfuse/shared";
 
 /**
  * Provider presets for the "LLM Connections" settings page.
@@ -143,6 +143,24 @@ export const llmProviderPresets: LlmProviderPreset[] = [
     docsUrl: "https://docs.ollama.com/api/openai-compatibility",
     apiKeyUrl: "https://docs.ollama.com/",
     note: "Ollama ignores the API key, so any non-empty string works; replace the model with one you have pulled.",
+  },
+
+  // ------------------------------------------- Decision models (Jev/TypeSafe)
+  {
+    id: "typesafe-decision-model",
+    label: "TypeSafe / Jev (decision models)",
+    group: "international",
+    adapter: LLMAdapter.TypeSafe,
+    provider: "TypeSafe",
+    // Empty means "no gateway": the TypeSafe decision-model client defaults to
+    // https://api.typesafe.ai/v1. The connection form turns this into the
+    // upstream picker (TypeSafe / Vercel AI Gateway / OpenRouter / Custom).
+    baseURL: "",
+    withDefaultModels: false,
+    customModels: [...typeSafeModels],
+    docsUrl: "https://typesafe.ai",
+    apiKeyUrl: "https://typesafe.ai",
+    note: "Decision model (Jev) for evaluators, not a text model: pick the upstream that serves it and add that provider's API key.",
   },
 
   // ------------------------------------------------------------------- China

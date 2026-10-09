@@ -79,6 +79,14 @@ interface SearchConfig {
 interface TableViewControllers {
   applyViewState: (viewData: TableViewPresetState) => void;
   selectedViewId: string | null;
+  /**
+   * LITEFUSE ADDITIONS (evaluators v2): `appliedViewId` is what upstream's
+   * controllers expose next to `selectedViewId` — the view that was actually
+   * applied, used to decide whether a state change updates a saved view.
+   * Optional here so our existing (pre-v2) callers keep constructing the
+   * three-field object they always did.
+   */
+  appliedViewId?: string | null;
   handleSetViewId: (viewId: string | null) => void;
 }
 
@@ -99,6 +107,13 @@ interface DataTableToolbarProps<TData, TValue> {
   columns: LangfuseColumnDef<TData, TValue>[];
   filterColumnDefinition?: ColumnDefinition[];
   searchConfig?: SearchConfig;
+  /**
+   * LITEFUSE ADDITION (copied from upstream): the authoritative search query to
+   * persist into a saved view. Needed when the toolbar's own search field is
+   * hidden (search-bar mode) so the live query — not the toolbar's local mirror
+   * — is captured.
+   */
+  currentSearchQuery?: string;
   actionButtons?: React.ReactNode;
   filterState?: FilterState;
   setFilterState?:
@@ -122,6 +137,13 @@ interface DataTableToolbarProps<TData, TValue> {
   };
   orderByState?: OrderByState;
   viewConfig?: TableViewConfig;
+  /**
+   * LITEFUSE ADDITION (copied from upstream): an explicit analytics table
+   * identity for surfaces without a `viewConfig`. Upstream also passes it to
+   * the per-control analytics events; our toolbar only records the search
+   * submit event today, so the value is forwarded there.
+   */
+  tableName?: string;
   filterWithAI?: boolean;
   className?: string;
   viewModeToggle?: React.ReactNode;
@@ -149,12 +171,19 @@ export function DataTableToolbar<TData, TValue>({
   className,
   orderByState,
   viewConfig,
+  currentSearchQuery,
+  tableName,
   filterWithAI = false,
   viewModeToggle,
 }: DataTableToolbarProps<TData, TValue>) {
   const [searchString, setSearchString] = useState(
     searchConfig?.currentQuery ?? "",
   );
+
+  // LITEFUSE NOTE: upstream derives a table identity for its analytics events
+  // (explicit `tableName`, else the saved-view table name). We keep the same
+  // precedence so the search-submit event names the table it came from.
+  const analyticsTableName = tableName ?? viewConfig?.tableName;
 
   const capture = usePostHogClientCapture();
   const { open: controlsPanelOpen, setOpen: setControlsPanelOpen } =
@@ -193,7 +222,7 @@ export function DataTableToolbar<TData, TValue>({
               filters: filterState ?? [],
               columnOrder,
               columnVisibility,
-              searchQuery: searchString,
+              searchQuery: currentSearchQuery ?? searchString,
             }}
           />
         )}
@@ -212,7 +241,15 @@ export function DataTableToolbar<TData, TValue>({
                 size="icon"
                 className="mr-1"
                 onClick={() => {
-                  capture("table:search_submit");
+                  // LITEFUSE NOTE: upstream tags this event with the table
+                  // identity; the property stays optional so tables without a
+                  // viewConfig (and without a `tableName`) still emit.
+                  capture(
+                    "table:search_submit",
+                    analyticsTableName
+                      ? { tableName: analyticsTableName }
+                      : undefined,
+                  );
                   searchConfig.updateQuery(searchString);
                 }}
               >
@@ -236,7 +273,13 @@ export function DataTableToolbar<TData, TValue>({
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
-                    capture("table:search_submit");
+                    // Same table-identity tagging as the search button above.
+                    capture(
+                      "table:search_submit",
+                      analyticsTableName
+                        ? { tableName: analyticsTableName }
+                        : undefined,
+                    );
                     searchConfig.updateQuery(searchString);
                   }
                 }}
