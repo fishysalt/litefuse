@@ -73,11 +73,16 @@ describe("llmProviderPresets", () => {
   it("uses a valid base URL or an empty string for SDK defaults", () => {
     for (const preset of llmProviderPresets) {
       if (preset.baseURL === "") {
-        // Only the native adapters may rely on the SDK default base URL
+        // Only the native adapters may rely on the SDK default base URL.
+        // LLMAdapter.TypeSafe is the exception: an empty base URL means "the
+        // TypeSafe endpoint itself" (the decision-model client defaults to
+        // https://api.typesafe.ai/v1) and the form renders the upstream picker
+        // instead of a base URL field. See TYPESAFE_UPSTREAMS in @langfuse/shared.
         expect([
           LLMAdapter.OpenAI,
           LLMAdapter.Anthropic,
           LLMAdapter.GoogleAIStudio,
+          LLMAdapter.TypeSafe,
         ]).toContain(preset.adapter);
         continue;
       }
@@ -85,6 +90,20 @@ describe("llmProviderPresets", () => {
       const parsed = new URL(preset.baseURL);
       expect(["http:", "https:"]).toContain(parsed.protocol);
     }
+  });
+
+  it("offers a decision-model (Jev) preset for the TypeSafe adapter", () => {
+    const preset = llmProviderPresets.find(
+      (p) => p.adapter === LLMAdapter.TypeSafe,
+    );
+
+    expect(preset).toBeDefined();
+    // Empty base URL = the direct TypeSafe upstream; see TYPESAFE_UPSTREAMS[0].
+    expect(preset!.baseURL).toBe("");
+    expect(preset!.label.toLowerCase()).toContain("decision model");
+    // Converged with upstream main, which dropped `jev-1.13.0` from
+    // `typeSafeModels` in favour of the `jev-latest` alias.
+    expect(preset!.customModels).toEqual(["jev-latest"]);
   });
 
   it("covers the providers required by the product brief", () => {

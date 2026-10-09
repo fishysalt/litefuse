@@ -3,6 +3,8 @@ import CodeMirror, {
   type ReactCodeMirrorRef,
 } from "@uiw/react-codemirror";
 import { SearchQuery, setSearchQuery } from "@codemirror/search";
+// LITEFUSE ADDITION: type of the caller-provided `extensions` prop below.
+import { type Extension } from "@codemirror/state";
 import { json, jsonParseLinter } from "@codemirror/lang-json";
 import { linter, type Diagnostic } from "@codemirror/lint";
 import { useTheme } from "next-themes";
@@ -235,6 +237,7 @@ export function CodeMirrorEditor({
   editorRef,
   enableSearchKeymap = true,
   onEditorMount,
+  extensions: additionalExtensions,
 }: {
   value: string;
   onChange?: (value: string) => void;
@@ -250,6 +253,12 @@ export function CodeMirrorEditor({
   editorRef?: RefObject<ReactCodeMirrorRef | null>;
   enableSearchKeymap?: boolean;
   onEditorMount?: () => void;
+  /**
+   * LITEFUSE ADDITION (copied from upstream): caller-provided CodeMirror
+   * extensions appended after the built-ins, e.g. a media drop/paste handler.
+   * Memoize the array at the call site to avoid reconfiguring the editor.
+   */
+  extensions?: Extension[];
 }) {
   const { resolvedTheme } = useTheme();
   const codeMirrorTheme = resolvedTheme === "dark" ? darkTheme : lightTheme;
@@ -315,6 +324,9 @@ export function CodeMirrorEditor({
             overflow: "auto",
           },
         }),
+
+        // Caller-provided extensions last, so they can override the built-ins.
+        ...(additionalExtensions ?? []),
       ]}
       defaultValue={value}
       onChange={(c) => {
