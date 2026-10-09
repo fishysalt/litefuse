@@ -370,6 +370,14 @@ export async function fetchLLMCompletion(
           }
         : {}),
     });
+  } else if (modelParams.adapter === LLMAdapter.TypeSafe) {
+    // Decision-model (Jev) connections are never text models: they are executed by
+    // the decision-model evaluator. Fail loudly instead of sending a
+    // text-completion request that the upstream API would reject anyway.
+    // (Upstream has the same branch in its AI-SDK resolver.)
+    throw new Error(
+      "TypeSafe decision models cannot generate text; use a decision-model evaluator",
+    );
   } else {
     const _exhaustiveCheck: never = modelParams.adapter;
     throw new Error(
