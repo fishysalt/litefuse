@@ -185,3 +185,9 @@ export function sanitizeEmailSubject(input: string): string {
  * versionZod.parse(undefined) // Returns undefined
  */
 export const versionZod = z.coerce.date().optional();
+
+// ── Added for the evaluators v2 migration (copied from upstream) ─────────────
+export const paginationLimitZod = z.preprocess(
+  (x) => (x === "" ? undefined : x),
+  z.coerce.number().int().gte(1).lte(100).default(50),
+);
