@@ -23,6 +23,7 @@ import {
   buildEffectiveEnvironmentFilter,
   buildManagedEnvironmentPolicyConfig,
   stripImplicitEnvironmentFilterFromExplicitState,
+  toSearchBarEnvironmentFilters,
   type ManagedEnvironmentPolicyInput,
 } from "../lib/managedEnvironmentPolicy";
 import { areStringSetsEqual } from "../lib/stringSetUtils";
@@ -356,6 +357,24 @@ type UseSidebarFilterStateOptions = {
    */
   sessionFilterContextId?: string | null;
   implicitDefaultConfig?: ManagedEnvironmentPolicyInput;
+  // ── Added for the evaluators v2 migration (ported from upstream) ───────────
+  /**
+   * Where the filter state lives. Litefuse implements the default
+   * (`urlAndSessionStorage`), which is what every caller in this repo uses; the
+   * other modes are upstream's, used by views we do not have. Passing one of
+   * them fails loudly rather than silently persisting to the wrong place.
+   */
+  stateLocation?: "urlAndSessionStorage" | "url" | "memory" | "peekContext";
+  /**
+   * Fires when the explicit filters change, with the origin of the change, so a
+   * host view can react (e.g. the evaluator tables deselect the saved view).
+   */
+  onExplicitFilterStateChange?: (params: {
+    previousFilters: FilterState;
+    nextFilters: FilterState;
+    origin: "user" | "saved_view" | "system";
+    action?: "clear";
+  }) => void;
 };
 
 /**
@@ -422,7 +441,18 @@ export function useSidebarFilterState(
     disableUrlPersistence,
     sessionFilterContextId,
     implicitDefaultConfig,
+    stateLocation = "urlAndSessionStorage",
+    onExplicitFilterStateChange,
   } = hookOptions;
+
+  // Only the default state location is implemented (see the option's doc). Fail
+  // loudly instead of persisting filter state to the wrong place.
+  if (stateLocation !== "urlAndSessionStorage") {
+    throw new Error(
+      `useSidebarFilterState: stateLocation "${stateLocation}" is not implemented in Litefuse; only "urlAndSessionStorage" is.`,
+    );
+  }
+
   const peekContext = usePeekTableState();
 
   const FILTER_EXPANDED_STORAGE_KEY = `${config.tableName}-filters-expanded`;
@@ -478,6 +508,9 @@ export function useSidebarFilterState(
   );
   // Optimistic query state: prevents stale URL reads from overriding immediate
   // local changes while use-query-params updates the URL asynchronously.
+  // Bumped when all filters are cleared so the filter editor remounts and drops
+  // its uncommitted draft (ported from upstream).
+  const [draftResetKey, setDraftResetKey] = useState(0);
   const [pendingFiltersQuery, setPendingFiltersQuery] = useState<string | null>(
     null,
   );
@@ -562,7 +595,14 @@ export function useSidebarFilterState(
   );
 
   const setFilterState = useCallback(
-    (newFilters: FilterState) => {
+    (
+      newFilters: FilterState,
+      options?: {
+        updateType?: "push" | "pushIn" | "replace" | "replaceIn";
+        origin?: "user" | "saved_view" | "system";
+        action?: "clear";
+      },
+    ) => {
       // Keep mutual exclusion reconciliation canonicalized in one place.
       // Any direct writes to peekContext.tableState.filters outside this hook can bypass this guard.
       const reconciledFilters = reconcileMutuallyExclusiveFilters(
@@ -573,6 +613,15 @@ export function useSidebarFilterState(
         explicitFilters: reconciledFilters,
         availableEnvironmentValues,
         config: managedEnvironmentPolicyConfig,
+      });
+
+      // Tell the host before persisting, so it sees the same canonicalized shape
+      // that is about to be written (ported from upstream).
+      onExplicitFilterStateChange?.({
+        previousFilters: explicitFilterState,
+        nextFilters: explicitFilters,
+        origin: options?.origin ?? "user",
+        action: options?.action,
       });
 
       if (peekContext) {
@@ -588,7 +637,7 @@ export function useSidebarFilterState(
 
       const encoded = encodeFiltersGeneric(explicitFilters);
       setPendingFiltersQuery(encoded);
-      setUrlFiltersQuery(encoded || null);
+      setUrlFiltersQuery(encoded || null, options?.updateType);
       setStoredFiltersQuery(encoded);
     },
     [
@@ -599,6 +648,8 @@ export function useSidebarFilterState(
       mutualExclusionContext,
       managedEnvironmentPolicyConfig,
       availableEnvironmentValues,
+      explicitFilterState,
+      onExplicitFilterStateChange,
     ],
   );
 
@@ -641,7 +692,9 @@ export function useSidebarFilterState(
   ]);
 
   const clearAll = () => {
-    setFilterState([]);
+    // Clearing discards drafts, so the editor must remount (ported from upstream).
+    setDraftResetKey((key) => key + 1);
+    setFilterState([], { action: "clear" });
   };
 
   // Generic apply selection logic
@@ -1720,10 +1773,29 @@ export function useSidebarFilterState(
     t,
   ]);
 
+  // ── Added for the evaluators v2 migration (ported from upstream) ───────────
+  const projectFiltersForSearchBar = useCallback(
+    (filters: FilterState) =>
+      toSearchBarEnvironmentFilters({
+        explicitFilters: filters,
+        config: managedEnvironmentPolicyConfig,
+      }),
+    [managedEnvironmentPolicyConfig],
+  );
+
+  /** What the search bar reads: the user's own selection, in bar form. */
+  const searchBarFilterState: FilterState = useMemo(
+    () => projectFiltersForSearchBar(explicitFilterState),
+    [explicitFilterState, projectFiltersForSearchBar],
+  );
+
   return {
     filterState,
     effectiveFilterState: filterState,
     explicitFilterState,
+    searchBarFilterState,
+    projectFiltersForSearchBar,
+    draftResetKey,
     setFilterState,
     updateFilter,
     updateFilterOnly,

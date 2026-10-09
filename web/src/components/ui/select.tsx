@@ -12,22 +12,36 @@ const SelectGroup = SelectPrimitive.Group;
 
 const SelectValue = SelectPrimitive.Value;
 
+/**
+ * The canonical value-picker trigger surface, exported (for the evaluators v2 UI)
+ * so a Popover trigger that sets a value can look identical to a Select.
+ * Extracted verbatim from SelectTrigger below, so nothing changes visually.
+ */
+export const selectTriggerClassName =
+  "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus:ring-ring disabled:bg-muted/50 flex h-8 w-full items-center justify-between gap-1 rounded-md border px-3 py-2 text-sm focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50";
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & {
     hideDownIcon?: boolean;
+    /**
+     * LITEFUSE ADDITION (copied from upstream): opt out of the single-line
+     * clamp on the value span. Used by the evaluators v2 backfill picker, whose
+     * labels are longer than a trigger width.
+     */
+    disableValueLineClamp?: boolean;
   }
->(({ className, children, ...props }, ref) => (
+>(({ className, children, hideDownIcon, disableValueLineClamp, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus:ring-ring disabled:bg-muted/50 flex h-8 w-full items-center justify-between gap-1 rounded-md border px-3 py-2 text-sm focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      selectTriggerClassName,
+      disableValueLineClamp ? null : "[&>span]:line-clamp-1",
       className,
     )}
     {...props}
   >
     {children}
-    {props.hideDownIcon ? null : (
+    {hideDownIcon ? null : (
       <SelectPrimitive.Icon asChild>
         <ChevronDown className="h-4 w-4 opacity-50" />
       </SelectPrimitive.Icon>
