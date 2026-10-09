@@ -449,6 +449,8 @@ export const getEventsStreamForEval = async (props: {
       e.trace_name,
       e.user_id,
       e.session_id,
+      e.is_root,
+      e.experiment_item_root_span_id,
       e.tags,
       e.release,
       e.provided_model_name,
@@ -497,6 +499,13 @@ export const getEventsStreamForEval = async (props: {
     trace_name: string | null;
     user_id: string | null;
     session_id: string | null;
+    // Numeric root flag as stored in `spans` (1 = trace root); the eval filter
+    // registry reads it as `is_root` and normalises it to a boolean.
+    is_root: number | null;
+    // The experiment item's root span id (a string). The eval filter registry's
+    // boolean `isExperimentItemRootSpan` is derived by comparing it with the
+    // row's own `span_id`, so the column must be part of this projection.
+    experiment_item_root_span_id: string | null;
     tags: string[];
     release: string | null;
     provided_model_name: string | null;
