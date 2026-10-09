@@ -239,7 +239,7 @@ export default function EvalsTemplateTable({
                 e.stopPropagation();
                 if (id) {
                   void router.push(
-                    `/project/${projectId}/evals/new?evaluator=${id}`,
+                    `/project/${projectId}/evals/legacy/new?evaluator=${id}`,
                   );
                 }
               }}
@@ -289,7 +289,7 @@ export default function EvalsTemplateTable({
 
   const peekNavigationProps = usePeekNavigation({
     expandConfig: {
-      basePath: `/project/${projectId}/evals/templates`,
+      basePath: `/project/${projectId}/evals/legacy/templates`,
     },
   });
 
