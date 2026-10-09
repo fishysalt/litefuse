@@ -101,7 +101,9 @@ export default function NewEvaluatorPage() {
           )}
           <BreadcrumbItem
             className="hover:cursor-pointer"
-            onClick={() => router.push(`/project/${projectId}/evals/legacy/new`)}
+            onClick={() =>
+              router.push(`/project/${projectId}/evals/legacy/new`)
+            }
           >
             <BreadcrumbPage
               className={cn(
