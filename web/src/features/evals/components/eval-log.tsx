@@ -182,7 +182,7 @@ export default function EvalLogTable({
         const templateId = row.getValue();
         return templateId ? (
           <TableLink
-            path={`/project/${projectId}/evals/templates/${encodeURIComponent(templateId)}`}
+            path={`/project/${projectId}/evals/legacy/templates/${encodeURIComponent(templateId)}`}
             value={templateId}
           />
         ) : undefined;
@@ -199,7 +199,7 @@ export default function EvalLogTable({
           const evaluatorId = row.getValue();
           return evaluatorId ? (
             <TableLink
-              path={`/project/${projectId}/evals/${encodeURIComponent(evaluatorId)}`}
+              path={`/project/${projectId}/evals/legacy/${encodeURIComponent(evaluatorId)}`}
               value={evaluatorId}
             />
           ) : undefined;

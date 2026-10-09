@@ -235,7 +235,7 @@ export const TemplateSelector = ({
                                 <TooltipContent className="max-h-[50dvh] overflow-y-auto text-xs break-normal whitespace-normal">
                                   <p>Requires project-level evaluation model</p>
                                   <Link
-                                    href={`/project/${projectId}/evals/default-model`}
+                                    href={`/project/${projectId}/evals/legacy/default-model`}
                                     className="mt-2 flex items-center gap-1 text-blue-600 hover:underline"
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -327,7 +327,7 @@ export const TemplateSelector = ({
                               <TooltipContent className="max-h-[50dvh] overflow-y-auto text-xs break-normal whitespace-normal">
                                 <p>Requires project-level evaluation model</p>
                                 <Link
-                                  href={`/project/${projectId}/evals/default-model`}
+                                  href={`/project/${projectId}/evals/legacy/default-model`}
                                   className="mt-2 flex items-center gap-1 text-blue-600 hover:underline"
                                   target="_blank"
                                   rel="noopener noreferrer"
@@ -376,7 +376,7 @@ export const TemplateSelector = ({
                     onSelect={() => {
                       if (disabled) return;
                       window.open(
-                        `/project/${projectId}/evals/templates/new`,
+                        `/project/${projectId}/evals/legacy/templates/new`,
                         "_blank",
                       );
                     }}
@@ -389,7 +389,7 @@ export const TemplateSelector = ({
                       onSelect={() => {
                         if (disabled) return;
                         window.open(
-                          `/project/${projectId}/evals/default-model`,
+                          `/project/${projectId}/evals/legacy/default-model`,
                           "_blank",
                         );
                       }}

@@ -159,7 +159,7 @@ export function EvaluatorSelector({
                         <TooltipContent className="max-h-[50dvh] overflow-y-auto text-sm break-normal whitespace-normal">
                           <p>Requires project-level evaluation model</p>
                           <Link
-                            href={`/project/${projectId}/evals/default-model`}
+                            href={`/project/${projectId}/evals/legacy/default-model`}
                             className="mt-2 flex items-center gap-1 text-blue-600 hover:underline"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -173,7 +173,7 @@ export function EvaluatorSelector({
                     {templateData.some((t) => t.id === selectedTemplateId) ? (
                       <>
                         <Link
-                          href={`/project/${projectId}/evals/templates/${latestVersion.id}`}
+                          href={`/project/${projectId}/evals/legacy/templates/${latestVersion.id}`}
                           target="_blank"
                           className="ml-auto opacity-0 group-hover:opacity-100 hover:opacity-100"
                           onClick={(e) => {
@@ -186,7 +186,7 @@ export function EvaluatorSelector({
                       </>
                     ) : (
                       <Link
-                        href={`/project/${projectId}/evals/templates/${latestVersion.id}`}
+                        href={`/project/${projectId}/evals/legacy/templates/${latestVersion.id}`}
                         target="_blank"
                         className="ml-auto opacity-0 group-hover:opacity-100 hover:opacity-100"
                         onClick={(e) => {
@@ -253,7 +253,7 @@ export function EvaluatorSelector({
                         <TooltipContent className="max-h-[50dvh] overflow-y-auto text-sm break-normal whitespace-normal">
                           <p>Requires project-level evaluation model</p>
                           <Link
-                            href={`/project/${projectId}/evals/default-model`}
+                            href={`/project/${projectId}/evals/legacy/default-model`}
                             className="mt-2 flex items-center gap-1 text-blue-600 hover:underline"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -267,7 +267,7 @@ export function EvaluatorSelector({
                     {templateData.some((t) => t.id === selectedTemplateId) ? (
                       <>
                         <Link
-                          href={`/project/${projectId}/evals/templates/${latestVersion.id}`}
+                          href={`/project/${projectId}/evals/legacy/templates/${latestVersion.id}`}
                           target="_blank"
                           className="ml-auto opacity-0 group-hover:opacity-100 hover:opacity-100"
                           onClick={(e) => {
@@ -280,7 +280,7 @@ export function EvaluatorSelector({
                       </>
                     ) : (
                       <Link
-                        href={`/project/${projectId}/evals/templates/${latestVersion.id}`}
+                        href={`/project/${projectId}/evals/legacy/templates/${latestVersion.id}`}
                         target="_blank"
                         className="ml-auto opacity-0 group-hover:opacity-100 hover:opacity-100"
                         onClick={(e) => {

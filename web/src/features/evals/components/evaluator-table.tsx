@@ -247,7 +247,7 @@ export default function EvaluatorTable({ projectId }: { projectId: string }) {
             onClick={(e) => {
               e.stopPropagation();
               router.push(
-                `/project/${projectId}/evals/${encodeURIComponent(id)}`,
+                `/project/${projectId}/evals/legacy/${encodeURIComponent(id)}`,
               );
             }}
           >
@@ -391,7 +391,7 @@ export default function EvaluatorTable({ projectId }: { projectId: string }) {
                   aria-label="delete"
                   itemId={id}
                   projectId={projectId}
-                  redirectUrl={`/project/${projectId}/evals`}
+                  redirectUrl={`/project/${projectId}/evals/legacy`}
                   deleteConfirmation={row.original.scoreName}
                 />
               </DropdownMenuItem>
