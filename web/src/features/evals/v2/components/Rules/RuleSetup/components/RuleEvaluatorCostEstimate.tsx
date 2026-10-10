@@ -1,35 +1,17 @@
-/* eslint-disable no-nested-ternary */
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/src/components/ui/tooltip";
-import { EvaluatorCostCalculationTooltipContent } from "@/src/features/evals/v2/components/EvaluatorCostCalculationTooltipContent/EvaluatorCostCalculationTooltipContent";
-import { formatEvaluatorCostCalculation } from "@/src/features/evals/v2/fns/formatEvaluatorCostCalculation";
+// LITEFUSE: cost-estimate UI is hidden in this fork.
+//
+// `getLatestEvaluatorRunCost` always returns null and the test-run cost is left
+// unset by decision L1 (web/src/features/evals/v2/server/evaluators/testEvaluator.ts),
+// so every caller of this component rendered an "Unavailable" / "≈ $0.00 / week"
+// label — a blank or actively misleading value. Rather than show it, the
+// component renders nothing. Kept as a component (instead of deleting every call
+// site) so the surrounding rule-setup and activation layouts are untouched.
 import type { RuleCostEstimate } from "@/src/features/evals/v2/hooks/useRuleCostEstimate";
-import { usdFormatter } from "@/src/utils/numbers";
 
 export function RuleEvaluatorCostEstimate({
-  estimate,
+  estimate: _estimate,
 }: {
   estimate: RuleCostEstimate;
 }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="cursor-help font-mono text-sm tabular-nums underline decoration-dotted underline-offset-4">
-          {estimate.estimatedCostUsd === null
-            ? "Unavailable"
-            : estimate.period === "selection"
-              ? `≈ ${usdFormatter(estimate.estimatedCostUsd, 2, 2)}`
-              : `≈ ${usdFormatter(estimate.estimatedCostUsd, 2, 2)} / week`}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-72">
-        <EvaluatorCostCalculationTooltipContent
-          {...formatEvaluatorCostCalculation(estimate)}
-        />
-      </TooltipContent>
-    </Tooltip>
-  );
+  return null;
 }

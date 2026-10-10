@@ -34,12 +34,16 @@ export const runEvaluationRouter = createTRPCRouter({
         const { projectId, query, evaluatorIds: rawEvaluatorIds } = input;
         const { evaluatorMappings, sampling, rowLimit } = input;
 
-        if (env.LITEFUSE_ENABLE_EVENTS_TABLE_FLAGS !== "true") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Events table is not enabled for this instance.",
-          });
-        }
+        // LITEFUSE: upstream gated this endpoint on
+        // `LITEFUSE_ENABLE_EVENTS_TABLE_FLAGS` because both the count below and
+        // the worker's historic read stream targeted a physical `events` table.
+        // That table does not exist here — telemetry is split per project — and
+        // the read path was adapted instead of the storage
+        // (worker/src/features/database-read-stream/event-stream.ts reads
+        // `spans_<projectId>`, and `getObservationsCountFromEventsTable` already
+        // resolves the split `spans` table), so nothing on this path depends on
+        // that flag any more. Rejecting the request would only have kept a
+        // working feature unreachable while the flag defaults to "false".
 
         const requestedEvaluatorIds = Array.from(new Set(rawEvaluatorIds));
 
