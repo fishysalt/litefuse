@@ -264,28 +264,69 @@ export function isDecisionModelAdapterType(adapter: string): boolean {
   return DECISION_MODEL_ADAPTERS.includes(adapter as LLMAdapter);
 }
 
-// LITEFUSE ADDITION (copied from upstream main): OpenAI models the Decisions API
-// accepts. Upstream keeps OpenAI as both a text adapter and a decision-model
-// adapter, so the two predicates below ask "can this adapter answer a
-// decision-model evaluator at all" rather than "is this a decision-only
-// adapter" (that question is `isDecisionModelAdapterType` above).
+// ── LITEFUSE NOTE: decision-model support is deliberately narrowed to TypeSafe ──
+// This is an intentional, reversible deviation from upstream — not a missed port.
+//
+// Upstream 4.56 (`packages/shared/src/server/llm/types.ts:272-284`) treats OpenAI
+// as a second decision-model adapter: `supportsDecisionModels` returns true for
+// `LLMAdapter.OpenAI`, and `isAllowedDecisionModel` accepts the model ids of the
+// hosted OpenAI Decisions API (`OPENAI_DECISION_MODEL_IDS`). Upstream can honour
+// that claim because it ships the whole execution chain for it — an OpenAI
+// decision-model client (`.../llm/openai/openAIDecisionModelClient.ts`), a
+// dispatcher that selects it (`.../llm/createDecisionModelClient.ts`) and the
+// `ai@7` / `@ai-sdk/openai` dependencies those two need.
+//
+// Litefuse ships none of that. Our only decision-model client is the hand-written
+// TypeSafe/Jev one (`.../llm/typesafe/typeSafeDecisionModelClient.ts`), the worker
+// execution path builds exactly that client
+// (`worker/src/features/evaluation/v2DecisionModelExecution.ts`) and the execute
+// gate there is `isDecisionModelAdapter` / `DECISION_MODEL_ADAPTERS`, which lists
+// TypeSafe only.
+//
+// Keeping OpenAI "capable" here while nothing could execute it created a trap:
+// the save-time capability check waved OpenAI through, so an OpenAI decision-model
+// evaluator *saved successfully* and was only refused by the adapter gate on its
+// first real run — "saves fine, blocked later", worse than a plain rejection.
+// Narrowing both predicates to TypeSafe removes the claim and the trap together:
+// the selector filter, the save validation and the worker execution gate now all
+// answer the same question, because all three are TypeSafe-only.
+//
+// To re-enable OpenAI decision models: add the OpenAI decision-model client plus
+// the AI SDK dependencies and dispatch to it from the worker, then widen the two
+// predicates below back to their upstream form. See
+// `docs/handover/04-open-items-and-decisions.md` (D4) for the work item.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Kept verbatim from upstream 4.56 for contract parity: the model ids the hosted
+// OpenAI Decisions API accepts. LITEFUSE: NOT ENABLED — nothing in this repo can
+// create or dispatch an OpenAI decision-model client, so these ids are
+// descriptive only and are deliberately *not* accepted by
+// `isAllowedDecisionModel` below. See the LITEFUSE NOTE above.
 export const OPENAI_DECISION_MODEL_IDS: readonly string[] = ["gpt-6-luna"];
 
-export function isOpenAIDecisionModel(model: string): boolean {
-  return OPENAI_DECISION_MODEL_IDS.includes(model);
-}
-
-/** Adapters that can answer a decision-model evaluator. OpenAI stays a text adapter too. */
+/**
+ * Adapters that can answer a decision-model evaluator.
+ *
+ * LITEFUSE: TypeSafe only — upstream also returns true for `LLMAdapter.OpenAI`
+ * (see the LITEFUSE NOTE above). OpenAI is a text adapter here, nothing more.
+ */
 export function supportsDecisionModels(adapter: string): boolean {
-  return adapter === LLMAdapter.TypeSafe || adapter === LLMAdapter.OpenAI;
+  return adapter === LLMAdapter.TypeSafe;
 }
 
+/**
+ * LITEFUSE: TypeSafe only — any non-empty model name is allowed, because a
+ * TypeSafe/Jev connection stores a free-text model version (`jev-latest` by
+ * default). Upstream's OpenAI branch — the `isOpenAIDecisionModel(model)` call —
+ * is intentionally absent: that upstream helper was DELETED from this package
+ * (it had no call sites outside that branch). The name survives only in this
+ * comment as traceability; see the LITEFUSE NOTE above.
+ */
 export function isAllowedDecisionModel(
   adapter: string,
   model: string,
 ): boolean {
   if (adapter === LLMAdapter.TypeSafe) return model.length > 0;
-  if (adapter === LLMAdapter.OpenAI) return isOpenAIDecisionModel(model);
   return false;
 }
 

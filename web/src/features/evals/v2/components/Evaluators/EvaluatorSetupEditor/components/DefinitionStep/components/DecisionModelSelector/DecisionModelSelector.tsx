@@ -2,7 +2,6 @@ import {
   isAllowedDecisionModel,
   isDecisionModelAdapter,
   supportedModels,
-  supportsDecisionModels,
 } from "@langfuse/shared";
 import { useStore } from "zustand";
 
@@ -35,19 +34,22 @@ export function DecisionModelSelector({
     includeDecisionModels: true,
   });
 
-  // LITEFUSE ADDITION (gap D4): a connection is offered only when it both runs
-  // decision models in this deployment (`isDecisionModelAdapter`) and is capable
-  // of answering a decision-model question (`supportsDecisionModels`), and a
-  // model is offered only when the capability registry allows it for that
-  // adapter (`isAllowedDecisionModel`). The filters can only remove entries —
+  // LITEFUSE ADDITION (gap D4): a connection is offered only when it can run
+  // decision models in this deployment (`isDecisionModelAdapter`), and a model is
+  // offered only when the capability registry allows it for that adapter
+  // (`isAllowedDecisionModel`). The filters can only remove entries —
   // capabilities never make an adapter selectable that the execution path
   // cannot run.
+  //
+  // LITEFUSE: decision-model support is narrowed to TypeSafe (LITEFUSE NOTE in
+  // `packages/shared/src/server/llm/types.ts`), so the adapter half of that pair
+  // — `supportsDecisionModels` — is now the same TypeSafe-only predicate as
+  // `isDecisionModelAdapter`, and the upstream OpenAI case is gone. One adapter
+  // check is kept instead of ANDing two identical predicates; that is
+  // behaviour-identical today and stays correct if the widening is ever restored,
+  // because the execution gate is what decides.
   const options = (connections.data?.data ?? [])
-    .filter(
-      (connection) =>
-        isDecisionModelAdapter(connection.adapter) &&
-        supportsDecisionModels(connection.adapter),
-    )
+    .filter((connection) => isDecisionModelAdapter(connection.adapter))
     .flatMap((connection) => {
       const models = connection.withDefaultModels
         ? [...connection.customModels, ...supportedModels[connection.adapter]]
@@ -65,8 +67,8 @@ export function DecisionModelSelector({
         }));
     });
 
-  // LITEFUSE ADDITION (gap D4): name the connections the two gates above kept
-  // out of the picker instead of letting them disappear silently.
+  // LITEFUSE ADDITION (gap D4): name the connections the gate above kept out of
+  // the picker instead of letting them disappear silently.
   const capabilityNotice = (
     <DecisionModelCapabilityNotice connections={connections.data?.data ?? []} />
   );
