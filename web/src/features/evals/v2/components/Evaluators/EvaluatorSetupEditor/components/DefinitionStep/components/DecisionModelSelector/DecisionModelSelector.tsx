@@ -35,7 +35,12 @@ export function DecisionModelSelector({
       const models = connection.withDefaultModels
         ? [...connection.customModels, ...supportedModels[connection.adapter]]
         : connection.customModels;
-      return models.map((model) => ({
+      // A connection usually repeats the adapter's default model in its
+      // customModels (our TypeSafe preset stores `jev-latest` while
+      // supportedModels.typesafe already lists it), which used to render the
+      // same option twice. De-duplicate while keeping the first occurrence, so
+      // custom models stay ahead of the defaults.
+      return [...new Set(models)].map((model) => ({
         value: `${connection.provider}${SEPARATOR}${model}`,
         label: `${connection.provider}: ${model}`,
       }));

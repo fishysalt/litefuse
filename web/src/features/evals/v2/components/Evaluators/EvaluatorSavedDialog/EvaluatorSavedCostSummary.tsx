@@ -1,5 +1,5 @@
 /* eslint-disable no-nested-ternary */
-import { type EvalTemplateType, EvalTemplateTypeEnum } from "@langfuse/shared";
+import { EvalTemplateType, EvalTemplateTypeEnum } from "@langfuse/shared";
 import { InfoTooltip } from "@/src/components/ui/InfoTooltip/InfoTooltip";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { Slider } from "@/src/components/ui/slider";
@@ -7,20 +7,28 @@ import {
   SAMPLING_SLIDER_MIN,
   SAMPLING_SLIDER_STEP,
 } from "@/src/features/evals/v2/constants/ruleSampling";
-import { EvaluatorCostCalculationTooltipContent } from "@/src/features/evals/v2/components/EvaluatorCostCalculationTooltipContent/EvaluatorCostCalculationTooltipContent";
 import type { ActivationEstimate } from "@/src/features/evals/v2/fns/requestRuleActivation";
-import { formatEvaluatorCostCalculation } from "@/src/features/evals/v2/fns/formatEvaluatorCostCalculation";
-import { compactNumberFormatter, usdFormatter } from "@/src/utils/numbers";
+import { compactNumberFormatter } from "@/src/utils/numbers";
 
+/**
+ * LITEFUSE: the cost-estimate half of this summary is hidden.
+ *
+ * The test-run cost is not computed in this fork (`testEvaluator` leaves
+ * `estimatedCostUsd` unset and `getLatestEvaluatorRunCost` always returns null),
+ * so the "Recurring ≈ $…" and "One-time backfill ≈ $…" sections could only ever
+ * render `≈ $0.00` or "Unavailable" — a misleading value. The sampling slider and
+ * the code-evaluator "Matches" section are untouched, so saving an evaluator
+ * behaves exactly as before.
+ *
+ * The `estimates`, `unavailableEstimateCount` and `backfill` props are kept in
+ * the type because the dialog still passes them; they are intentionally unread.
+ */
 export function EvaluatorSavedCostSummary({
-  estimates,
-  unavailableEstimateCount,
   matchingObservations,
   sampling,
   isEstimating,
   onSamplingChange,
   evaluatorType,
-  backfill,
 }: {
   estimates: ActivationEstimate[];
   unavailableEstimateCount: number;
@@ -39,24 +47,7 @@ export function EvaluatorSavedCostSummary({
         isEstimating: boolean;
       };
 }) {
-  const estimate = estimates[0];
   const sampledObservations = Math.round(matchingObservations * sampling);
-  const estimatedCostUsd =
-    matchingObservations === 0
-      ? 0
-      : estimate
-        ? estimate.matchingObservations * sampling * estimate.testRunCostUsd
-        : null;
-  const backfillObservationCount = backfill.enabled
-    ? Math.min(backfill.matchingObservations, backfill.maxItems)
-    : 0;
-  const backfillTestRunCostUsd = backfill.enabled
-    ? backfill.testRunCostUsd
-    : null;
-  const backfillEstimatedCostUsd =
-    backfillTestRunCostUsd === null
-      ? null
-      : backfillObservationCount * sampling * backfillTestRunCostUsd;
 
   return (
     <div className="space-y-5">
@@ -97,89 +88,6 @@ export function EvaluatorSavedCostSummary({
               </p>
               <p className="text-muted-foreground text-xs tabular-nums">
                 {compactNumberFormatter(sampledObservations, 1)} sampled
-              </p>
-            </>
-          )}
-        </section>
-      ) : null}
-
-      {evaluatorType !== EvalTemplateTypeEnum.CODE ? (
-        <section className="border-t pt-4">
-          {isEstimating ? (
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-24" />
-              <Skeleton className="h-3 w-20" />
-            </div>
-          ) : (
-            <>
-              <p className="text-muted-foreground mb-1 font-mono text-[10px] tracking-wider uppercase">
-                Recurring
-              </p>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-lg font-bold tabular-nums">
-                  {estimatedCostUsd === null
-                    ? "Unavailable"
-                    : `≈ ${usdFormatter(estimatedCostUsd, 2, 2)}`}
-                </span>
-                <InfoTooltip label="How estimated LLM costs are calculated">
-                  <EvaluatorCostCalculationTooltipContent
-                    {...formatEvaluatorCostCalculation({
-                      matchingObservations,
-                      sampling,
-                      testRunCostUsd: estimate?.testRunCostUsd ?? null,
-                      estimatedCostUsd,
-                      evaluatorType,
-                    })}
-                  />
-                </InfoTooltip>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                estimated LLM costs / week
-              </p>
-              {unavailableEstimateCount > 0 ? (
-                <p className="text-muted-foreground mt-2 text-xs">
-                  No recent cost-bearing evaluator trace or successful fallback
-                  test was available.
-                </p>
-              ) : null}
-            </>
-          )}
-        </section>
-      ) : null}
-
-      {evaluatorType !== EvalTemplateTypeEnum.CODE && backfill.enabled ? (
-        <section className="border-t pt-4">
-          {backfill.isEstimating ? (
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-24" />
-              <Skeleton className="h-3 w-20" />
-            </div>
-          ) : (
-            <>
-              <p className="text-muted-foreground mb-1 font-mono text-[10px] tracking-wider uppercase">
-                One-time backfill
-              </p>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-lg font-bold tabular-nums">
-                  {backfillEstimatedCostUsd !== null
-                    ? `≈ ${usdFormatter(backfillEstimatedCostUsd, 2, 2)}`
-                    : "Unavailable"}
-                </span>
-                <InfoTooltip label="How estimated backfill costs are calculated">
-                  <EvaluatorCostCalculationTooltipContent
-                    {...formatEvaluatorCostCalculation({
-                      matchingObservations: backfillObservationCount,
-                      sampling,
-                      testRunCostUsd: backfillTestRunCostUsd,
-                      estimatedCostUsd: backfillEstimatedCostUsd,
-                      evaluatorType,
-                      period: "selection",
-                    })}
-                  />
-                </InfoTooltip>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                estimated LLM costs, once
               </p>
             </>
           )}

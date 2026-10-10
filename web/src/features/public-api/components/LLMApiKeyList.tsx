@@ -40,6 +40,12 @@ export function LlmApiKeyList(props: { projectId: string }) {
   const apiKeys = api.llmApiKey.all.useQuery(
     {
       projectId: props.projectId,
+      // This is the *connection management* surface: a decision-model (TypeSafe)
+      // connection that the evaluators v2 picker can select must also be listed
+      // here, otherwise it can neither be inspected, edited nor deleted — while
+      // creating a second one still fails as a duplicate. Ordinary model pickers
+      // keep the default (excluded).
+      includeDecisionModels: true,
     },
     {
       enabled: hasAccess,

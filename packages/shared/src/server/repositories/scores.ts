@@ -226,9 +226,16 @@ const formatMetadataSelect = (
     "environment",
   ];
 
+  // `scores.metadata` is a Doris MAP<TEXT,TEXT>. Doris renders a MAP as text by
+  // concatenating the raw values, WITHOUT escaping quotes inside them, so a
+  // value that is itself JSON (every decision-model score, and any nested
+  // object) came back as invalid JSON — e.g. {"typesafe":"{"questionId":"q1"}"}
+  // — and `parseMetadataCHRecordToDomain` then JSON.parse-failed into `{}`.
+  // `to_json` serialises the map with proper escaping (and a JSON-typed column),
+  // so the parser receives a real object and keeps such values intact.
   const selectColumns = excludeMetadata
     ? baseColumns
-    : [...baseColumns, "metadata"];
+    : [...baseColumns, "to_json(metadata) AS metadata"];
 
   return [
     selectColumns.join(", "),
@@ -972,7 +979,7 @@ const getScoresUiGeneric = async <T>(props: {
           s.source,
           s.data_type,
           s.comment,
-          ${!excludeMetadata ? "s.metadata," : ""}
+          ${!excludeMetadata ? "to_json(s.metadata) AS metadata," : ""}
           s.trace_id,
           s.session_id,
           s.observation_id,
@@ -1058,6 +1065,7 @@ const getScoresUiGeneric = async <T>(props: {
             ${props.select === "rows" ? `, t.user_id, t.name as trace_name, t.tags as trace_tags` : ""}
         FROM (
             SELECT s.*,
+                ${!excludeMetadata ? "to_json(s.metadata) AS metadata," : ""}
                 CASE WHEN s.metadata IS NOT NULL AND map_size(s.metadata) > 0
                      THEN 1 ELSE 0 END AS has_metadata
             FROM scores s
@@ -1746,7 +1754,7 @@ export const getScoreMetadataById = async (
   source?: ScoreSourceType,
 ) => {
   const query = `
-      SELECT metadata
+      SELECT to_json(metadata) AS metadata
       FROM scores s
       WHERE s.project_id = {projectId: String}
       AND s.id = {id: String}

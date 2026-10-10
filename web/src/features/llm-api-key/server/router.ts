@@ -258,6 +258,21 @@ export const llmApiKeyRouter = createTRPCRouter({
         });
       } catch (e) {
         logger.error(e);
+        // LITEFUSE ADDITION: `llm_api_keys` carries @@unique([projectId, provider]),
+        // so re-using a provider name (e.g. adding a second "TypeSafe" connection)
+        // makes Prisma throw P2002. Rethrowing that verbatim surfaced as a bare
+        // "internal server error" for what is a user-fixable naming clash; answer
+        // with an actionable message instead.
+        if (
+          e &&
+          typeof e === "object" &&
+          (e as { code?: string }).code === "P2002"
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `A connection with provider "${input.provider}" already exists in this project. Edit that connection instead, or use a different provider name.`,
+          });
+        }
         throw e;
       }
     }),

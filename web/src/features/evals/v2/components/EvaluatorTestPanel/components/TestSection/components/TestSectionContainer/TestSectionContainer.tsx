@@ -48,7 +48,6 @@ export function TestSectionContainer({
       ? testResult.executionTraceId
       : null;
   const durationMs = readNumber(testResult, "durationMs");
-  const estimatedCostUsd = readNumber(testResult, "estimatedCostUsd");
 
   return (
     <TestSection
@@ -69,7 +68,6 @@ export function TestSectionContainer({
               result: testResult,
             })}
             durationMs={durationMs}
-            estimatedCostUsd={estimatedCostUsd}
             rawOutput={testResult}
             rawOpen={rawResultOpen}
             onRawOpenChange={onRawResultOpenChange}

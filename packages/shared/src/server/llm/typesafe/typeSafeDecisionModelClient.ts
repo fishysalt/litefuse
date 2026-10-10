@@ -17,6 +17,14 @@
 // rest of it — answer translation, confidence clean-up — is written out here too,
 // because that part has to exist either way.
 //
+// Proxy support (LITEFUSE ADDITION): a raw `fetch` ignores the HTTP(S)_PROXY
+// environment variables, so a Jev endpoint that is only reachable through a proxy
+// (e.g. a region-restricted provider behind a VPN, or a corporate gateway) would
+// otherwise be unreachable. This mirrors what `fetchLLMCompletion` already does for
+// the LLM-judge path: build an undici `ProxyAgent` from `HTTPS_PROXY` and hand it to
+// fetch as the dispatcher. Note undici's ProxyAgent speaks HTTP(S) proxies only —
+// a SOCKS5-only proxy needs a bridge or a SOCKS-capable agent.
+//
 // Deviation: upstream wraps fetch in `createSecureLlmFetch` (SSRF hardening for a
 // user-supplied base URL). We do not have that module, and no other LLM call in
 // this project validates the connection's base URL either, so this uses plain
@@ -25,7 +33,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { z } from "zod/v4";
+import { ProxyAgent, type Dispatcher } from "undici";
 
+import { env } from "../../../env";
 import type {
   DecisionModelAnswer,
   DecisionModelClient,
@@ -112,12 +122,20 @@ export function createTypeSafeDecisionModelClient(params: {
 }): DecisionModelClient {
   const baseURL = withoutTrailingSlash(params.baseURL ?? DEFAULT_BASE_URL);
   const doFetch = params.fetchImpl ?? fetch;
+  // HTTPS_PROXY is the same variable the LLM-judge path honours, so one setting
+  // covers every outbound LLM call in the worker. Read per client (not at module
+  // load) so a test or a one-off script can set it before constructing the client.
+  const proxyUrl = env.HTTPS_PROXY;
+  const proxyDispatcher: Dispatcher | undefined = proxyUrl
+    ? new ProxyAgent(proxyUrl)
+    : undefined;
 
   return {
     evaluate: async (
       request: DecisionModelRequest,
     ): Promise<DecisionModelEvaluation> => {
-      const response = await doFetch(`${baseURL}${DECISION_PATH}`, {
+      // `dispatcher` is undici's fetch extension and is not part of RequestInit.
+      const init: RequestInit & { dispatcher?: Dispatcher } = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -136,7 +154,9 @@ export function createTypeSafeDecisionModelClient(params: {
             ]),
           ),
         }),
-      });
+        ...(proxyDispatcher ? { dispatcher: proxyDispatcher } : {}),
+      };
+      const response = await doFetch(`${baseURL}${DECISION_PATH}`, init);
 
       if (!response.ok) {
         const detail = await response.text().catch(() => "");
