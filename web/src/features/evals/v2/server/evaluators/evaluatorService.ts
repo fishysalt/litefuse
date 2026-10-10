@@ -50,6 +50,7 @@ import {
 import {
   assertEvaluatorConfigurationValid,
   getDecisionModelConfigurationError,
+  type EvaluatorValidationOptions,
 } from "./evaluatorValidation";
 
 type SuggestEvaluatorTextParams = {
@@ -425,7 +426,15 @@ export class EvaluatorService {
     createdByUserId: string | null,
     options?: { forceNewVersion?: boolean },
   ) {
-    const block = await validateEvaluatorForPersistence(input);
+    // LITEFUSE ADDITION: the decision-model save preflight makes one real
+    // provider call (one unit of real Jev quota). Handing the validator the
+    // provider+model pair that is already persisted lets it skip that call
+    // whenever the model did not change, so a rename or a question edit costs
+    // nothing.
+    const previousDecisionModel = await this.loadPreviousDecisionModel(input);
+    const block = await validateEvaluatorForPersistence(input, {
+      previousDecisionModel,
+    });
     const evaluator = await this.prisma.$transaction((tx) =>
       updateEvaluator({
         tx,
@@ -473,16 +482,33 @@ export class EvaluatorService {
     definition: EvaluatorDefinition,
   ) {
     const current = await this.get(input.projectId, input.evaluatorId);
-    return validateEvaluatorForPersistence({
-      projectId: input.projectId,
-      evaluatorId: input.evaluatorId,
-      name: input.name ?? current.name,
-      description:
-        input.description === undefined
-          ? current.description
-          : input.description,
-      definition,
-    });
+    return validateEvaluatorForPersistence(
+      {
+        projectId: input.projectId,
+        evaluatorId: input.evaluatorId,
+        name: input.name ?? current.name,
+        description:
+          input.description === undefined
+            ? current.description
+            : input.description,
+        definition,
+      },
+      // LITEFUSE ADDITION: same skip rule as `update` — the patched evaluator's
+      // persisted model pair is already loaded here.
+      { previousDecisionModel: previousDecisionModelTarget(current) },
+    );
+  }
+
+  /**
+   * LITEFUSE ADDITION: the provider+model pair persisted for this evaluator
+   * right now, read before validation so the decision-model save preflight can
+   * be skipped when it did not change. Also reused by the patch path above.
+   */
+  private async loadPreviousDecisionModel(input: UpdateEvaluatorInput) {
+    if (input.definition.type !== EvalTemplateType.DECISION_MODEL) return null;
+    return previousDecisionModelTarget(
+      await this.get(input.projectId, input.evaluatorId),
+    );
   }
 
   async reactivate(params: { projectId: string; evaluatorId: string }) {
@@ -898,11 +924,28 @@ async function reconcileEvaluatorBlock(params: {
   await repository.unblockEvaluator(params);
 }
 
+/**
+ * LITEFUSE ADDITION (decision-model save preflight): the provider+model pair a
+ * persisted evaluator already uses, or null when this is not a decision-model
+ * evaluator (or it has no version yet). Read straight off the latest version row
+ * — no definition parsing, and the pair is exactly what the preflight compares.
+ */
+function previousDecisionModelTarget(evaluator: {
+  type: EvalTemplateType;
+  versions: Array<{ provider: string | null; model: string | null }>;
+}): { provider: string; model: string } | null {
+  if (evaluator.type !== EvalTemplateType.DECISION_MODEL) return null;
+  const latest = evaluator.versions[0];
+  if (!latest?.provider || !latest.model) return null;
+  return { provider: latest.provider, model: latest.model };
+}
+
 async function validateEvaluatorForPersistence(
   input: CreateEvaluatorInput | UpdateEvaluatorInput,
+  options?: EvaluatorValidationOptions,
 ) {
   try {
-    await assertEvaluatorConfigurationValid(input);
+    await assertEvaluatorConfigurationValid(input, options);
     return null;
   } catch (error) {
     if (

@@ -4,9 +4,13 @@ import {
   InvalidRequestError,
   observationVariableMappingList,
 } from "@langfuse/shared";
+import { decrypt } from "@langfuse/shared/encryption";
 import {
+  createTypeSafeDecisionModelClient,
   DefaultEvalModelService,
+  getClientInitiatedNonStreamingLlmTimeoutMs,
   isDecisionModelAdapter,
+  logger,
 } from "@langfuse/shared/src/server";
 import { getEvaluatorDefinitionConfigurationError } from "@/src/features/evals/server/evaluator-preflight";
 import { getPromptMessagesValidationError } from "@/src/features/evals/v2/fns/promptMessages/hasInvalidSystemPromptMessage";
@@ -20,7 +24,27 @@ import {
   EvaluatorModelConfigurationError,
 } from "./evaluatorErrors";
 import { getDecisionModelCapabilityError } from "./decisionModelCapability";
+import {
+  createDecisionModelProbeFetch,
+  isDecisionModelPreflightRequired,
+  runDecisionModelPreflight,
+  type DecisionModelPreflightModel,
+  type DecisionModelProbeObservation,
+} from "./decisionModelPreflight";
 import type { EvaluatorDefinition } from "./evaluatorTypes";
+
+/**
+ * Options a caller passes when it can tell us what is already persisted. Only
+ * the decision-model preflight reads them today.
+ */
+export type EvaluatorValidationOptions = {
+  /**
+   * Provider+model of the evaluator version currently in the database, when the
+   * caller is updating an existing evaluator. `undefined`/`null` means "treat as
+   * a new model choice", so create always probes.
+   */
+  previousDecisionModel?: DecisionModelPreflightModel | null;
+};
 
 export function extractEvaluatorPromptVariables(
   promptMessages: Array<{ content: string }>,
@@ -99,11 +123,14 @@ export function assertCompleteEvaluatorVariableMapping(params: {
   }
 }
 
-export async function assertEvaluatorConfigurationValid(params: {
-  projectId: string;
-  name: string;
-  definition: EvaluatorDefinition;
-}) {
+export async function assertEvaluatorConfigurationValid(
+  params: {
+    projectId: string;
+    name: string;
+    definition: EvaluatorDefinition;
+  },
+  options?: EvaluatorValidationOptions,
+) {
   if (params.definition.type === EvalTemplateType.CODE) {
     if (!isCodeEvalEnabled()) {
       throw new EvaluatorConfigurationError(
@@ -127,6 +154,7 @@ export async function assertEvaluatorConfigurationValid(params: {
       projectId: params.projectId,
       name: params.name,
       definition: params.definition,
+      previousModel: options?.previousDecisionModel,
     });
     return;
   }
@@ -222,6 +250,7 @@ async function assertDecisionModelDefinitionValid(params: {
   projectId: string;
   name: string;
   definition: Extract<EvaluatorDefinition, { type: "DECISION_MODEL" }>;
+  previousModel?: DecisionModelPreflightModel | null;
 }) {
   if (params.definition.vars.length === 0) {
     throw new InvalidRequestError(
@@ -235,4 +264,129 @@ async function assertDecisionModelDefinitionValid(params: {
 
   const error = await getDecisionModelConfigurationError(params);
   if (error) throw new EvaluatorModelConfigurationError(error);
+
+  const preflightError = await getDecisionModelPreflightError({
+    projectId: params.projectId,
+    name: params.name,
+    provider: params.definition.provider,
+    model: params.definition.model,
+    previousModel: params.previousModel,
+  });
+  if (preflightError) throw new EvaluatorModelConfigurationError(preflightError);
+}
+
+/**
+ * ── LITEFUSE ADDITION (decision-model save preflight) ──────────────────────
+ * The connection gate above only proves that the provider *connection* exists
+ * and is decision-model-capable — it never asks the provider whether the model
+ * name inside that connection exists. A decision-model evaluator therefore used
+ * to save fine with a typo (`not-a-decision-model`) and only fail on the first
+ * real run. This mirrors upstream's "let the provider falsify the name" approach
+ * (`web/src/features/evals/server/evaluator-preflight.ts` on upstream main) for
+ * the decision-model side.
+ *
+ * COST: the probe is a real Jev call, i.e. one unit of real Jev quota, per save.
+ * It is deliberately skipped when the persisted version already uses the same
+ * provider+model pair, so renaming an evaluator (or editing its questions or
+ * description) spends nothing.
+ *
+ * INTENTIONAL DEVIATION FROM UPSTREAM: a failure that is *operational* rather
+ * than a verdict about the model (transport/proxy failure, timeout, 451 region
+ * block, 5xx, or a 4xx that says nothing about the model) does NOT block the
+ * save; it is logged as a warning and reported as "saved without verifying"
+ * through that log line. Upstream blocks in every failure case (upstream
+ * evaluator-validation passes `{ throwOnOperationalError: true }` and turns
+ * retryable/timeout errors into "The evaluator was not saved"). Blocking here
+ * would make a dropped VPN or a blocked region render evaluators unsavable,
+ * which is worse than persisting an unverified model that the user can test
+ * explicitly. Only a provider verdict about the model (404, or a body naming the
+ * model unknown/invalid/not-available) refuses the save.
+ *
+ * The warning is log-only on purpose: surfacing it in the mutation response
+ * would change the shape the setup UI consumes, which is outside the scope of
+ * this change (server-side evaluators only).
+ * ───────────────────────────────────────────────────────────────────────────
+ */
+async function getDecisionModelPreflightError(params: {
+  projectId: string;
+  name: string;
+  provider: string;
+  model: string;
+  previousModel?: DecisionModelPreflightModel | null;
+}): Promise<string | null> {
+  if (
+    !isDecisionModelPreflightRequired({
+      provider: params.provider,
+      model: params.model,
+      previousModel: params.previousModel,
+    })
+  ) {
+    // Unchanged model: no provider call, no quota. (Create has no previous
+    // model, so it always probes.)
+    return null;
+  }
+
+  // Same escape hatch as the LLM-judge preflight: a built app run against
+  // seeded test data must not spend provider quota.
+  if (
+    process.env.LANGFUSE_SKIP_EVALUATOR_MODEL_CALL_VALIDATION === "true" ||
+    process.env.NODE_ENV === "test" ||
+    process.env.DATABASE_URL?.includes("langfuse_test")
+  ) {
+    return null;
+  }
+
+  // Resolved a second time (the gate above already resolved it): one extra
+  // prisma read is cheaper than widening `getDecisionModelConfigurationError`'s
+  // return type for every existing caller.
+  const modelConfig = await DefaultEvalModelService.fetchValidModelConfig(
+    params.projectId,
+    params.provider,
+    params.model,
+  );
+  if (!modelConfig.valid) return null;
+
+  const observation: DecisionModelProbeObservation = {};
+  const outcome = await runDecisionModelPreflight({
+    evaluatorName: params.name,
+    provider: params.provider,
+    model: params.model,
+    previousModel: params.previousModel,
+    observation,
+    // Built lazily: when the probe is skipped, no client (and no proxy agent) is
+    // constructed and no request leaves the process.
+    createClient: () =>
+      createTypeSafeDecisionModelClient({
+        apiKey: decrypt(modelConfig.config.apiKey.secretKey),
+        model: modelConfig.config.model,
+        baseURL: modelConfig.config.apiKey.baseURL,
+        fetchImpl: createDecisionModelProbeFetch({
+          fetchImpl: fetch,
+          timeoutMs: getClientInitiatedNonStreamingLlmTimeoutMs(),
+          observation,
+        }),
+      }),
+  });
+
+  switch (outcome.status) {
+    case "skipped":
+    case "valid":
+      return null;
+    case "invalid":
+      return outcome.message;
+    case "unverified":
+      logger.warn(
+        "Decision-model evaluator save preflight could not verify the model; save allowed",
+        {
+          projectId: params.projectId,
+          evaluatorName: params.name,
+          provider: params.provider,
+          model: params.model,
+          reason: outcome.reason,
+          detail: outcome.detail,
+          unverified: true,
+        },
+      );
+      return null;
+  }
 }
