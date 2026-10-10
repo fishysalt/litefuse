@@ -32,17 +32,35 @@ export class LLMCompletionError extends Error {
   responseStatusCode: number;
   isRetryable: boolean;
   blockReason: EvaluatorBlockReason | null;
+  /**
+   * LITEFUSE ADDITION. True when the failure was our own client-side timeout
+   * rather than a provider response.
+   *
+   * Our LLM layer applies the timeout itself (`timeout:
+   * LITEFUSE_FETCH_LLM_COMPLETION_TIMEOUT_MS` on the LangChain client,
+   * fetchLLMCompletion.ts:287/344/351) and then wraps *every* failure into this
+   * class without attaching the cause, so the underlying
+   * `APIConnectionTimeoutError` / `TimeoutError` is lost and the failure looks
+   * exactly like a generic HTTP 500. `getLLMErrorInfo` therefore reported
+   * `kind: "provider"` for a timeout, and a save-time preflight would read that
+   * as a verdict about the model — writing a block the provider never asked for.
+   * Upstream reads native AI SDK errors, where `kind` comes out `"timeout"` on
+   * its own.
+   */
+  isTimeout: boolean;
 
   constructor(params: {
     message: string;
     responseStatusCode?: number;
     isRetryable?: boolean;
+    isTimeout?: boolean;
   }) {
     super(params.message);
 
     this.name = LLMCompletionErrorName;
     this.responseStatusCode = params.responseStatusCode ?? 500;
     this.isRetryable = params.isRetryable ?? false; // Default to false - be explicit about retryability
+    this.isTimeout = params.isTimeout ?? false;
     this.blockReason = inferLLMCompletionBlockReason({
       responseStatusCode: this.responseStatusCode,
       message: this.message,
@@ -148,6 +166,20 @@ export function getLLMErrorInfo(error: unknown): LLMErrorInfo | null {
 
   const providerError = findInCauseChain(error, isLLMCompletionError);
   if (providerError) {
+    // LITEFUSE ADDITION: a client-side timeout carries no provider verdict.
+    // Report it with upstream's `timeout` kind so callers classify it as
+    // operational (upstream's `isOperationalError`) instead of mistaking it for
+    // a statement about the model.
+    if (providerError.isTimeout) {
+      return {
+        kind: "timeout",
+        message: providerError.message,
+        statusCode: providerError.responseStatusCode,
+        isRetryable: providerError.isRetryable,
+        error,
+        providerError,
+      };
+    }
     return {
       kind: "provider",
       message: providerError.message,

@@ -18,6 +18,7 @@
 import { type JobExecution } from "@prisma/client";
 import {
   DECISION_MODEL_ADAPTER,
+  EvalExecutionMetadataKey,
   getBlockReasonForInvalidModelConfig,
   getEvaluatorBlockMetadata,
   isDecisionModelAdapter,
@@ -58,6 +59,7 @@ export async function runV2DecisionModelEvaluation({
   job,
   evaluatorId,
   evaluationRuleId,
+  assignmentId,
   scoreName,
   version,
   extractedVariables,
@@ -70,6 +72,13 @@ export async function runV2DecisionModelEvaluation({
   evaluatorId: string;
   /** Null for a ruleless manual batch run. */
   evaluationRuleId: string | null;
+  /**
+   * The rule↔evaluator assignment this execution ran. Null for a ruleless manual
+   * batch run. Recorded on the score as `evaluation_rule_assignment_id`, which is
+   * what identifies the variable mapping actually used when one rule has several
+   * evaluators attached.
+   */
+  assignmentId: string | null;
   scoreName: string;
   version: V2DecisionModelVersionForExecution;
   extractedVariables: ExtractedVariable[];
@@ -189,6 +198,15 @@ export async function runV2DecisionModelEvaluation({
         evaluator_version_id: version.id,
         // Absent on ruleless manual batch runs.
         ...(evaluationRuleId ? { evaluation_rule_id: evaluationRuleId } : {}),
+        // Same conditional-shape contract as upstream
+        // (`packages/shared/src/server/evals/evalExecutionMetadata.ts:48-53`): the
+        // key is omitted rather than written as null when there is no assignment.
+        ...(assignmentId
+          ? {
+              [EvalExecutionMetadataKey.EVALUATION_RULE_ASSIGNMENT_ID]:
+                assignmentId,
+            }
+          : {}),
       };
 
       span.setAttributes({
