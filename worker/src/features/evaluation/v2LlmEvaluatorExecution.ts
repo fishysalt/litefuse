@@ -24,6 +24,7 @@
 import { randomUUID } from "crypto";
 import { type JobExecution } from "@prisma/client";
 import {
+  EvalExecutionMetadataKey,
   getBlockReasonForInvalidModelConfig,
   getEvaluatorBlockMetadata,
   getEvaluatorPromptMessages,
@@ -137,6 +138,7 @@ export async function runV2LlmEvaluatorEvaluation({
   job,
   evaluatorId,
   evaluationRuleId,
+  assignmentId,
   scoreName,
   version,
   variableMapping,
@@ -150,6 +152,13 @@ export async function runV2LlmEvaluatorEvaluation({
   evaluatorId: string;
   /** Null for a ruleless manual batch run. */
   evaluationRuleId: string | null;
+  /**
+   * The rule↔evaluator assignment this execution ran. Null for a ruleless manual
+   * batch run. Recorded on the score as `evaluation_rule_assignment_id`, which is
+   * what identifies the variable mapping actually used when one rule has several
+   * evaluators attached.
+   */
+  assignmentId: string | null;
   scoreName: string;
   version: V2EvaluatorVersionForExecution;
   variableMapping: unknown;
@@ -202,6 +211,15 @@ export async function runV2LlmEvaluatorEvaluation({
         evaluator_version_id: version.id,
         // Absent on ruleless manual batch runs.
         ...(evaluationRuleId ? { evaluation_rule_id: evaluationRuleId } : {}),
+        // Same conditional-shape contract as upstream
+        // (`packages/shared/src/server/evals/evalExecutionMetadata.ts:48-53`): the
+        // key is omitted rather than written as null when there is no assignment.
+        ...(assignmentId
+          ? {
+              [EvalExecutionMetadataKey.EVALUATION_RULE_ASSIGNMENT_ID]:
+                assignmentId,
+            }
+          : {}),
       };
 
       /** Pauses the evaluator row (the field the migrated UI reads). */

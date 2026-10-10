@@ -70,10 +70,29 @@ export async function getEvaluatorDefinitionConfigurationError(params: {
   return prepared.valid ? null : prepared.error;
 }
 
-export async function getEvaluatorDefinitionPreflightError(params: {
-  projectId: string;
-  template: EvaluatorPreflightDefinition;
-}): Promise<string | null> {
+/**
+ * Validates an LLM-as-a-judge definition by *making the call*: `testModelCall`
+ * below is a REAL provider request (see the COST note in
+ * `web/src/features/evals/v2/server/evaluators/evaluatorValidation.ts`, which is
+ * the save-time caller).
+ *
+ * `throwOnOperationalError` splits a failure into the two upstream verdicts:
+ *   * a provider verdict about the model (404) is returned as a message, so the
+ *     caller can save the evaluator and mark it blocked instead of rejecting it;
+ *   * a timeout / retryable operational failure is rethrown, because there is no
+ *     verdict to persist and the save must be refused.
+ * Callers that omit the option (the reactivate path) keep the older behaviour of
+ * always getting a message back.
+ */
+export async function getEvaluatorDefinitionPreflightError(
+  params: {
+    projectId: string;
+    template: EvaluatorPreflightDefinition;
+  },
+  options?: {
+    throwOnOperationalError?: boolean;
+  },
+): Promise<string | null> {
   if (params.template.type === EvalTemplateType.CODE) return null;
 
   const prepared = await prepareEvaluatorDefinition(params);
@@ -104,6 +123,14 @@ export async function getEvaluatorDefinitionPreflightError(params: {
     });
   } catch (err) {
     const llmError = getLLMErrorInfo(err);
+    const isOperationalError =
+      !llmError ||
+      llmError.isRetryable ||
+      llmError.kind === "timeout" ||
+      llmError.kind === "abort";
+    if (isOperationalError && options?.throwOnOperationalError) {
+      throw err;
+    }
     // A provider 404 also covers typos, missing model access, and bad base
     // URLs — not just retired models, so don't claim "retired" as fact.
     if (llmError?.statusCode === 404) {
