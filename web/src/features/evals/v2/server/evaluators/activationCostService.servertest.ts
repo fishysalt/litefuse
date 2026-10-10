@@ -1,35 +1,52 @@
 import { EvalTemplateType } from "@langfuse/shared";
 import { prisma } from "@langfuse/shared/src/db";
-import type * as SharedServer from "@langfuse/shared/src/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  findEvaluatorsByIds: vi.fn(),
-  getObservationsCountFromEventsTable: vi.fn(),
-  getObservationsWithModelDataFromEventsTable: vi.fn(),
-  getLatestEvaluatorRunCost: vi.fn(),
-  testEvaluator: vi.fn(),
+// NOTE (Litefuse): upstream runs this suite on vitest, where `vi.hoisted` hands the
+// mock functions back to module scope before the (hoisted) `vi.mock` factories run.
+// jest hoists `jest.mock` above every other statement as well, so the factories
+// below create the `jest.fn()`s themselves and the typed handles are picked up
+// after the imports with `jest.mocked`.
+jest.mock("./evaluatorRepository", () => ({
+  findEvaluatorsByIds: jest.fn(),
 }));
 
-vi.mock("./evaluatorRepository", () => ({
-  findEvaluatorsByIds: mocks.findEvaluatorsByIds,
+jest.mock("@langfuse/shared/src/server", () => {
+  const actual = jest.requireActual("@langfuse/shared/src/server");
+
+  return {
+    __esModule: true,
+    ...actual,
+    getObservationsCountFromEventsTable: jest.fn(),
+    getObservationsWithModelDataFromEventsTable: jest.fn(),
+    getLatestEvaluatorRunCost: jest.fn(),
+  };
+});
+
+jest.mock("./testEvaluator", () => ({
+  testEvaluator: jest.fn(),
 }));
 
-vi.mock("@langfuse/shared/src/server", async (importOriginal) => ({
-  ...(await importOriginal<typeof SharedServer>()),
-  getObservationsCountFromEventsTable:
-    mocks.getObservationsCountFromEventsTable,
-  getObservationsWithModelDataFromEventsTable:
-    mocks.getObservationsWithModelDataFromEventsTable,
-  getLatestEvaluatorRunCost: mocks.getLatestEvaluatorRunCost,
-}));
-
-vi.mock("./testEvaluator", () => ({
-  testEvaluator: mocks.testEvaluator,
-}));
-
+import {
+  getLatestEvaluatorRunCost,
+  getObservationsCountFromEventsTable,
+  getObservationsWithModelDataFromEventsTable,
+} from "@langfuse/shared/src/server";
 import { getActivationCostEstimates } from "./activationCostService";
 import { ActivationCostEstimatesSchema } from "./evaluatorTypes";
+import { findEvaluatorsByIds } from "./evaluatorRepository";
+import { testEvaluator } from "./testEvaluator";
+
+const mocks = {
+  findEvaluatorsByIds: jest.mocked(findEvaluatorsByIds),
+  getObservationsCountFromEventsTable: jest.mocked(
+    getObservationsCountFromEventsTable,
+  ),
+  getObservationsWithModelDataFromEventsTable: jest.mocked(
+    getObservationsWithModelDataFromEventsTable,
+  ),
+  getLatestEvaluatorRunCost: jest.mocked(getLatestEvaluatorRunCost),
+  testEvaluator: jest.mocked(testEvaluator),
+};
 
 const evaluator = {
   id: "evaluator-id",
@@ -56,10 +73,10 @@ const evaluator = {
 
 describe("getActivationCostEstimates", () => {
   beforeEach(() => {
-    vi.resetAllMocks();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-08-12T08:00:00.000Z"));
-    mocks.findEvaluatorsByIds.mockResolvedValue([evaluator]);
+    jest.resetAllMocks();
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-08-12T08:00:00.000Z"));
+    mocks.findEvaluatorsByIds.mockResolvedValue([evaluator] as never);
     mocks.getObservationsCountFromEventsTable.mockResolvedValue(700);
     mocks.getObservationsWithModelDataFromEventsTable.mockResolvedValue([
       {
@@ -67,16 +84,16 @@ describe("getActivationCostEstimates", () => {
         traceId: "trace-id",
         startTime: new Date("2026-08-11T12:00:00.000Z"),
       },
-    ]);
+    ] as never);
     mocks.getLatestEvaluatorRunCost.mockResolvedValue(0.02);
     mocks.testEvaluator.mockResolvedValue({
       success: true,
       executionTraceId: "execution-trace-id",
-    });
+    } as never);
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    jest.useRealTimers();
   });
 
   it("rejects backfill ranges that start more than six months ago", () => {
@@ -111,7 +128,7 @@ describe("getActivationCostEstimates", () => {
       shouldReadFromObservationsTable: false,
     });
 
-    expect(mocks.findEvaluatorsByIds).toHaveBeenCalledOnce();
+    expect(mocks.findEvaluatorsByIds).toHaveBeenCalledTimes(1);
     expect(mocks.findEvaluatorsByIds.mock.calls[0]?.[0].prisma).toBe(prisma);
     expect(mocks.findEvaluatorsByIds.mock.calls[0]?.[0]).toMatchObject({
       projectId: "project-id",
@@ -136,7 +153,7 @@ describe("getActivationCostEstimates", () => {
       limit: 1,
       offset: 0,
     });
-    expect(mocks.getLatestEvaluatorRunCost).toHaveBeenCalledOnce();
+    expect(mocks.getLatestEvaluatorRunCost).toHaveBeenCalledTimes(1);
     expect(result).toEqual([
       {
         evaluatorId: "evaluator-id",
@@ -189,7 +206,7 @@ describe("getActivationCostEstimates", () => {
     mocks.findEvaluatorsByIds.mockResolvedValue([
       evaluator,
       { ...evaluator, id: "second-evaluator-id" },
-    ]);
+    ] as never);
     mocks.getLatestEvaluatorRunCost.mockImplementation(
       async (_projectId, evaluatorId) =>
         evaluatorId === "evaluator-id" ? 0.02 : 0.04,
@@ -204,8 +221,8 @@ describe("getActivationCostEstimates", () => {
       shouldReadFromObservationsTable: false,
     });
 
-    expect(mocks.findEvaluatorsByIds).toHaveBeenCalledOnce();
-    expect(mocks.getObservationsCountFromEventsTable).toHaveBeenCalledOnce();
+    expect(mocks.findEvaluatorsByIds).toHaveBeenCalledTimes(1);
+    expect(mocks.getObservationsCountFromEventsTable).toHaveBeenCalledTimes(1);
     expect(mocks.getLatestEvaluatorRunCost).toHaveBeenCalledTimes(2);
     expect(result).toEqual([
       expect.objectContaining({
@@ -249,7 +266,10 @@ describe("getActivationCostEstimates", () => {
       id: "code-evaluator-id",
       type: EvalTemplateType.CODE,
     };
-    mocks.findEvaluatorsByIds.mockResolvedValue([evaluator, codeEvaluator]);
+    mocks.findEvaluatorsByIds.mockResolvedValue([
+      evaluator,
+      codeEvaluator,
+    ] as never);
 
     const result = await getActivationCostEstimates({
       orgId: "org-id",
@@ -260,7 +280,7 @@ describe("getActivationCostEstimates", () => {
       shouldReadFromObservationsTable: false,
     });
 
-    expect(mocks.getLatestEvaluatorRunCost).toHaveBeenCalledOnce();
+    expect(mocks.getLatestEvaluatorRunCost).toHaveBeenCalledTimes(1);
     expect(mocks.getLatestEvaluatorRunCost).toHaveBeenCalledWith(
       "project-id",
       "evaluator-id",
@@ -341,7 +361,7 @@ describe("getActivationCostEstimates", () => {
       shouldReadFromObservationsTable: false,
     });
 
-    expect(mocks.getLatestEvaluatorRunCost).toHaveBeenCalledOnce();
+    expect(mocks.getLatestEvaluatorRunCost).toHaveBeenCalledTimes(1);
     expect(mocks.testEvaluator).not.toHaveBeenCalled();
     expect(result[0]?.estimatedCostUsd).toBe(10.5);
   });
@@ -350,7 +370,7 @@ describe("getActivationCostEstimates", () => {
     mocks.findEvaluatorsByIds.mockResolvedValue([
       evaluator,
       { ...evaluator, id: "second-evaluator-id" },
-    ]);
+    ] as never);
     const costReads = new Map<string, number>();
     mocks.getLatestEvaluatorRunCost.mockImplementation(
       async (_projectId, evaluatorId) => {
@@ -366,7 +386,7 @@ describe("getActivationCostEstimates", () => {
       maxActiveTests = Math.max(maxActiveTests, activeTests);
       await Promise.resolve();
       activeTests -= 1;
-      return { success: true, executionTraceId: "execution-trace-id" };
+      return { success: true, executionTraceId: "execution-trace-id" } as never;
     });
 
     const result = await getActivationCostEstimates({
@@ -380,7 +400,7 @@ describe("getActivationCostEstimates", () => {
 
     expect(
       mocks.getObservationsWithModelDataFromEventsTable,
-    ).toHaveBeenCalledOnce();
+    ).toHaveBeenCalledTimes(1);
     expect(mocks.testEvaluator).toHaveBeenCalledTimes(2);
     expect(maxActiveTests).toBe(2);
     expect(result.map(({ testRunCostUsd }) => testRunCostUsd)).toEqual([

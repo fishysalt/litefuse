@@ -33,16 +33,40 @@ import type { FilterConfig } from "../lib/filter-config";
 import { usePeekTableState } from "@/src/components/table/peek/contexts/PeekTableStateContext";
 
 /**
+ * Per-surface rules for columns that arrive from a URL / saved view. See
+ * `FilterConfig.columnAliases` and `FilterConfig.unappliedFilterColumns`.
+ */
+export type FilterColumnHandling = {
+  columnAliases?: Record<string, string>;
+  unappliedFilterColumns?: Record<string, string>;
+};
+
+function applyColumnAliases(
+  filters: FilterState,
+  columnAliases: Record<string, string>,
+): FilterState {
+  return filters.map((filter) => {
+    const aliased = columnAliases[filter.column];
+    if (aliased && aliased !== filter.column) {
+      return { ...filter, column: aliased };
+    }
+    return filter;
+  });
+}
+
+/**
  * Decodes filters from URL query string and normalizes display names to column IDs.
  * This prevents duplicates when old URLs use display names and new filters use column IDs.
  *
  * @param filtersQuery - Encoded filter string from URL
  * @param columnDefinitions - Column definitions for validation and normalization
+ * @param handling - Per-surface column aliases and columns this surface cannot apply
  * @returns Normalized and validated FilterState
  */
 export function decodeAndNormalizeFilters(
   filtersQuery: string,
   columnDefinitions: ColumnDefinition[],
+  handling: FilterColumnHandling = {},
 ): FilterState {
   try {
     const filters = decodeFiltersGeneric(filtersQuery);
@@ -52,16 +76,31 @@ export function decodeAndNormalizeFilters(
       knownColumns.set(columnDefinition.name, columnDefinition.id);
     }
 
-    // Normalize display names to column IDs immediately after decoding
+    // Rewrite aliased ids first, then normalize display names to column IDs.
     // This prevents duplicates when old URLs use display names (e.g., "Environment")
     // and user adds new filters with column IDs (e.g., "environment")
-    const normalized = normalizeFilterColumnNames(filters, columnDefinitions);
+    const normalized = normalizeFilterColumnNames(
+      applyColumnAliases(filters, handling.columnAliases ?? {}),
+      columnDefinitions,
+    );
 
     // Validate normalized filters
     const result: FilterState = [];
     for (const filter of normalized) {
       const validationResult = singleFilter.safeParse(filter);
       if (validationResult.success) {
+        const skippedReason =
+          handling.unappliedFilterColumns?.[validationResult.data.column];
+        if (skippedReason) {
+          // Expected on this surface: the column is known (our own deep links
+          // emit it) but this view has nothing to apply it to, so the filter is
+          // dropped with the reason instead of looking like a bug.
+          console.info(
+            `Filter on "${validationResult.data.column}" is not applied on this view: ${skippedReason}. The filter was ignored.`,
+          );
+          continue;
+        }
+
         const canonicalColumnId = knownColumns.get(
           validationResult.data.column,
         );
@@ -527,12 +566,17 @@ export function useSidebarFilterState(
     // If URL persistence is disabled, return empty filter state
     if (disableUrlPersistence) return [];
     return reconcileMutuallyExclusiveFilters(
-      decodeAndNormalizeFilters(filtersQuery, config.columnDefinitions),
+      decodeAndNormalizeFilters(filtersQuery, config.columnDefinitions, {
+        columnAliases: config.columnAliases,
+        unappliedFilterColumns: config.unappliedFilterColumns,
+      }),
       mutualExclusionContext,
     );
   }, [
     filtersQuery,
     config.columnDefinitions,
+    config.columnAliases,
+    config.unappliedFilterColumns,
     disableUrlPersistence,
     mutualExclusionContext,
   ]);

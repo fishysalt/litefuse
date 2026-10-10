@@ -19,6 +19,7 @@ import {
   EvaluatorConfigurationError,
   EvaluatorModelConfigurationError,
 } from "./evaluatorErrors";
+import { getDecisionModelCapabilityError } from "./decisionModelCapability";
 import type { EvaluatorDefinition } from "./evaluatorTypes";
 
 export function extractEvaluatorPromptVariables(
@@ -196,6 +197,20 @@ export async function getDecisionModelConfigurationError(params: {
   );
   if (!modelConfig.valid) {
     return `No decision-model connection found for evaluator "${params.name}". ${modelConfig.error}. Add a TypeSafe connection under Settings → LLM Connections (/project/${params.projectId}/settings/llm-connections) first.`;
+  }
+  // LITEFUSE ADDITION (gap D4): `supportsDecisionModels` / `isAllowedDecisionModel`
+  // answer the adapter *and* the model half of the question, so an unsupported
+  // adapter or a decision-model-incapable model is rejected with its own
+  // readable reason instead of falling through to the generic adapter message.
+  // The existing adapter check below still runs: it is the execution gate, and
+  // this one never accepts an adapter that gate rejects.
+  const capabilityError = getDecisionModelCapabilityError({
+    provider: params.definition.provider,
+    adapter: modelConfig.config.apiKey.adapter,
+    model: modelConfig.config.model,
+  });
+  if (capabilityError) {
+    return capabilityError;
   }
   if (!isDecisionModelAdapter(modelConfig.config.apiKey.adapter)) {
     return `Connection "${params.definition.provider}" is not a decision-model connection. Decision-model evaluators need a TypeSafe connection.`;

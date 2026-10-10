@@ -1,8 +1,14 @@
-import { isDecisionModelAdapter, supportedModels } from "@langfuse/shared";
+import {
+  isAllowedDecisionModel,
+  isDecisionModelAdapter,
+  supportedModels,
+  supportsDecisionModels,
+} from "@langfuse/shared";
 import { useStore } from "zustand";
 
 import { Button } from "@/src/components/ui/button";
 import { SelectInput } from "@/src/components/design-system/SelectInput/SelectInput";
+import { DecisionModelCapabilityNotice } from "@/src/features/evals/v2/components/Evaluators/EvaluatorSetupEditor/components/DefinitionStep/components/DecisionModelSelector/DecisionModelCapabilityNotice";
 import type { EvaluatorSetupStore } from "@/src/features/evals/v2/store/evaluatorSetupStore/evaluatorSetupStore";
 import { api } from "@/src/utils/api";
 
@@ -29,8 +35,19 @@ export function DecisionModelSelector({
     includeDecisionModels: true,
   });
 
+  // LITEFUSE ADDITION (gap D4): a connection is offered only when it both runs
+  // decision models in this deployment (`isDecisionModelAdapter`) and is capable
+  // of answering a decision-model question (`supportsDecisionModels`), and a
+  // model is offered only when the capability registry allows it for that
+  // adapter (`isAllowedDecisionModel`). The filters can only remove entries —
+  // capabilities never make an adapter selectable that the execution path
+  // cannot run.
   const options = (connections.data?.data ?? [])
-    .filter((connection) => isDecisionModelAdapter(connection.adapter))
+    .filter(
+      (connection) =>
+        isDecisionModelAdapter(connection.adapter) &&
+        supportsDecisionModels(connection.adapter),
+    )
     .flatMap((connection) => {
       const models = connection.withDefaultModels
         ? [...connection.customModels, ...supportedModels[connection.adapter]]
@@ -40,17 +57,28 @@ export function DecisionModelSelector({
       // supportedModels.typesafe already lists it), which used to render the
       // same option twice. De-duplicate while keeping the first occurrence, so
       // custom models stay ahead of the defaults.
-      return [...new Set(models)].map((model) => ({
-        value: `${connection.provider}${SEPARATOR}${model}`,
-        label: `${connection.provider}: ${model}`,
-      }));
+      return [...new Set(models)]
+        .filter((model) => isAllowedDecisionModel(connection.adapter, model))
+        .map((model) => ({
+          value: `${connection.provider}${SEPARATOR}${model}`,
+          label: `${connection.provider}: ${model}`,
+        }));
     });
+
+  // LITEFUSE ADDITION (gap D4): name the connections the two gates above kept
+  // out of the picker instead of letting them disappear silently.
+  const capabilityNotice = (
+    <DecisionModelCapabilityNotice connections={connections.data?.data ?? []} />
+  );
 
   if (connections.isSuccess && options.length === 0) {
     return (
-      <Button type="button" variant="outline" onClick={onConfigureProviders}>
-        Add a TypeSafe connection
-      </Button>
+      <>
+        <Button type="button" variant="outline" onClick={onConfigureProviders}>
+          Add a TypeSafe connection
+        </Button>
+        {capabilityNotice}
+      </>
     );
   }
 
@@ -74,6 +102,7 @@ export function DecisionModelSelector({
           });
         }}
       />
+      {capabilityNotice}
     </div>
   );
 }

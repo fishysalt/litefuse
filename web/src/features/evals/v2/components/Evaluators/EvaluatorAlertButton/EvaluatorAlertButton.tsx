@@ -63,6 +63,15 @@ type EvaluatorAlertButtonProps = {
   canRead: boolean;
   canCreate: boolean;
   limitReached?: boolean;
+  /**
+   * LITEFUSE ADDITION (decision M1): alerts are not available yet, so a surface
+   * that has no connected alerts must not offer the *creation* entry point
+   * (upstream's "Add alert" trigger + its create menu). Surfaces that do have
+   * connected alerts keep the whole picker, so the connected list stays
+   * reachable. Defaults to `false`: the component's own behaviour is unchanged
+   * unless a caller opts in, which keeps the existing component tests honest.
+   */
+  hideCreateEntryWhenEmpty?: boolean;
 } & (
   | {
       scope: "evaluator";
@@ -83,6 +92,7 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
     canRead,
     canCreate,
     limitReached = false,
+    hideCreateEntryWhenEmpty = false,
   } = props;
   const router = useRouter();
   const capture = usePostHogClientCapture();
@@ -128,6 +138,13 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
     });
     navigate(href, closePopover);
   };
+
+  // M1: no connected alerts means there is nothing to list and nothing to
+  // create, so the trigger (and its create menu) is not rendered at all. While
+  // the alerts are still loading we cannot tell yet, so the trigger stays.
+  if (hideCreateEntryWhenEmpty && !isLoading && alertCount === 0) {
+    return null;
+  }
 
   return (
     <PopoverController
