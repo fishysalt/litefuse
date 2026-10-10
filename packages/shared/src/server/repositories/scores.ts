@@ -1,4 +1,5 @@
 import {
+  ScoreDataTypeEnum,
   ScoreDataTypeType,
   ScoreDomain,
   ScoreSourceType,
@@ -6,6 +7,10 @@ import {
   LISTABLE_SCORE_TYPES,
   AggregatableScoreDataType,
 } from "../../domain/scores";
+import z from "zod/v4";
+import { InvalidRequestError, InternalServerError } from "../../errors";
+import type { APIScoreV3 } from "../../features/scores/interfaces/api/v3/schemas";
+import type { ScoreFieldGroupV3 } from "../../features/scores/interfaces/api/v3/endpoints";
 import { env } from "../../env";
 import { logger } from "../logger";
 import { FilterList } from "../queries";
@@ -1848,3 +1853,149 @@ export const getScoreCountsByProjectAndDay = async ({
     date: row.date,
   }));
 };
+
+// ── LITEFUSE PORT ───────────────────────────────────────────────────────────
+// Copied from upstream Langfuse 4.56.0
+// `packages/shared/src/server/repositories/scores.ts` ("Cursor helpers (v3
+// pagination)" + `polymorphicValueForV3` / `deriveSubjectForV3` /
+// `scoreDomainToV3`).
+//
+// Deliberate difference: upstream's `listScoresV3ForPublicApi` and its
+// `buildV3ListQuery`/`buildDynamicFilters` are ClickHouse-specific. Litefuse
+// reads scores from Doris, so the query itself lives next to the other
+// public-API score reads in
+// `web/src/features/public-api/server/scores.ts`
+// (`_handleListScoresV3ForPublicApi`) and only these cursor/payload helpers,
+// which are storage-agnostic, are shared.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ScoresCursorV3 = z.discriminatedUnion("v", [
+  z.object({
+    v: z.literal(1),
+    lastTimestamp: z.coerce.date(),
+    lastId: z.string(),
+  }),
+]);
+export type ScoresCursorV3Type = z.infer<typeof ScoresCursorV3>;
+
+export const EncodedScoresCursorV3 = z
+  .string()
+  .transform((val) => {
+    try {
+      const decoded = Buffer.from(val, "base64url").toString("utf-8");
+      return JSON.parse(decoded);
+    } catch (_e) {
+      throw new InvalidRequestError("Invalid cursor format");
+    }
+  })
+  .pipe(ScoresCursorV3);
+
+export const encodeCursorV3 = (cursor: ScoresCursorV3Type): string =>
+  Buffer.from(
+    JSON.stringify({
+      v: cursor.v,
+      lastTimestamp: cursor.lastTimestamp.toISOString(),
+      lastId: cursor.lastId,
+    }),
+  ).toString("base64url");
+
+export function polymorphicValueForV3(score: {
+  dataType: ScoreDataTypeType;
+  value: number;
+  stringValue?: string | null;
+  longStringValue?: string | null;
+}): number | boolean | string {
+  switch (score.dataType) {
+    case ScoreDataTypeEnum.NUMERIC:
+      return score.value;
+    case ScoreDataTypeEnum.BOOLEAN:
+      return score.value === 1;
+    case ScoreDataTypeEnum.CATEGORICAL:
+    case ScoreDataTypeEnum.TEXT:
+      if (score.stringValue == null) {
+        throw new InternalServerError(
+          `Score with dataType ${score.dataType} is missing its stringValue`,
+        );
+      }
+      return score.stringValue;
+    case ScoreDataTypeEnum.CORRECTION:
+      if (score.longStringValue == null) {
+        throw new InternalServerError(
+          "Score with dataType CORRECTION is missing its longStringValue",
+        );
+      }
+      return score.longStringValue;
+    default: {
+      const _exhaustiveCheck: never = score.dataType;
+      throw new InternalServerError(
+        `Score has unknown dataType: ${_exhaustiveCheck as string}`,
+      );
+    }
+  }
+}
+
+function deriveSubjectForV3(
+  score: ScoreDomain,
+):
+  | { kind: "observation"; id: string; traceId?: string }
+  | { kind: "trace" | "session" | "experiment"; id: string } {
+  if (score.datasetRunId) {
+    return { kind: "experiment", id: score.datasetRunId };
+  }
+  if (score.observationId) {
+    return {
+      kind: "observation",
+      id: score.observationId,
+      ...(score.traceId ? { traceId: score.traceId } : {}),
+    };
+  }
+  if (score.sessionId) {
+    return { kind: "session", id: score.sessionId };
+  }
+  if (!score.traceId) {
+    throw new InternalServerError(
+      `Score ${score.id} has kind=trace but missing traceId`,
+    );
+  }
+  return { kind: "trace", id: score.traceId };
+}
+
+export function scoreDomainToV3(
+  score: ScoreDomain,
+  fields: ScoreFieldGroupV3[],
+): APIScoreV3 {
+  return {
+    id: score.id,
+    projectId: score.projectId,
+    name: score.name,
+    dataType: score.dataType,
+    value: polymorphicValueForV3({
+      dataType: score.dataType,
+      value: score.value,
+      stringValue: score.stringValue as string | null | undefined,
+      longStringValue: score.longStringValue as string | null | undefined,
+    }),
+    source: score.source,
+    timestamp: score.timestamp,
+    environment: score.environment,
+    createdAt: score.createdAt,
+    updatedAt: score.updatedAt,
+    ...(fields.includes("details")
+      ? {
+          comment: score.comment,
+          configId: score.configId,
+          metadata: score.metadata,
+        }
+      : {}),
+    ...(fields.includes("annotation")
+      ? {
+          authorUserId: score.authorUserId,
+          queueId: score.queueId,
+        }
+      : {}),
+    ...(fields.includes("subject")
+      ? { subject: deriveSubjectForV3(score) }
+      : {}),
+  } as APIScoreV3;
+}
+// ── END LITEFUSE PORT ───────────────────────────────────────────────────────
