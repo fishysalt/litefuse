@@ -443,6 +443,12 @@ export default function EvaluatorsPage() {
         header: "Total cost (7d)",
         size: 140,
         enableHiding: true,
+        // Hidden by default: the cost reader returns no real numbers in this
+        // deployment, so the column only ever showed an empty placeholder.
+        // The column stays in the definition so the cost wiring is untouched;
+        // to show it again, tick it in "Column Visibility", or delete this
+        // line to make it visible for everyone again.
+        defaultHidden: true,
         formatter: (value) => usdFormatter(value, 2, 4),
         getValue: (value) => {
           if (costs.isPending && hasExecutionReadAccess) {
