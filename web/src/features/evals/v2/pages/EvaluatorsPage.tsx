@@ -407,15 +407,19 @@ export default function EvaluatorsPage() {
               type="button"
               className="focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
               aria-label={`View executions for ${row.original.name}`}
-              onClick={() =>
+              onClick={(event) => {
+                // The run markers are a drill-down inside the row; without this
+                // the row's own onClick also fires and the evaluator detail page
+                // wins the navigation race against this executions link.
+                event.stopPropagation();
                 router.push(
                   evaluatorExecutionsUrl(
                     projectId,
                     row.original.name,
                     row.original.type,
                   ),
-                )
-              }
+                );
+              }}
             >
               {history}
             </button>
@@ -670,6 +674,7 @@ export default function EvaluatorsPage() {
                 scope="allEvaluators"
                 projectId={projectId}
                 {...evaluatorAlerts}
+                hideCreateEntryWhenEmpty
               />
             )}
             <Button onClick={() => setGalleryOpen(true)}>
