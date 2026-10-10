@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { Clock, Coins } from "lucide-react";
+import { Clock } from "lucide-react";
 
 import { Switch } from "@/src/components/design-system/Switch/Switch";
 import { PrettyJsonView } from "@/src/components/ui/PrettyJsonView";
@@ -7,7 +7,6 @@ import {
   DecisionModelResultView,
   type DecisionModelQuestionResult,
 } from "@/src/features/evals/v2/components/Evaluators/DecisionModel/DecisionModelResultView/DecisionModelResultView";
-import { usdFormatter } from "@/src/utils/numbers";
 
 export type TestResultPanelState =
   | { status: "empty" }
@@ -58,14 +57,12 @@ function ResultStat({
 function TestResultHeader({
   title,
   durationMs,
-  estimatedCostUsd,
   rawOpen,
   onRawOpenChange,
   traceActions,
 }: {
   title: TestResultPanelTitle;
   durationMs: number | null;
-  estimatedCostUsd: number | null;
   rawOpen: boolean;
   onRawOpenChange: (open: boolean) => void;
   traceActions: ReactNode;
@@ -78,14 +75,9 @@ function TestResultHeader({
           {(durationMs / 1000).toFixed(2)}s
         </ResultStat>
       ) : null}
-      {estimatedCostUsd !== null ? (
-        <ResultStat
-          icon={Coins}
-          title="Estimated cost of the test call — also feeds the daily projection when saving"
-        >
-          {usdFormatter(estimatedCostUsd)}
-        </ResultStat>
-      ) : null}
+      {/* LITEFUSE: the test-run cost estimate ("Estimated cost of the test call")
+          is not computed in this fork — `estimatedCostUsd` is always null — so the
+          stat was removed rather than rendered as a blank/meaningless value. */}
       <span className="ml-auto flex shrink-0 items-center gap-2">
         <label className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs">
           <Switch
@@ -237,7 +229,6 @@ export function TestResultPanelView({
   title,
   result,
   durationMs,
-  estimatedCostUsd,
   rawOutput,
   rawOpen,
   onRawOpenChange,
@@ -247,7 +238,6 @@ export function TestResultPanelView({
   title: TestResultPanelTitle;
   result: TestResultPanelState;
   durationMs: number | null;
-  estimatedCostUsd: number | null;
   rawOutput: unknown | null;
   rawOpen: boolean;
   onRawOpenChange: (open: boolean) => void;
@@ -259,7 +249,6 @@ export function TestResultPanelView({
       <TestResultHeader
         title={title}
         durationMs={durationMs}
-        estimatedCostUsd={estimatedCostUsd}
         rawOpen={rawOpen}
         onRawOpenChange={onRawOpenChange}
         traceActions={traceActions}

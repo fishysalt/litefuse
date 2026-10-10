@@ -21,8 +21,14 @@ import {
   FilterList,
   createFilterFromFilterState,
   eventsTableUiColumnDefinitions,
+  eventsTableUiColumnDefinitionsForDoris,
   dorisSearchCondition,
   parseDorisUTCDateTimeFormat,
+  tableFor,
+  // `release` is a Doris reserved word: the column must be backtick-quoted or
+  // the whole statement fails with
+  // `no viable alternative at input 'o.release'`.
+  dq,
 } from "@langfuse/shared/src/server";
 import { Readable } from "stream";
 import { env } from "../../env";
@@ -382,6 +388,14 @@ export const getEventsStream = async (props: {
  * - Skips scores CTE and JOIN
  * - Skips comment fetching
  * - Maps Doris rows to ObservationForEval at the stream boundary
+ *
+ * LITEFUSE: this used to read a physical `events` table, which does not exist
+ * here — all telemetry lives in per-project split tables (`spans_<projectId>` /
+ * `traces_scalar_<projectId>`), so the historic run failed as soon as it tried
+ * to read. It now reads `spans` (roots and children live in the same table) with
+ * the same alias `o` the Doris filter/search helpers emit. `spans` is
+ * denormalised (trace_name/user_id/session_id/tags/release are columns), so no
+ * trace join is needed.
  */
 export const getEventsStreamForEval = async (props: {
   projectId: string;
@@ -402,7 +416,7 @@ export const getEventsStreamForEval = async (props: {
 
   // Filter out score and comment filters since they're not relevant for eval
   const eventOnlyFilters = (filter ?? []).filter((f) => {
-    const columnDef = eventsTableUiColumnDefinitions.find(
+    const columnDef = eventsTableUiColumnDefinitionsForDoris.find(
       (col) => col.uiTableName === f.column || col.uiTableId === f.column,
     );
 
@@ -422,7 +436,7 @@ export const getEventsStreamForEval = async (props: {
           type: "datetime" as const,
         },
       ],
-      eventsTableUiColumnDefinitions,
+      eventsTableUiColumnDefinitionsForDoris,
     ),
   );
 
@@ -433,47 +447,49 @@ export const getEventsStreamForEval = async (props: {
     hasTracesJoin: false,
   });
 
-  // Build the query for Doris - lightweight eval version
+  // `map<...>` columns are converted with `to_json` so they arrive as objects
+  // (Doris' own MAP -> text rendering does not escape quotes and produced
+  // invalid JSON for values that are themselves JSON), and the VARIANT
+  // `metadata` column is flattened to a JSON string that is parsed below.
   const query = `
     SELECT
-      e.id,
-      e.trace_id,
-      e.project_id,
-      e.parent_observation_id,
-      e.type,
-      e.name,
-      e.environment,
-      e.version,
-      e.level,
-      e.status_message,
-      e.trace_name,
-      e.user_id,
-      e.session_id,
-      e.is_root,
-      e.experiment_item_root_span_id,
-      e.tags,
-      e.release,
-      e.provided_model_name,
-      e.model_parameters,
-      e.prompt_id,
-      e.prompt_name,
-      e.prompt_version,
-      e.provided_usage_details,
-      e.usage_details,
-      e.provided_cost_details,
-      e.cost_details,
-      e.tool_definitions,
-      e.tool_calls,
-      e.tool_call_names,
-      e.input,
-      e.output,
-      e.metadata
-    FROM events e
-    WHERE e.project_id = {projectId: String}
+      o.span_id AS id,
+      o.trace_id AS trace_id,
+      o.project_id AS project_id,
+      o.parent_span_id AS parent_observation_id,
+      o.type AS type,
+      o.name AS name,
+      o.environment AS environment,
+      o.version AS version,
+      o.level AS level,
+      o.status_message AS status_message,
+      o.trace_name AS trace_name,
+      o.user_id AS user_id,
+      o.session_id AS session_id,
+      o.is_root AS is_root,
+      o.experiment_item_root_span_id AS experiment_item_root_span_id,
+      o.tags AS tags,
+      o.${dq("release")} AS ${dq("release")},
+      o.provided_model_name AS provided_model_name,
+      o.model_parameters AS model_parameters,
+      o.prompt_id AS prompt_id,
+      o.prompt_name AS prompt_name,
+      o.prompt_version AS prompt_version,
+      to_json(o.provided_usage_details) AS provided_usage_details,
+      to_json(o.usage_details) AS usage_details,
+      to_json(o.provided_cost_details) AS provided_cost_details,
+      to_json(o.cost_details) AS cost_details,
+      to_json(o.tool_definitions) AS tool_definitions,
+      o.tool_calls AS tool_calls,
+      o.tool_call_names AS tool_call_names,
+      o.input AS input,
+      o.output AS output,
+      json_object_flatten(o.metadata) AS metadata
+    FROM ${tableFor(projectId, "spans")} o
+    WHERE o.project_id = {projectId: String}
       ${appliedEventsFilter.query ? `AND ${appliedEventsFilter.query}` : ""}
       ${search.query}
-      AND e.is_deleted = 0
-    ORDER BY e.start_time DESC
+    ORDER BY o.start_time DESC
     LIMIT {rowLimit: Int64}
   `;
 
@@ -538,6 +554,12 @@ export const getEventsStreamForEval = async (props: {
 
   // Remap Doris aliases to schema field names.
   // Schema validation is left to the consumer so per-row errors can be handled gracefully.
+  //
+  // LITEFUSE: `spans` stores NULL for a few columns whose eval schema counterpart
+  // is non-nullable (zod `.default()` only covers `undefined`, not SQL NULL), so
+  // fill the documented defaults here instead of failing those rows during
+  // validation: `tags` is NULL for almost every span, `level`/`is_root` can be
+  // NULL on older rows and the map columns are NULL when unset.
   return Readable.from(
     (async function* () {
       for await (const row of asyncGenerator) {
@@ -545,11 +567,46 @@ export const getEventsStreamForEval = async (props: {
           ...row,
           span_id: row.id,
           parent_span_id: row.parent_observation_id,
+          tags: row.tags ?? [],
+          level: row.level ?? "DEFAULT",
+          is_root: row.is_root ?? 0,
+          provided_usage_details: row.provided_usage_details ?? {},
+          usage_details: row.usage_details ?? {},
+          provided_cost_details: row.provided_cost_details ?? {},
+          cost_details: row.cost_details ?? {},
+          tool_definitions: row.tool_definitions ?? {},
+          tool_calls: row.tool_calls ?? [],
+          tool_call_names: row.tool_call_names ?? [],
+          metadata: parseMetadataJson(row.metadata),
         };
       }
     })(),
   );
 };
+
+/**
+ * `json_object_flatten` returns the VARIANT metadata as JSON text; a malformed
+ * value must not abort the whole historic run, so it degrades to `null` (which
+ * the eval schema accepts).
+ */
+function parseMetadataJson(
+  metadata: unknown,
+): Record<string, unknown> | null {
+  if (metadata === null || metadata === undefined) return null;
+  if (typeof metadata !== "string") {
+    return typeof metadata === "object"
+      ? (metadata as Record<string, unknown>)
+      : null;
+  }
+  try {
+    const parsed = JSON.parse(metadata);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Lightweight event stream for batch add-to-dataset.
