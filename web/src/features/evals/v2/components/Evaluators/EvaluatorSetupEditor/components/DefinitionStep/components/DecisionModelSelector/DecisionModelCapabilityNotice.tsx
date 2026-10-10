@@ -1,6 +1,5 @@
 import {
   isAllowedDecisionModel,
-  isDecisionModelAdapter,
   supportedModels,
   supportsDecisionModels,
 } from "@langfuse/shared";
@@ -46,12 +45,15 @@ export function getDecisionModelConnectionExclusionReason(
 ): string | null {
   const label = `"${connection.provider}" (adapter "${connection.adapter}")`;
 
+  // LITEFUSE: decision-model support is narrowed to TypeSafe (LITEFUSE NOTE in
+  // `packages/shared/src/server/llm/types.ts`), so `supportsDecisionModels` and
+  // `isDecisionModelAdapter` are now the same TypeSafe-only predicate. The branch
+  // that used to explain "can serve decision models, but this deployment runs
+  // them on TypeSafe connections only" is therefore unreachable — it only ever
+  // fired for OpenAI, which no longer reports as decision-model capable — and was
+  // removed rather than left as dead text.
   if (!supportsDecisionModels(connection.adapter)) {
-    return `${label} cannot answer decision-model questions.`;
-  }
-
-  if (!isDecisionModelAdapter(connection.adapter)) {
-    return `${label} can serve decision models, but this deployment runs decision models on TypeSafe connections only.`;
+    return `${label} cannot answer decision-model questions; decision-model evaluators need a TypeSafe connection.`;
   }
 
   const hasAllowedModel = getConnectionModels(connection).some((model) =>
