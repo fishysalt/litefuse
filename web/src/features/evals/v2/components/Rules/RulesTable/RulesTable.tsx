@@ -686,11 +686,19 @@ export function RulesTable({
             />
           </div>
         </ResizableFilterLayout>
-        <TablePeekViewEvaluatorConfigDetail
-          {...legacyPeekConfig}
-          projectId={projectId}
-          readOnly
-        />
+        {/* Same gate as upstream's `TablePeekView` shell, which returns null
+            while no peek target is set (components/table/peek.tsx) and is what
+            the evaluator list renders. The adapter below drops that shell, so
+            without this gate the peek's `h-full` loading skeleton stays in the
+            flex column, splits the available height with the resizable panel
+            group and leaves the lower half of the page empty. */}
+        {router.query.peek ? (
+          <TablePeekViewEvaluatorConfigDetail
+            {...legacyPeekConfig}
+            projectId={projectId}
+            readOnly
+          />
+        ) : null}
         <RulesOverviewSelectionBar
           projectId={projectId}
           hasWriteAccess={hasWriteAccess}
