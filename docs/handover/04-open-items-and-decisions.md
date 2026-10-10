@@ -1,0 +1,257 @@
+# 04 · 待决策项与已知缺口
+
+> 配套文件：`docs/handover/01-state-and-history.md`（现状与历史）。
+> 本文件里的每一条都能直接当任务卡片用：**背景 → 影响 → 最短复现/验证步骤 → 建议**。
+> 生成时间：2026-10-10；撰写过程**未发起任何 LLM 调用**。凡未经独立核实的一律标注 **⚠️未核实**。
+> 命令里的 `<projectId>` 在 jev-demo 项目下就是 `jevdemoproject01`；密钥/密码一律用 `<占位符>`，真实值不入文档。
+
+接手后先花 10 分钟确认环境和两条只读事实（不花钱、不写数据）：
+
+```powershell
+# 1) 规则与绑定的现状（Postgres）
+docker exec litefuse-postgres psql -U postgres -d postgres -t -A -F'|' -c "select r.name, r.status, coalesce(e.name,'(none)'), coalesce(e.type::text,'-') from evaluation_rules r left join evaluation_rule_evaluator_assignments a on a.evaluation_rule_id=r.id left join evaluators e on e.id=a.evaluator_id where r.project_id='jevdemoproject01' order by r.status, r.name;"
+
+# 2) Doris root 连接数（修复后应当是个位数；修复前是 100 打满）
+node D:\SelectDB\litefuse-master\probe-doris-sql.cjs "select count(*) as total, sum(case when command='Sleep' then 1 else 0 end) as sleeping from information_schema.processlist where user='root'"
+```
+
+> Postgres 里评估器/规则相关的表名是 `evaluators` / `evaluator_versions` / `evaluation_rules` / `evaluation_rule_evaluator_assignments`（**没有** `evaluation_rule_evaluators`，列名是 `evaluation_rule_id` 不是 `rule_id`）。
+> macOS 对应：`docker exec` 命令一致；`node D:\...\probe-doris-sql.cjs` 换成你在 macOS 上的等价路径（如 `node ~/SelectDB/probe-doris-sql.cjs`）。
+
+---
+
+## 一、待用户拍板的决策
+
+### 决策 ① 规则 `parentObservationId is null` 正在为每条新 trace 花一次 Jev 调用 —— 禁还是留？
+
+**背景**（✅本轮 DB 级核实）
+
+- 规则名 `parentObservationId is null`，id `cmv1u03870048a2ogx26xnjyp`，状态 **ACTIVE**。
+- audit 记录显示由 `jev-demo-user` 在 **10-10 03:25:21 创建**（**不是**本任务代理创建的，所以没有擅自改动）。
+- 它绑定了 **DECISION_MODEL** 评估器 `3 different question jev`；另有一条 INACTIVE 规则 `名为supply` 也绑着同一个评估器。
+- 该规则到目前为止产出分数 **0 条**（说明创建后没有新 trace 进入，或还没被匹配上）。
+
+**影响**：只要它保持 ACTIVE，**每条新 trace 的根 span 都会真调一次 Jev**（`parentObservationId is null` 在这个模型里命中根 span）。这是当前唯一的持续性 Jev 花费面。
+
+**选项**
+
+| 选项 | 说明 |
+| --- | --- |
+| A. 立即禁用（**建议**） | 若这条是你手动测 UI 时随手建的，禁用即关闭花费面；需要时再开。 |
+| B. 留着但收窄过滤条件 | 例如加 `name contains 'ZZ demo'` 之类的限定，只对造数 trace 生效。 |
+| C. 原样保留 | 承认「每条新 trace 一次 Jev」的持续成本，或你本就不打算再让新 trace 进入。 |
+
+**建议**：A 或 B。理由是成本纪律是硬要求，且这条规则目前没有任何产出。
+
+**最短验证/操作步骤**
+
+```powershell
+# 看现状（只读）
+docker exec litefuse-postgres psql -U postgres -d postgres -t -A -F'|' -c "select id,name,status from evaluation_rules where project_id='jevdemoproject01' and id='cmv1u03870048a2ogx26xnjyp';"
+
+# 看它到底有没有花过钱（Doris 只读，数它名下的分数）
+node D:\SelectDB\litefuse-master\probe-doris-sql.cjs "select count(*) from scores where project_id='jevdemoproject01' and metadata['evaluation_rule_id']='cmv1u03870048a2ogx26xnjyp'"
+
+# 看创建者与改动时间线
+docker exec litefuse-postgres psql -U postgres -d postgres -t -A -F'|' -c "select to_char(created_at,'MM-DD HH24:MI:SS'), action, coalesce(user_id,'?') from audit_logs where resource_id='cmv1u03870048a2ogx26xnjyp' order by created_at;"
+```
+
+**操作方式建议**：**在 UI 上禁用**（规则列表 → 该规则 → 停用），而不是直接改库 —— 走 UI 会留 audit 记录，交接可追溯。
+
+### 决策 ② 列表页 “Total cost (7d)” 列是否隐藏？
+
+**背景**：评估器/规则列表页有一列 `Total cost (7d)`，它走的是**另一条**成本读取路径（不是本轮隐藏的那批估算组件）。当前显示 `—` / `No value`，因为 `evalCostCompat.ts` 的成本函数仍返回 `[]` / `null`。
+
+**影响**：不影响功能，但会让用户以为系统能算成本而实际算不出 —— 与已隐藏的「估算 $0.00/week」是同一类误导。
+
+**选项**：A. 隐藏该列（**建议**，与已做的隐藏保持一致的观感）；B. 保留但加 tooltip 说明「成本估算暂不可用」；C. 原样保留。
+
+**建议**：A。若要藏在服务端做更彻底（或先只在 UI 层隐藏），具体落点需再定位（⚠️本文件作者未定位到该列的确切组件）。
+
+**最短验证步骤**
+
+1. 打开 `http://localhost:3000/project/jevdemoproject01/evals`（评估器列表）与 `/evals/rules`（规则列表）。
+2. 在表头找到 `Total cost (7d)`，确认每行显示 `—` / `No value`。
+3. 定位方式（只读）：
+
+```powershell
+cd D:\SelectDB\litefuse-master\litefuse-master\dev_version\litefuse-main\litefuse-main
+Get-ChildItem -Recurse -File -Include *.tsx web\src\features\evals\v2 | Select-String -Pattern 'Total cost' | ForEach-Object { $_.Path + ':' + $_.LineNumber }
+# macOS: grep -rn "Total cost" web/src/features/evals/v2
+```
+
+### 决策 ③ 文档修正项（4 处，需你确认后我再改上游那 15 份文档）
+
+文档位置：`D:\SelectDB\litefuse-master\litefuse-master\docs\jev as judge\`（**仓库外，不是 git 仓库**，push 不会带走）。macOS 对应：你自己放这 15 份 md 的目录。
+
+| # | 要改什么 | 依据 |
+| --- | --- | --- |
+| ③-1 | Jev 从「未验证」改为「**已验证**」，并注明**前提是走 VPN 出口**（不走代理会得到 `HTTP 451 Typesafe is not available in your region.`） | ✅Jev 端到端真跑通过（CATEGORICAL 分 + metadata 里 `jev-1.13.0`） |
+| ③-2 | 题型→分数类型的表述更正：boolean/`noul` 题**落成 NUMERIC = P(true)**，**不是** BOOLEAN | ✅单次执行三题型产三条分数时实测 |
+| ③-3 | 补记 metadata 缺陷：Doris `map<text,text>` 转文本不转义内层引号 → 读侧必须 `to_json`；写侧预转义是错的方向 | ✅SQL 只读证明 + 存量行复读通过 |
+| ③-4 | 补记 D3 漏洞：创建规则时传入非法 `selectedColumnId` 会被接受、之后静默渲染空 | ⚠️来自交接前审计记录，未独立复现（见下文缺口 D3） |
+
+**选项**：A. 全部改（**建议**）；B. 只改 ③-1/③-2（最影响判断的两条）；C. 先不改，等 D3 复现确认后一起改。
+
+**最短验证**：打开这些 md 搜 `未验证` / `boolean` （Windows：`Select-String -Path '<docs>\*.md' -Pattern '未验证|boolean'`；macOS：`grep -rn "未验证\|boolean" <docs>`）。
+
+### 决策 ④ 5 个 v2 客户端测试仍红 —— 怎么办？
+
+**背景**（⚠️来自上一轮记录，未独立复跑）：`web/src/features/evals/v2/**/*.clienttest.tsx` 下 5 个测试文件未通过。分两类：
+
+- **3 个是刻意的策略差异**：我们把上游行为按自己的策略改了，测试仍按上游期望断言 → 正确做法是**改测试断言**（记录我们的策略），不要为了过测试回退策略。
+- **2 个是我方共享组件真缺能力**（**真缺口**）：
+  1. 共享 `CodeMirrorEditor` 缺 **Ctrl-F 搜索面板** → v2 里依赖该能力的地方拿不到；
+  2. 共享 `FilterBuilderForm` **内嵌 `useRouter`** → 无法在无 router 上下文（如测试/独立挂载）中使用。
+
+**影响**：不是线上功能故障，但它意味着「对齐上游」这件事在 UI 层还有两处没落地；且这 2 个缺口会在更多 v2 组件里重复咬人。
+
+**选项**
+
+| 选项 | 说明 |
+| --- | --- |
+| A（**建议**） | 分两步：先把 3 个策略差异的断言改成我们的策略（显式记录），再各开一张卡片修 2 个真缺口（优先 `FilterBuilderForm` 的 `useRouter` 解耦，影响面更大） |
+| B. 只改断言，2 个真缺口挂 backlog | 省事，但缺口会继续阻塞别的 v2 组件 |
+| C. 一次性全修 | 成本高，且会动共享组件 —— 与「尽量少动底座」原则冲突，需你明确授权 |
+
+**复现步骤**（⚠️命令形式按仓库 AGENTS/CLAUDE 约定，未在本轮复跑）：
+
+```powershell
+cd D:\SelectDB\litefuse-master\litefuse-master\dev_version\litefuse-main\litefuse-main
+pnpm test-client --testPathPatterns="evals/v2"      # 列出失败的 5 个文件
+# 单跑某个：
+pnpm test-client --testPathPatterns="<失败文件名>" --testNamePattern="<测试名>"
+```
+
+macOS 同命令（`pnpm` 跨平台）；只把工作目录换成你的仓库路径。
+
+**验证修好后**：`pnpm test-client --testPathPatterns="evals/v2"` 全绿，并且**不**出现为了过测试而回退我们策略的 diff。
+
+---
+
+## 二、已知缺口 / 未做项（可直接当任务卡片）
+
+### D1 `getEventsStream` / `getEventsStreamForDataset` 仍读物理 `events` 表
+
+- **背景**：本模型**没有 `events` 表**（per-project `spans_<projectId>` / `traces_scalar_<projectId>`）。历史批量评估路径（`getEventsStreamForEval`，`worker/src/features/database-read-stream/event-stream.ts`）已在 `45791b4` 改成 `FROM ${tableFor(projectId,"spans")} o` 并修掉 `release` 保留字、map 列 `to_json`、VARIANT `json_object_flatten`。
+- **缺口**：同一个文件里的 `getEventsStream` 与 `getEventsStreamForDataset` **仍是 `FROM events e`** → 同类缺陷，走到这两条路径就会得到与修复前同样的报错。
+- **影响**：取决于哪些功能走这两条路（⚠️未核实具体调用方），任何命中它的导出/数据集评估都会失败。
+- **最短复现/定位**：
+
+```powershell
+cd D:\SelectDB\litefuse-master\litefuse-master\dev_version\litefuse-main\litefuse-main
+Select-String -Path worker\src\features\database-read-stream\event-stream.ts -Pattern 'FROM events|tableFor\(' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line.Trim() }
+# macOS: grep -n "FROM events\|tableFor(" worker/src/features/database-read-stream/event-stream.ts
+```
+
+- **建议**：照 `getEventsStreamForEval` 的改法同构替换；改完跑一次**窄范围**真实调用验证（注意成本纪律：优先用 DeepSeek 评估器、rowLimit 设 2，别用 Jev）。
+
+### D2 决策模型 boolean 题不产出 BOOLEAN 分（现落成 NUMERIC = P(true)）
+
+- **背景**：✅实测 —— 一次执行里三题型产出三条分数：choice → CATEGORICAL、score → NUMERIC、boolean/`noul` → **NUMERIC = P(true)**。
+- **影响**：与上游语义不一致；下游按 BOOLEAN 过滤/展示的地方看不到这类题。
+- **最短验证**：查 Doris 看某条决策模型分数的 `data_type`：
+
+```powershell
+node D:\SelectDB\litefuse-master\probe-doris-sql.cjs "select name, data_type, value, string_value, to_json(metadata) from scores where project_id='jevdemoproject01' and name like '%boolean%' limit 5"
+```
+
+- **建议**：改 `worker/src/features/evaluation/v2DecisionModelExecution.ts` + `v2ScorePersistence.ts` 的分数类型推导；**先写会失败的测试再改**（仓库硬性要求）。是否值得改由你定 —— 涉及下游语义。
+
+### D3 创建规则时非法 `selectedColumnId` 被接受，之后静默渲染空
+
+- **背景**：⚠️交接前审计记录（**未独立复现**）：创建规则时可提交一个不在注册表里的 `selectedColumnId`，服务端接受，回显时该条过滤条件被丢弃 → 规则看起来「没有过滤条件」，实际过滤语义与用户以为的不同。
+- **影响**：**静默**语义偏差 —— 比报错更危险（可能让规则命中远超预期的 trace，直接放大 Jev/LLM 花费）。
+- **最短复现**：UI 新建规则 → 过滤器里选择一列后，用 devtools 改请求体里的 `selectedColumnId` 为不存在的值 → 提交 → 重新打开规则详情，观察该条件消失且无任何提示。
+- **建议**：在 `web/src/features/evals/v2/server/rules/` 侧把 `filter` 的列 id 做白名单校验（对照 `ruleSearchRegistry.ts` 与 `observationForEval.ts` 的注册表），非法值直接 `BAD_REQUEST`。
+- **验证**：提交非法列 id 应当**报错**而不是静默保存。
+
+### D4 `supportsDecisionModels` / `isAllowedDecisionModel` 已移植但未接线
+
+- **背景**：两个判定函数已在 `packages/shared/src/server/llm/types.ts` 里（连同 `DECISION_MODEL_ADAPTERS`、`typeSafeModels`、`resolveTypeSafeUpstream`），但**没有调用点**。
+- **影响**：决策模型的能力门禁/权限校验实际未生效；相关行为靠别处兜着（⚠️未核实是否已有等价校验）。
+- **最短定位**：
+
+```powershell
+cd D:\SelectDB\litefuse-master\litefuse-master\dev_version\litefuse-main\litefuse-main
+Select-String -Path packages\shared\src\server\llm\types.ts -Pattern 'supportsDecisionModels|isAllowedDecisionModel' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line.Trim() }
+# 全仓找调用点（应当找不到除定义外的引用）
+Get-ChildItem -Recurse -File -Include *.ts,*.tsx packages\shared\src,web\src,worker\src | Select-String -Pattern 'supportsDecisionModels|isAllowedDecisionModel' | ForEach-Object { $_.Path + ':' + $_.LineNumber }
+```
+
+- **建议**：接到决策模型选择/保存的校验路径上（选择器 + 服务端 router 双处），并补单测。
+
+### D5 `Add alert` 按钮按 M1 应隐藏，但当前仍可见
+
+- **背景**：✅源码确认按钮仍在：`web/src/features/evals/v2/components/Evaluators/EvaluatorAlertButton/EvaluatorAlertButton.tsx:349` → `{alertCount > 0 ? "Alerts" : "Add alert"}`。交接前审计（M1）要求隐藏该入口。
+- **影响**：暴露一个未接通/未完成的功能入口（点击后的行为 ⚠️未核实）。
+- **最短验证**：打开 `http://localhost:3000/project/jevdemoproject01/evals/<evaluatorId>`，右上角应能看到 `Add alert`。
+- **建议**：按 M1 隐藏（保持组件不删，仅不渲染 —— 符合「组件只增不换」原则）；或明确决定保留并标注为 beta。
+
+### D6 legacy 书签 `/evals/templates`、`/evals/default-model`、`/evals/configs` 全部 404
+
+- **背景**：旧 UI 已整体搬到 `/evals/legacy/**`，实际存在的文件是（✅文件级核实）：
+
+```
+evals/legacy/index.tsx        evals/legacy/new.tsx        evals/legacy/[evaluatorId].tsx
+evals/legacy/default-model.tsx
+evals/legacy/configs/{index,new,[configId]}.tsx
+evals/legacy/templates/{index,new,[id]}.tsx
+```
+
+→ 旧的顶层地址 `/evals/templates`、`/evals/default-model`、`/evals/configs` 不再有对应文件，**旧书签/旧链接会 404**。
+
+- **影响**：用户体验回退（书签失效）；外部文档里的旧链接同样失效。
+- **最短验证**：浏览器直接访问 `http://localhost:3000/project/jevdemoproject01/evals/templates` → 404；访问 `/evals/legacy/templates` → 正常。
+- **建议**：加 3 个**薄重定向壳**（照 `/evals/v2/*` 的 307 重定向写法），把旧路径 → `/evals/legacy/...`。成本很低，收益明确。
+
+### D7 评估器列表页的标记被行点击覆盖（缺 `stopPropagation`）
+
+- **背景**：⚠️来自交接前手工测试记录：在评估器列表页点击行内的标记/标签控件时，事件冒泡到整行 → 触发行点击（跳转），标记控件自身的动作被吞掉。
+- **影响**：列表页的标记操作不可用/时好时坏。
+- **最短复现**：打开 `/evals` → 对某行内的标记控件点击 → 观察是否跳到详情页而不是切换标记。
+- **建议**：在标记控件的点击处理里加 `e.stopPropagation()`（`web/src/features/evals/v2/components/Evaluators/**` 内定位）。
+- **验证**：点击标记不再触发跳转，且标记状态确实改变。
+
+### D8 traces 页过滤报 `Unknown filter column skipped: ruleId / traceName / isRootObservation`
+
+- **背景**：✅定位到告警出处：`web/src/features/filters/hooks/useSidebarFilterState.tsx:70` —— 当 `singleFilter.safeParse(filter)` 失败时会 `console.warn(\`Unknown filter column skipped: ${...column}\`)` 并**丢弃**该条件。也就是说这三个列 id 没通过该页面的 `singleFilter` 校验。
+- **根因**：⚠️**未完全定位** —— 后端侧 `observationForEval.ts` 的过滤注册表**已经**包含 `isRootObservation`（前端也有 `ruleSearchRegistry.ts` 的对应项），所以缺的应当是 **traces 页面侧栏过滤列注册表**（`web/src/features/filters/**`）未登记 `ruleId` / `traceName` / `isRootObservation`，或列 id 与枚举不匹配。
+- **影响**：用户在 traces 页添加这三个过滤条件时，条件被**静默丢弃** → 看到的是一份没有该过滤的结果（又是静默语义偏差）。
+- **最短复现**：打开 traces 页 → 侧栏添加过滤 `isRootObservation = true` → 看浏览器 console 是否出现 `Unknown filter column skipped: isRootObservation`，且结果集没变。
+- **定位步骤**：
+
+```powershell
+cd D:\SelectDB\litefuse-master\litefuse-master\dev_version\litefuse-main\litefuse-main
+Select-String -Path web\src\features\filters\hooks\useSidebarFilterState.tsx -Pattern 'Unknown filter column skipped' -Context 6,6
+# macOS: grep -n -A6 -B6 "Unknown filter column skipped" web/src/features/filters/hooks/useSidebarFilterState.tsx
+```
+
+- **建议**：把这三个列登记进 traces 页的过滤列定义（并确认后端 `singleFilter` 的白名单包含它们），或者——如果是有意不支持——把告警改成用户可见的提示，**不要静默丢弃**。
+
+---
+
+## 三、UI 陷阱提醒（交接对象必须知道）
+
+| 陷阱 | 说明 | 怎么避开 / 验证 |
+| --- | --- | --- |
+| **两套 UI 并存** | `/evals`（及其子路由）= **新 UI**；`/evals/legacy/**` = **旧 UI**；`/evals/v2/*` = **307 重定向壳**，不是真页面 | 直接访问 `http://localhost:3000/project/jevdemoproject01/evals` 看新 UI；`.../evals/legacy` 看旧 UI；`.../evals/v2/rules` 应当 307 跳到 `/evals/rules` |
+| **`/evals/rules` 曾「永久 Loading…」** | 历史坑：只有当 `[evaluatorId].tsx` 而没有静态 `rules.tsx` 时，`/evals/rules` 会被动态路由当成 `evaluatorId="rules"`，页面卡在 `Loading…` 永不返回 | 当前文件树里静态 `evals/rules.tsx` **存在**（✅核实）。**不要删这些静态路由文件**，否则该坑立刻回归 |
+| **dev 首次访问某路由编译慢** | Next dev（webpack）首访路由要现场编译，看起来像卡死 | 等 10–60 秒；再点一次通常就出来。别据此判定 bug |
+| **`remap` 在顶层** | `evals/remap.tsx` **没有**进 legacy | 引用路径时不要写成 `/evals/legacy/remap` |
+| **shared 改动不会自动生效** | web 读 `packages/shared/dist` | 改 shared 后必须 `pnpm --filter @langfuse/shared run build` **然后重启 web**；worker 由 `tsx watch` 自动重启 |
+| **Doris 写入依赖代理** | FE 307 指向 `172.29.0.3:8040`，本机不可直达 | 先起 `node D:\SelectDB\litefuse-master\_doris_be_proxy.cjs`（8899），并让 web/worker 带 `HTTP_PROXY=http://127.0.0.1:8899` |
+| **Doris SQL 走 9030** | HTTP query 端点返回 405 | 用 MySQL 协议 9030 或 `probe-doris-sql.cjs` |
+| **接入只有 OTel** | `/api/public/ingestion` 只收 score-create / sdk-log | 打 trace 用 `POST /api/public/otel/v1/traces` + 头 `x-langfuse-ingestion-version: 4` |
+| **登录要回显 csrf** | NextAuth credentials 登录必须回显 csrf cookie | 用 `_lf_session.cjs` 或照它的做法 |
+| **成本会真花钱** | 任何 ACTIVE 规则 + 带 Jev 评估器 = 每条新 trace 一次真实调用 | 造数/测试前先按 01 文档第 7 节禁用再恢复，并留 audit 证据 |
+
+---
+
+## 四、建议的接手顺序（不动手也能先只读完成前三步）
+
+1. **只读核对**：跑本文件开头两条命令 → 确认规则状态与 Doris 连接数。
+2. **拍板决策 ①**（唯一在持续花钱的项），顺手决定 ②③④。
+3. **按 D8 → D7 → D6 → D3 → D5 → D4 → D1 → D2 排序**修缺口（先修「静默语义偏差」类，再修「功能入口/重定向」类，最后修语义一致性与跨表适配）。
+4. 任何改动后跑 01 文档第 3 节的类型检查三连；涉及 `packages/shared` 先 build 再重启 web。
+5. **每一步都记账**：真实 LLM/Jev 调用次数写进交接记录；provider 失败不重试。
