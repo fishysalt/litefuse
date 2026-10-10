@@ -3,6 +3,7 @@
 > 配套文件：`docs/handover/01-state-and-history.md`（现状与历史）。
 > 本文件里的每一条都能直接当任务卡片用：**背景 → 影响 → 最短复现/验证步骤 → 建议**。
 > 生成时间：2026-10-10；撰写过程**未发起任何 LLM 调用**。凡未经独立核实的一律标注 **⚠️未核实**。
+> **修订记录（2026-10-10 第二轮，仅改文档）**：D1 由"未修"改为"**已修 + 剩余未验证项**"；D2 由"缺口"改为"**已核实为非缺口**"（boolean → NUMERIC = P(true) 与上游一致，原前提错误）；决策 ③-2 的措辞同步更正；新增"SDK 回归套件怎么跑"的说明在 `06`。D3~D8 本轮核对后确认**仍在原状**。
 > 命令里的 `<projectId>` 在 jev-demo 项目下就是 `jevdemoproject01`；密钥/密码一律用 `<占位符>`，真实值不入文档。
 
 接手后先花 10 分钟确认环境和两条只读事实（不花钱、不写数据）：
@@ -87,7 +88,7 @@ Get-ChildItem -Recurse -File -Include *.tsx web\src\features\evals\v2 | Select-S
 | # | 要改什么 | 依据 |
 | --- | --- | --- |
 | ③-1 | Jev 从「未验证」改为「**已验证**」，并注明**前提是走 VPN 出口**（不走代理会得到 `HTTP 451 Typesafe is not available in your region.`） | ✅Jev 端到端真跑通过（CATEGORICAL 分 + metadata 里 `jev-1.13.0`） |
-| ③-2 | 题型→分数类型的表述更正：boolean/`noul` 题**落成 NUMERIC = P(true)**，**不是** BOOLEAN | ✅单次执行三题型产三条分数时实测 |
+| ③-2 | 题型→分数类型的表述更正：boolean/`noul` 题**落成 NUMERIC = P(true)**，**不是** BOOLEAN —— 而且这是**与上游一致的正确行为**（上游同为 NUMERIC，见 D2 卡片）；文档里若写成"BOOLEAN"才是错的 | ✅实测 + 上游实现/单测/UI 文案逐条核对（见 D2） |
 | ③-3 | 补记 metadata 缺陷：Doris `map<text,text>` 转文本不转义内层引号 → 读侧必须 `to_json`；写侧预转义是错的方向 | ✅SQL 只读证明 + 存量行复读通过 |
 | ③-4 | 补记 D3 漏洞：创建规则时传入非法 `selectedColumnId` 会被接受、之后静默渲染空 | ⚠️来自交接前审计记录，未独立复现（见下文缺口 D3） |
 
@@ -131,32 +132,48 @@ macOS 同命令（`pnpm` 跨平台）；只把工作目录换成你的仓库路�
 
 ## 二、已知缺口 / 未做项（可直接当任务卡片）
 
-### D1 `getEventsStream` / `getEventsStreamForDataset` 仍读物理 `events` 表
+> **本轮（2026-10-10 第二轮）逐条核对结果**：**D1 已修**（改动在工作树中、未提交，含剩余未验证项）；**D2 已核实为非缺口**（原前提错误，已改写）；**D3 / D4 / D5 / D6 / D7 / D8 均仍在原状**——D4 全仓只有 `packages/shared/src/server/llm/types.ts:279,283` 两处定义、无调用点；D5 `Add alert` 仍在 `EvaluatorAlertButton.tsx:349`（另有 `:221`）；D6 `web/src/pages/project/[projectId]/evals/` 顶层仍只有 `index/new/rules/[evaluatorId]/remap`，没有 `templates`/`default-model`/`configs` 壳；D7 `Evaluators/**` 下唯一的 `stopPropagation` 出现在 `EvaluatorSampleObservationSelector.tsx:71`，标记控件处仍无。
 
-- **背景**：本模型**没有 `events` 表**（per-project `spans_<projectId>` / `traces_scalar_<projectId>`）。历史批量评估路径（`getEventsStreamForEval`，`worker/src/features/database-read-stream/event-stream.ts`）已在 `45791b4` 改成 `FROM ${tableFor(projectId,"spans")} o` 并修掉 `release` 保留字、map 列 `to_json`、VARIANT `json_object_flatten`。
-- **缺口**：同一个文件里的 `getEventsStream` 与 `getEventsStreamForDataset` **仍是 `FROM events e`** → 同类缺陷，走到这两条路径就会得到与修复前同样的报错。
-- **影响**：取决于哪些功能走这两条路（⚠️未核实具体调用方），任何命中它的导出/数据集评估都会失败。
-- **最短复现/定位**：
+### D1 ✅ **已修**（`getEventsStream` / `getEventsStreamForDataset` 已改读 Doris `spans`）—— 附剩余未验证项
+
+**状态**：**已修**，但**改动当前只在工作树里、尚未 commit**（`git status` 显示 `worker/src/features/database-read-stream/event-stream.ts` 为 modified）。
+
+- **背景**：本模型**没有 `events` 表**（per-project `spans_<projectId>` / `traces_scalar_<projectId>`）。历史批量评估路径（`getEventsStreamForEval`，`worker/src/features/database-read-stream/event-stream.ts`）已在 `45791b4` 改成 `FROM ${tableFor(projectId,"spans")} o`。
+- **本轮修法**（与 `getEventsStreamForEval` 同构）：复用 `eventsTableUiColumnDefinitionsForDoris` + Doris SQL 工厂 + `dq()` + map 列 `to_json`；**root 的 `parent_span_id=''` 归一为 NULL**；**去掉 `is_deleted` 谓词**（`spans` 没有这一列）；latency 用 `milliseconds_diff` 现算。
+- **证据（✅本轮核实）**：
+  - 三处 FROM 全部是 `${tableFor(projectId,"spans")} o`：`event-stream.ts:206 / 517 / 712`；`milliseconds_diff` 在 `:198-199`；worker 全库 **grep `FROM events` 无命中**。
+  - 真实读取实测：`getEventsStream(rowLimit=1000)` → **rows=241**；`getEventsStreamForDataset` → **rows=241**；`isRootObservation:true` → 94；`hasParentObservation:true` → 147。
+  - 数据侧交叉核对（本轮用 `probe-doris-sql.cjs` 复核）：`spans_jevdemoproject01` = **241 行 / 94 条 root（trace）**，与上面数字吻合。
+- **仍未验证的部分（接手后要补）**：
+  1. **没有跑真实 BullMQ 端到端导出作业** —— 没建 `batchExport` / `batchAction` 记录、没上传 S3、没跑 CSV/JSON 转换；
+  2. `isExperimentItemRootSpan` 的语义**因数据为空无法验证**；
+  3. 内容搜索（content search）路径**未实测**。
+- **复核命令**（只读）：
 
 ```powershell
 cd D:\SelectDB\litefuse-master\litefuse-master\dev_version\litefuse-main\litefuse-main
-Select-String -Path worker\src\features\database-read-stream\event-stream.ts -Pattern 'FROM events|tableFor\(' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line.Trim() }
-# macOS: grep -n "FROM events\|tableFor(" worker/src/features/database-read-stream/event-stream.ts
+Select-String -Path worker\src\features\database-read-stream\event-stream.ts -Pattern 'FROM events|tableFor\(|milliseconds_diff' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line.Trim() }
+Get-ChildItem -Recurse -File worker\src | Select-String -Pattern 'FROM events'   # 应当无输出
+# macOS: grep -n "FROM events\|tableFor(\|milliseconds_diff" worker/src/features/database-read-stream/event-stream.ts
 ```
+- **建议**：先把这个改动落进 commit；补端到端导出验证时注意成本纪律（优先 DeepSeek、rowLimit 设 2，别用 Jev）。
 
-- **建议**：照 `getEventsStreamForEval` 的改法同构替换；改完跑一次**窄范围**真实调用验证（注意成本纪律：优先用 DeepSeek 评估器、rowLimit 设 2，别用 Jev）。
+### D2 ✅ **已核实的更正：不是缺口** —— 决策模型 boolean 题产出 NUMERIC = P(true) 是上游行为
 
-### D2 决策模型 boolean 题不产出 BOOLEAN 分（现落成 NUMERIC = P(true)）
+- **更正**：本卡片原先写的前提（"上游语义是 BOOLEAN，我们应产出 BOOLEAN"）**是错的**。上游 Langfuse 4.43.0 的 boolean / `noul` 题型**本来就产出 NUMERIC**，值为 P(true)（0–1 概率）。
+- **依据（✅本轮逐条核实）**：
 
-- **背景**：✅实测 —— 一次执行里三题型产出三条分数：choice → CATEGORICAL、score → NUMERIC、boolean/`noul` → **NUMERIC = P(true)**。
-- **影响**：与上游语义不一致；下游按 BOOLEAN 过滤/展示的地方看不到这类题。
-- **最短验证**：查 Doris 看某条决策模型分数的 `data_type`：
+| 依据 | 位置 | 内容 |
+| --- | --- | --- |
+| 上游实现 | 只读克隆 `langfuse-latest\packages\shared\src\server\evals\decisionModelEvaluatorExecution.ts:299-304` | `case "boolean": { dataType: ScoreDataTypeEnum.NUMERIC, value: answer.probability }` |
+| 上游单测 | 同目录 `decisionModelEvaluatorExecution.test.ts`（输入 `:58`；断言 `:159-171` 区间内的 `:161-163`） | 输入 `refund: { type: "boolean", probability: 0.97 }`；断言 `dataType: "NUMERIC"`、`comment: "P(true)=0.97"` |
+| 上游 UI 文案 | 上游 `web/src/.../QuestionTypeSelector.tsx:38-39` | `summary: "Get the probability a statement is true."` / `writes: "a numeric score (probability 0–1)"` |
+| 上游 UI 展示 | 上游 `web/src/.../DecisionModelResultView.tsx:192,198` | `const leaning = probability >= 0.5 ? "yes" : "no"`；`P(yes) = {probability.toFixed(2)} → leaning {leaning}` —— **leaning 是 UI 自己派生的，不是分数类型** |
+| 我方实现 | `packages/shared/src/server/evals/decisionModelEvaluatorExecution.ts:323-328` | 与上游**逐字节一致** |
 
-```powershell
-node D:\SelectDB\litefuse-master\probe-doris-sql.cjs "select name, data_type, value, string_value, to_json(metadata) from scores where project_id='jevdemoproject01' and name like '%boolean%' limit 5"
-```
-
-- **建议**：改 `worker/src/features/evaluation/v2DecisionModelExecution.ts` + `v2ScorePersistence.ts` 的分数类型推导；**先写会失败的测试再改**（仓库硬性要求）。是否值得改由你定 —— 涉及下游语义。
+- **实测**：一次执行三题型 → choice → CATEGORICAL、score → NUMERIC、boolean/`noul` → **NUMERIC = P(true)** —— 与上游一致，属**正确行为**。
+- **注意**：**BOOLEAN** 分数属于 **LLM-as-a-judge / code evaluator** 那条路径（分数类型由评估器的输出 schema 决定），**不是**决策模型路径。需要布尔分就建 LLM-as-a-judge 评估器，而不是改决策模型的类型推导。
+- **结论**：**无需改动**（原"改 `worker/src/features/evaluation/v2DecisionModelExecution.ts` + `v2ScorePersistence.ts` 的分数类型推导"的建议**作废**）。若下游要按布尔过滤，应像上游那样在前端按 `value >= 0.5` 派生。
 
 ### D3 创建规则时非法 `selectedColumnId` 被接受，之后静默渲染空
 
@@ -252,6 +269,6 @@ Select-String -Path web\src\features\filters\hooks\useSidebarFilterState.tsx -Pa
 
 1. **只读核对**：跑本文件开头两条命令 → 确认规则状态与 Doris 连接数。
 2. **拍板决策 ①**（唯一在持续花钱的项），顺手决定 ②③④。
-3. **按 D8 → D7 → D6 → D3 → D5 → D4 → D1 → D2 排序**修缺口（先修「静默语义偏差」类，再修「功能入口/重定向」类，最后修语义一致性与跨表适配）。
+3. **按 D8 → D7 → D6 → D3 → D5 → D4 排序**修缺口（先修「静默语义偏差」类，再修「功能入口/重定向」类）。**D1 已修**（改动在工作树中、未提交，剩余未验证项见其卡片）；**D2 已核实为非缺口**（boolean → NUMERIC = P(true) 与上游一致，**不要**再去改分数类型推导）。另有一条新阻塞：**`next build` 被测试文件的类型错误挡住**（详见 `01` 第 6 节），要跑生产构建/SDK 回归套件前必须先清掉。
 4. 任何改动后跑 01 文档第 3 节的类型检查三连；涉及 `packages/shared` 先 build 再重启 web。
 5. **每一步都记账**：真实 LLM/Jev 调用次数写进交接记录；provider 失败不重试。

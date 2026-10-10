@@ -25,6 +25,7 @@ import {
   type ExtractedVariable,
 } from "@langfuse/shared/src/server";
 import { getObservationForEvalById } from "@/src/features/evals/server/getObservationForEvalById";
+import { getDecisionModelCapabilityError } from "./decisionModelCapability";
 import type { NormalizedEvaluatorDefinition } from "./evaluatorTypes";
 import {
   assertCompleteEvaluatorVariableMapping,
@@ -132,6 +133,18 @@ async function testDecisionModelEvaluator(params: {
   );
   if (!modelConfig.valid) {
     return { success: false as const, error: modelConfig.error };
+  }
+  // LITEFUSE ADDITION (gap D4): reject an adapter/model pair the capability
+  // registry does not allow (e.g. a text-only adapter, or a connection whose
+  // model is not a decision model) before the decision-model client is built,
+  // so the test run reports why instead of failing inside Jev.
+  const capabilityError = getDecisionModelCapabilityError({
+    provider: params.definition.provider,
+    adapter: modelConfig.config.apiKey.adapter,
+    model: modelConfig.config.model,
+  });
+  if (capabilityError) {
+    return { success: false as const, error: capabilityError };
   }
   if (!isDecisionModelAdapter(modelConfig.config.apiKey.adapter)) {
     return {

@@ -3,6 +3,8 @@
 > 用途：换设备接手时第一份要读的文件。只写确知的事实；凡未经本人独立核实的一律标注 **⚠️未核实**。
 > 生成时间：2026-10-10（本文件由上一轮会话的代理生成，未做任何 LLM 调用、未改动其它文件）。
 > 可信度约定：**✅已验证** = 有命令级/DB 级证据；**⚠️未核实** = 来自旧记录或子代理转述，接手后请自行复核。
+>
+> **修订记录（2026-10-10 第二轮，仅改文档）**：① **D1 已修** —— `getEventsStream` / `getEventsStreamForDataset` 已改读 Doris `spans_<projectId>`（**改动当前只在工作树里、未 commit**），附剩余未验证项；② **boolean 题前提更正** —— 原"应该产 BOOLEAN 分"的判断**是错的**，实测与上游 4.43.0 逐字节一致（boolean → **NUMERIC = P(true)**，这是正确行为，不是缺口）；③ **新增已知阻塞** —— `next build` 被**测试文件**的类型错误挡住（修复中/待复核）。详见第 4 节 ④、第 6 节与 `04-open-items-and-decisions.md` 的 D1 / D2。
 
 ---
 
@@ -137,7 +139,7 @@ evals/legacy/{configs,templates}/{index,new,[id|configId]}.tsx
 - `packages/shared/src/server/tableMappings/mapEventsTable.ts`：`isRootObservation → <alias>.is_root = 1`；`isExperimentItemRootSpan → <alias>.experiment_item_root_span_id = <alias>.span_id`（`e.` 与 `o.` 两套别名都补齐）。
 - `packages/shared/src/server/queries/doris-sql/{eventsCursor.ts,doris-filter.ts,factory.ts}`：真实 keyset 游标；`emptyEqualsNull` 落地为 `(col IS NULL OR col = '')`。
 - `packages/shared/src/features/evals/observationForEval.ts`：派生字段 `is_root`、`tool_call_count`；过滤注册表扩展到 `release` / `statusMessage` / `providedModelName` / `promptName` / `promptVersion` / `experimentId` / `experimentName` / `calledToolNames` / `isRootObservation` / `isExperimentItemRootSpan` / `toolCalls`。
-- 已知同类缺陷未修：`getEventsStream` / `getEventsStreamForDataset` 仍 `FROM events e`（见 04 文档）。
+- ~~已知同类缺陷未修~~ → **已修（当前在工作树中，未提交）**：同一个文件里的 `getEventsStream` 与 `getEventsStreamForDataset` 也已改成 `FROM ${tableFor(projectId,"spans")} o`（与 `getEventsStreamForEval` 同构：`eventsTableUiColumnDefinitionsForDoris` + Doris SQL 工厂 + `dq()` + map 列 `to_json`，root 的 `parent_span_id=''` 归一为 NULL，去掉 `is_deleted` 谓词，latency 用 `milliseconds_diff` 现算）。三处 FROM 分别在 `event-stream.ts:206 / 517 / 712`，worker 全库已无 `FROM events`（本轮 grep 核实）。读取已实测通过，**但端到端导出作业与其余未验证项见 04 的 D1 卡片**。
 
 ### ⑤ worker v2 执行链
 
@@ -209,7 +211,7 @@ web/src/features/evals/v2/components/EvaluatorTestPanel/components/TestSection/c
 | 能力 | 证据 |
 | --- | --- |
 | **Jev 端到端可用（经 VPN）** | 分数落库为 CATEGORICAL，`string_value=yes`；metadata 内保留模型原始回答 `jev-1.13.0`；execution trace 环境 `langfuse-llm-as-a-judge` |
-| **单次执行三题型 → 三条分数** | choice → **CATEGORICAL**；score → **NUMERIC**；boolean/`noul` → **NUMERIC = P(true)（不是 BOOLEAN）** |
+| **单次执行三题型 → 三条分数** | choice → **CATEGORICAL**；score → **NUMERIC**；boolean/`noul` → **NUMERIC = P(true)**。✅**已核实的更正**：这是**与上游一致的正确行为**（原"应该产 BOOLEAN"的判断错误，证据见 04 的 D2 卡片） |
 | **n:m 规则↔评估器** | 一条规则挂两个评估器 → 2 个 job / 2 条分数 |
 | **规则级 mapping 覆盖版本级** | `mappingOverride ?? assignment ?? version ?? []`；`null` = 运行时真继承 |
 | **ingest → score 时延** | 约 **5–7 秒** |
@@ -221,12 +223,34 @@ web/src/features/evals/v2/components/EvaluatorTestPanel/components/TestSection/c
 
 ### ⚠️ 未验证 / 明确未做
 
-- 决策模型 **boolean 题不产出 BOOLEAN 分**（现落成 NUMERIC = P(true)）。
-- `supportsDecisionModels` / `isAllowedDecisionModel` **已移植未接线**。
-- `getEventsStream` / `getEventsStreamForDataset` 仍 `FROM events e`。
-- D3：创建规则时非法 `selectedColumnId` 被接受、静默渲染空。
+- ✅**已核实为非缺口**：决策模型 **boolean / `noul` 题产出 NUMERIC = P(true)** —— 与上游 4.43.0 **逐字节一致**（上游 `decisionModelEvaluatorExecution.ts:299-304`、我方 `:323-328`）；原先"应该产 BOOLEAN"的判断是错的，**BOOLEAN 分属于 LLM-as-a-judge / code evaluator 路径**。详见 04 的 D2。
+- `supportsDecisionModels` / `isAllowedDecisionModel` **已移植未接线**（本轮复核：全仓只有 `packages/shared/src/server/llm/types.ts:279,283` 两处定义，**无调用点**）。
+- `getEventsStream` / `getEventsStreamForDataset` **已修（工作树中未提交）**：改读 `spans_<projectId>`，实测 `getEventsStream(rowLimit=1000) rows=241`、`getEventsStreamForDataset rows=241`；**剩余未验证项**（未跑真实 BullMQ 端到端导出作业、`isExperimentItemRootSpan` 无数据可验、内容搜索未实测）见 04 的 D1。
+- **⛔ 新增已知阻塞：生产构建 `next build` 被测试文件的类型错误挡住**（修复中/待复核）——见本节末尾专节。
+- D3：创建规则时非法 `selectedColumnId` 被接受、静默渲染空（本轮未修，仍未独立复现）。
+- D5 `Add alert` / D6 legacy 书签 404 / D7 标记缺 `stopPropagation` / D8 traces 页过滤告警：**本轮均未修**（已逐条核实仍在原状，见 04）。
 - 5 个 v2 客户端测试仍红（3 个为刻意策略差异，2 个是我方共享组件真缺能力）。
 - 成本估算：服务端仍返回 `[]`/`null`，本轮只隐藏了 UI。
+
+### ⛔ 已知阻塞（修复中 / 待复核）：`next build` 被**测试文件**的类型错误挡住
+
+生产构建当前失败，原因在**测试文件**而非产品代码（三处）：
+
+| 文件 | 问题 |
+| --- | --- |
+| `web/src/__tests__/transformScores.clienttest.ts` | mock 缺 `longStringValue`、`metadata` 类型不符（本轮核对：多处 mock 写成 `metadata: {}`） |
+| `web/src/features/evals/v2/components/Evaluators/EvaluatorAlertButton/EvaluatorAlertButton.clienttest.tsx` | `:125`、`:160` 的 `status: "ACTIVE"` 不在 `ConnectedAlert` 类型上 |
+| `web/src/features/evals/v2/server/evaluators/activationCostService.servertest.ts` | 残留 vitest 写法（`import { … } from "vitest"`、`vi.fn()`、`vi.mock()`；本仓库用 jest） |
+
+**关键点**：`npx tsgo -p tsconfig.build.json --noEmit --skipLibCheck`（01 第 3 节的"类型检查三连"之一）**看不到这些错误**——该配置排除了测试文件；只有 `next build`（读 `tsconfig.json`，**包含**测试文件）会暴露。所以"类型检查全绿"**不等于**"能构建"，这是本轮踩到的坑。
+
+**本次核对状态（工作树）＝ 修复中**：这三处**已被实际改动**（`git status` 显示三个文件均为 modified，**未提交**），本轮核对到的改动为：
+
+- `transformScores.clienttest.ts`：diff 约 **+25/−?** 行，文件里现在有 **6 处 `longStringValue`**（改前 mock 里没有）；
+- `EvaluatorAlertButton.clienttest.tsx`：**删掉 2 行**（`status: "ACTIVE"` 两处，原在 `:125` / `:160`，改后该文件已无 `status` 字样）；
+- `activationCostService.servertest.ts`：改动约 **100 行**，已从 vitest 迁到 jest（`jest.mock` / `jest.mocked`，不再 `import … from "vitest"`）。
+
+⚠️ **仍属"待复核"**：上述三处修好**尚未经 `next build` 复现验证**。请在新设备上先跑一次 `next build`（或用 `npx tsc --noEmit -p web/tsconfig.json` 之类**包含测试文件**的配置）确认阻塞已解除，再动手其它任务。
 
 ---
 

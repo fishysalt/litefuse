@@ -122,7 +122,6 @@ describe("EvaluatorAlertButton", () => {
           {
             id: "alert-1",
             name: "Evaluator alert",
-            status: "ACTIVE",
             severity: "UNKNOWN",
             metric: { measure: "count", aggregation: "count" },
             thresholdOperator: "GT",
@@ -157,7 +156,6 @@ describe("EvaluatorAlertButton", () => {
           {
             id: "alert-1",
             name: "Evaluator alert",
-            status: "ACTIVE",
             severity: "UNKNOWN",
             metric: { measure: "count", aggregation: "count" },
             thresholdOperator: "GT",
@@ -195,5 +193,65 @@ describe("EvaluatorAlertButton", () => {
     expect(routerPush).toHaveBeenCalledWith(
       "/project/project-1/alerts?filter=evaluatorId%3BstringOptions%3B%3Bany+of%3Bevaluator-1",
     );
+  });
+
+  // LITEFUSE (decision M1): the evaluator surfaces opt in to hiding the
+  // creation entry point while there is nothing connected, so no "Add alert"
+  // affordance is offered. Connected alerts still render the full picker, which
+  // the cases above pin down.
+  it("hides the create entry when the surface opts in and no alerts are connected", () => {
+    const { container } = render(
+      <EvaluatorAlertButton
+        scope="evaluator"
+        projectId="project-1"
+        evaluatorId="evaluator-1"
+        evaluatorType="LLM_AS_JUDGE"
+        scoreDataType="NUMERIC"
+        connectedAlerts={[]}
+        canRead
+        canCreate
+        hideCreateEntryWhenEmpty
+      />,
+    );
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByText("Add alert")).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("keeps the connected-alert picker when the surface opts in and alerts are connected", () => {
+    render(
+      <EvaluatorAlertButton
+        scope="evaluator"
+        projectId="project-1"
+        evaluatorId="evaluator-1"
+        evaluatorType="LLM_AS_JUDGE"
+        scoreDataType="NUMERIC"
+        connectedAlerts={[
+          {
+            id: "alert-1",
+            name: "Evaluator alert",
+            severity: "UNKNOWN",
+            metric: { measure: "count", aggregation: "count" },
+            thresholdOperator: "GT",
+            alertThreshold: 1,
+            alertedAt: null,
+          },
+        ]}
+        canRead
+        canCreate
+        hideCreateEntryWhenEmpty
+      />,
+    );
+
+    const trigger = screen.getByRole("button", {
+      name: "1 connected evaluator alert",
+    });
+    expect(trigger).toHaveTextContent("Alerts");
+
+    fireEvent.click(trigger);
+
+    expect(screen.getByText("Evaluator alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Score" })).toBeInTheDocument();
   });
 });

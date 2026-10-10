@@ -755,6 +755,7 @@ export function EvaluatorSetupPage(
               evaluatorType={initialEvaluator.type}
               scoreDataType={scoreDataType}
               {...evaluatorAlerts}
+              hideCreateEntryWhenEmpty
             />
             <Button
               type="button"

@@ -1,5 +1,6 @@
 import {
   EvalTargetObject,
+  experimentTargetEvalVariableColumns,
   observationVariableMappingList,
   paginationLimitZod,
   singleFilterList,
@@ -12,9 +13,40 @@ export const RuleMetadataSchema = z.object({
   sampling: z.number().min(0).max(1),
 });
 
+/**
+ * LITEFUSE ADDITION (gap D3): columns a rule assignment may map a template
+ * variable to. This is the registry the evaluator UI renders its column picker
+ * from, so an id outside it used to be persisted happily and then render as an
+ * empty filter — a silent semantic change (the judge receives an empty slot)
+ * instead of an error. `""` stays valid: it is the explicit "not mapped yet"
+ * sentinel written by the legacy-mapping migration
+ * (`prepareModernRuleVariableMapping`).
+ */
+const selectableEvalVariableColumnIds = new Set<string>(
+  experimentTargetEvalVariableColumns.map((column) => column.id),
+);
+
+export const ruleVariableMapping = observationVariableMappingList.superRefine(
+  (mappings, ctx) => {
+    mappings.forEach((mapping, index) => {
+      if (mapping.selectedColumnId === "") return;
+      if (selectableEvalVariableColumnIds.has(mapping.selectedColumnId)) return;
+
+      ctx.addIssue({
+        code: "custom",
+        message:
+          `Unknown observation column "${mapping.selectedColumnId}" for variable ` +
+          `"${mapping.templateVariable}". Valid columns: ` +
+          `${[...selectableEvalVariableColumnIds].join(", ")} (or "" to leave the variable unmapped).`,
+        path: [index, "selectedColumnId"],
+      });
+    });
+  },
+);
+
 export const RuleAssignmentInputSchema = z.object({
   evaluatorId: z.string().min(1),
-  variableMapping: observationVariableMappingList.nullable(),
+  variableMapping: ruleVariableMapping.nullable(),
 });
 
 export const RuleIdSchema = z.object({
@@ -94,7 +126,9 @@ export const SetRuleEnabledSchema = RuleIdSchema.extend({
 
 export const RuleAssignmentSchema = RuleIdSchema.extend({
   evaluatorId: z.string(),
-  variableMapping: observationVariableMappingList.nullable(),
+  // LITEFUSE ADDITION (gap D3): the attach path writes a mapping too, so it
+  // validates the column against the same whitelist as create/update.
+  variableMapping: ruleVariableMapping.nullable(),
   enableRule: z.boolean().optional(),
 });
 

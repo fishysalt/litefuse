@@ -1,9 +1,10 @@
 /**
  * Event stream for batch exports.
- * Queries the Doris events table with filters and streams results
+ * Queries the project's Doris `spans_<projectId>` split table (there is no
+ * physical `events` table in this model) with filters and streams results
  * for efficient batch export processing.
  *
- * The events table is denormalized with trace data already included,
+ * `spans` is denormalized with trace data already included,
  * so no JOINs are needed for trace-level fields.
  */
 
@@ -20,7 +21,6 @@ import {
   logger,
   FilterList,
   createFilterFromFilterState,
-  eventsTableUiColumnDefinitions,
   eventsTableUiColumnDefinitionsForDoris,
   dorisSearchCondition,
   parseDorisUTCDateTimeFormat,
@@ -45,6 +45,17 @@ const BATCH_SIZE = 1000; // Fetch comments in batches for efficiency
  * Creates a stream of events from Doris for batch export.
  * Includes comments fetched in batches and flattened scores.
  *
+ * LITEFUSE: this used to read a physical `events` table, which does not exist
+ * here — every project's telemetry lives in its own split tables
+ * (`spans_<projectId>` / `traces_scalar_<projectId>`), so the statement now
+ * targets `spans_<projectId>`. It is the same table `getEventsStreamForEval`
+ * reads: trace roots and observations live in the same table and `is_root`
+ * tells them apart, so no `is_root` predicate is added here (the "Is Root
+ * Observation" filter column does that when the user asks for it, and this
+ * matches the observation read path on `spans`). `spans` is denormalised
+ * (trace_name/tags/release/user_id/session_id are columns), so no trace JOIN is
+ * needed, and there is no `is_deleted` column to filter on.
+ *
  * @param props - Query parameters including projectId, filters, and limits
  * @returns A Node.js Readable stream of event records
  */
@@ -67,7 +78,7 @@ export const getEventsStream = async (props: {
 
   // Filter out score and comment filters since they require special handling
   const eventOnlyFilters = (filter ?? []).filter((f) => {
-    const columnDef = eventsTableUiColumnDefinitions.find(
+    const columnDef = eventsTableUiColumnDefinitionsForDoris.find(
       (col) => col.uiTableName === f.column || col.uiTableId === f.column,
     );
     // Keep the filter if it's not a scores or comments filter
@@ -92,7 +103,11 @@ export const getEventsStream = async (props: {
     {} as Record<string, null>,
   );
 
-  // Build filters for events (project_id is handled by the query builder)
+  // Build filters for events (project_id is handled by the query builder).
+  // `eventsTableUiColumnDefinitionsForDoris` is required here: its `select`
+  // expressions are Doris SQL over the `o` alias (the ClickHouse mapping emits
+  // `e.\`col\`` / ClickHouse-only functions and names a table — `events_proto` —
+  // that the Doris filter factory rejects outright).
   const eventsFilter = new FilterList(
     createFilterFromFilterState(
       [
@@ -104,7 +119,7 @@ export const getEventsStream = async (props: {
           type: "datetime" as const,
         },
       ],
-      eventsTableUiColumnDefinitions,
+      eventsTableUiColumnDefinitionsForDoris,
     ),
   );
 
@@ -115,8 +130,16 @@ export const getEventsStream = async (props: {
     hasTracesJoin: false,
   });
 
-  // Build the query using raw SQL for Doris
-  // Doris doesn't have FINAL modifier or LIMIT 1 BY, so we use ROW_NUMBER() for deduplication
+  // Build the query using raw SQL for Doris, reading the project's `spans`
+  // split table under the alias `o` — the prefix the Doris filter/search
+  // helpers emit.
+  // `map<...>` columns are converted with `to_json` (see getEventsStreamForEval)
+  // and the VARIANT `metadata` column with `json_object_flatten`.
+  // The scores CTE is kept byte-identical to the previous shape on purpose:
+  // `scores_avg` is not filtered by `data_type`, so categorical scores already
+  // travel through it as `{dataType, stringValue}` and `prepareScoresForOutput`
+  // turns them into the categorical score columns. Adding the
+  // `score_categories_tuples` aggregate would emit every categorical value twice.
   const query = `
     WITH scores_agg AS (
       SELECT
@@ -146,48 +169,46 @@ export const getEventsStream = async (props: {
       GROUP BY trace_id, observation_id
     )
     SELECT
-      e.id,
-      e.trace_id,
-      e.project_id,
-      e.start_time,
-      e.end_time,
-      e.name,
-      e.type,
-      e.environment,
-      e.version,
-      e.user_id,
-      e.session_id,
-      e.level,
-      e.status_message,
-      e.prompt_name,
-      e.prompt_id,
-      e.prompt_version,
-      e.model_id,
-      e.provided_model_name,
-      e.model_parameters,
-      e.usage_details,
-      e.cost_details,
-      e.total_cost,
-      e.input,
-      e.output,
-      e.metadata,
-      e.completion_start_time,
-      e.latency,
-      e.time_to_first_token,
-      e.tags,
-      e.release,
-      e.trace_name,
-      e.parent_observation_id,
-      e.is_deleted,
+      o.span_id AS id,
+      o.trace_id AS trace_id,
+      o.project_id AS project_id,
+      o.start_time AS start_time,
+      o.end_time AS end_time,
+      o.name AS name,
+      o.type AS type,
+      o.environment AS environment,
+      o.version AS version,
+      o.user_id AS user_id,
+      o.session_id AS session_id,
+      o.level AS level,
+      o.status_message AS status_message,
+      o.prompt_name AS prompt_name,
+      o.prompt_id AS prompt_id,
+      o.prompt_version AS prompt_version,
+      o.model_id AS model_id,
+      o.provided_model_name AS provided_model_name,
+      o.model_parameters AS model_parameters,
+      to_json(o.usage_details) AS usage_details,
+      to_json(o.cost_details) AS cost_details,
+      o.total_cost AS total_cost,
+      o.input AS input,
+      o.output AS output,
+      json_object_flatten(o.metadata) AS metadata,
+      o.completion_start_time AS completion_start_time,
+      if(o.end_time IS NULL, NULL, milliseconds_diff(o.end_time, o.start_time)) AS latency,
+      if(o.completion_start_time IS NULL, NULL, milliseconds_diff(o.completion_start_time, o.start_time)) AS time_to_first_token,
+      o.tags AS tags,
+      o.${dq("release")} AS ${dq("release")},
+      o.trace_name AS trace_name,
+      if(o.parent_span_id = '', NULL, o.parent_span_id) AS parent_observation_id,
       s.scores_avg,
       s.score_categories
-    FROM events e
-    LEFT JOIN scores_agg s ON s.trace_id = e.trace_id AND s.observation_id = e.id
-    WHERE e.project_id = {projectId: String}
+    FROM ${tableFor(projectId, "spans")} o
+    LEFT JOIN scores_agg s ON s.trace_id = o.trace_id AND s.observation_id = o.span_id
+    WHERE o.project_id = {projectId: String}
       ${appliedEventsFilter.query ? `AND ${appliedEventsFilter.query}` : ""}
       ${search.query}
-      AND e.is_deleted = 0
-    ORDER BY e.start_time DESC
+    ORDER BY o.start_time DESC
     LIMIT {rowLimit: Int64}
   `;
 
@@ -198,19 +219,22 @@ export const getEventsStream = async (props: {
     ...search.params,
   };
 
+  // Aliased columns from the `spans` split table (`o`). `metadata` arrives as
+  // the JSON text produced by `json_object_flatten`; the `to_json` map columns
+  // arrive as objects (Doris reports JSON and the Doris client parses it).
   type EventRow = {
-    id: string;
+    id: string; // aliased from span_id
     trace_id: string;
     project_id: string;
     start_time: Date;
     end_time: Date | null;
     name: string | null;
-    type: string;
+    type: string | null;
     environment: string | null;
     version: string | null;
     user_id: string | null;
     session_id: string | null;
-    level: string;
+    level: string | null;
     status_message: string | null;
     prompt_name: string | null;
     prompt_id: string | null;
@@ -218,16 +242,16 @@ export const getEventsStream = async (props: {
     model_id: string | null;
     provided_model_name: string | null;
     model_parameters: unknown;
-    usage_details: Record<string, number>;
-    cost_details: Record<string, number>;
+    usage_details: Record<string, number> | null;
+    cost_details: Record<string, number> | null;
     total_cost: number | null;
     input: unknown;
     output: unknown;
-    metadata: Record<string, unknown>;
+    metadata: unknown;
     completion_start_time: Date | null;
     latency: number | null;
     time_to_first_token: number | null;
-    tags: string[];
+    tags: string[] | null;
     release: string | null;
     trace_name: string | null;
     parent_observation_id: string | null;
@@ -284,7 +308,7 @@ export const getEventsStream = async (props: {
       id: bufferedRow.id,
       traceId: bufferedRow.trace_id,
       traceName: bufferedRow.trace_name,
-      type: bufferedRow.type,
+      type: bufferedRow.type ?? "",
       name: bufferedRow.name ?? "",
       startTime: bufferedRow.start_time,
       endTime: bufferedRow.end_time,
@@ -293,7 +317,11 @@ export const getEventsStream = async (props: {
       version: bufferedRow.version,
       userId: bufferedRow.user_id,
       sessionId: bufferedRow.session_id,
-      level: bufferedRow.level,
+      // `spans` stores NULL for several columns the export type declares as
+      // non-nullable (no zod defaulting happens on this path), so the documented
+      // defaults are filled at the stream boundary — the same treatment
+      // getEventsStreamForEval applies for the eval field set.
+      level: bufferedRow.level ?? "DEFAULT",
       statusMessage: bufferedRow.status_message,
       promptName: bufferedRow.prompt_name,
       promptId: bufferedRow.prompt_id,
@@ -301,15 +329,16 @@ export const getEventsStream = async (props: {
       modelId: bufferedRow.model_id,
       providedModelName: bufferedRow.provided_model_name,
       modelParameters: bufferedRow.model_parameters,
-      usageDetails: bufferedRow.usage_details,
-      costDetails: bufferedRow.cost_details,
+      usageDetails: bufferedRow.usage_details ?? {},
+      costDetails: bufferedRow.cost_details ?? {},
       totalCost: bufferedRow.total_cost,
       input: bufferedRow.input,
       output: bufferedRow.output,
-      metadata: bufferedRow.metadata,
+      // `json_object_flatten` returns the VARIANT metadata as JSON text.
+      metadata: parseMetadataJson(bufferedRow.metadata) ?? {},
       latencyMs: bufferedRow.latency,
       timeToFirstTokenMs: bufferedRow.time_to_first_token,
-      tags: bufferedRow.tags,
+      tags: bufferedRow.tags ?? [],
       release: bufferedRow.release,
       parentObservationId: bufferedRow.parent_observation_id,
       scores: outputScores,
@@ -612,6 +641,14 @@ function parseMetadataJson(
  * Lightweight event stream for batch add-to-dataset.
  * Only fetches the fields needed for dataset item creation:
  * id, traceId, input, output, metadata.
+ *
+ * LITEFUSE: like getEventsStream this used to read a physical `events` table,
+ * which does not exist here — it now reads `spans_<projectId>` (alias `o`) with
+ * the Doris column definitions, so root-span/experiment-item filters
+ * (`isRootObservation` / `hasParentObservation` / `isExperimentItemRootSpan`)
+ * resolve to the Doris `o.is_root` / `o.experiment_item_root_span_id` columns.
+ * `spans` stores `''` (not NULL) in `parent_span_id` for roots; an
+ * `is_root = 1` filter column is what distinguishes them.
  */
 export const getEventsStreamForDataset = async (props: {
   projectId: string;
@@ -631,7 +668,7 @@ export const getEventsStreamForDataset = async (props: {
   } = props;
 
   const eventOnlyFilters = (filter ?? []).filter((f) => {
-    const columnDef = eventsTableUiColumnDefinitions.find(
+    const columnDef = eventsTableUiColumnDefinitionsForDoris.find(
       (col) => col.uiTableName === f.column || col.uiTableId === f.column,
     );
 
@@ -651,7 +688,7 @@ export const getEventsStreamForDataset = async (props: {
           type: "datetime" as const,
         },
       ],
-      eventsTableUiColumnDefinitions,
+      eventsTableUiColumnDefinitionsForDoris,
     ),
   );
 
@@ -662,20 +699,21 @@ export const getEventsStreamForDataset = async (props: {
     hasTracesJoin: false,
   });
 
-  // Build the query for Doris - lightweight dataset version
+  // Lightweight dataset version, reading the project's `spans` split table.
+  // The VARIANT `metadata` column is flattened to JSON text and parsed below;
+  // there is no `is_deleted` column on `spans`.
   const query = `
     SELECT
-      e.id,
-      e.trace_id,
-      e.input,
-      e.output,
-      e.metadata
-    FROM events e
-    WHERE e.project_id = {projectId: String}
+      o.span_id AS id,
+      o.trace_id AS trace_id,
+      o.input AS input,
+      o.output AS output,
+      json_object_flatten(o.metadata) AS metadata
+    FROM ${tableFor(projectId, "spans")} o
+    WHERE o.project_id = {projectId: String}
       ${appliedEventsFilter.query ? `AND ${appliedEventsFilter.query}` : ""}
       ${search.query}
-      AND e.is_deleted = 0
-    ORDER BY e.start_time DESC
+    ORDER BY o.start_time DESC
     LIMIT {rowLimit: Int64}
   `;
 
@@ -687,11 +725,11 @@ export const getEventsStreamForDataset = async (props: {
   };
 
   type DatasetEventRow = {
-    id: string;
+    id: string; // aliased from span_id
     trace_id: string;
     input: unknown;
     output: unknown;
-    metadata: Record<string, unknown> | null;
+    metadata: unknown;
   };
 
   const asyncGenerator = queryDorisStream<DatasetEventRow>({
@@ -713,7 +751,7 @@ export const getEventsStreamForDataset = async (props: {
           traceId: row.trace_id,
           input: row.input,
           output: row.output,
-          metadata: row.metadata,
+          metadata: parseMetadataJson(row.metadata),
         };
       }
     })(),
