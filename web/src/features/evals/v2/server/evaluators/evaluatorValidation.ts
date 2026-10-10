@@ -9,10 +9,11 @@ import {
   createTypeSafeDecisionModelClient,
   DefaultEvalModelService,
   getClientInitiatedNonStreamingLlmTimeoutMs,
+  getLLMErrorInfo,
   isDecisionModelAdapter,
   logger,
 } from "@langfuse/shared/src/server";
-import { getEvaluatorDefinitionConfigurationError } from "@/src/features/evals/server/evaluator-preflight";
+import { getEvaluatorDefinitionPreflightError } from "@/src/features/evals/server/evaluator-preflight";
 import { getPromptMessagesValidationError } from "@/src/features/evals/v2/fns/promptMessages/hasInvalidSystemPromptMessage";
 import {
   isCodeEvalEnabled,
@@ -196,18 +197,63 @@ export async function assertEvaluatorConfigurationValid(
     }
   }
 
-  const error = await getEvaluatorDefinitionConfigurationError({
-    projectId: params.projectId,
-    template: {
-      name: params.name,
-      type: params.definition.type,
-      provider: params.definition.provider,
-      model: params.definition.model,
-      modelParams: params.definition.modelParams,
-      outputDefinition: params.definition.outputDefinition,
-    },
-  });
-  if (error) throw new EvaluatorModelConfigurationError(error);
+  // ── LLM-as-a-judge save-time preflight (upstream 4.56 semantics) ──────────
+  // Upstream `web/src/features/evals/v2/server/evaluators/evaluatorValidation.ts:175-210`
+  // replaced the static `getEvaluatorDefinitionConfigurationError` check with
+  // `getEvaluatorDefinitionPreflightError(..., { throwOnOperationalError: true })`,
+  // i.e. the save itself makes one real provider call and lets the provider
+  // falsify the model name.
+  //
+  // COST: one REAL provider request per save of an LLM-as-a-judge evaluator.
+  // There is no "unchanged model" short-circuit here (unlike the decision-model
+  // preflight below) — this is upstream's behaviour, deliberately adopted.
+  //
+  // The three outcomes:
+  //   * provider verdict (404 → "could not find model") → an
+  //     `EvaluatorModelConfigurationError`, which
+  //     `evaluatorService.ts:validateEvaluatorForPersistence` converts into
+  //     "save + mark blocked" (`blocked_at` + `EVAL_MODEL_CONFIG_INVALID`).
+  //   * timeout / retryable operational failure → the preflight rethrows and the
+  //     catch below turns it into an `EvaluatorConfigurationError` ("the
+  //     evaluator was not saved"), which is *not* a model-verdict error, so the
+  //     save is refused.
+  //   * success → nothing.
+  try {
+    const error = await getEvaluatorDefinitionPreflightError(
+      {
+        projectId: params.projectId,
+        template: {
+          name: params.name,
+          type: params.definition.type,
+          provider: params.definition.provider,
+          model: params.definition.model,
+          modelParams: params.definition.modelParams,
+          outputDefinition: params.definition.outputDefinition,
+        },
+      },
+      { throwOnOperationalError: true },
+    );
+    if (error) throw new EvaluatorModelConfigurationError(error);
+  } catch (error) {
+    const llmError = getLLMErrorInfo(error);
+    if (llmError?.kind === "timeout") {
+      const timeoutSeconds =
+        getClientInitiatedNonStreamingLlmTimeoutMs() / 1000;
+      throw new EvaluatorConfigurationError(
+        `The model did not respond within ${timeoutSeconds} seconds during evaluator validation. The evaluator was not saved. Retry or check your LLM connection and model settings.`,
+      );
+    }
+    if (llmError && (llmError.isRetryable || llmError.kind === "abort")) {
+      const message =
+        llmError.kind === "abort"
+          ? "The model request was aborted during evaluator validation."
+          : "The LLM provider could not complete the model request during evaluator validation.";
+      throw new EvaluatorConfigurationError(
+        `${message} The evaluator was not saved. Retry or check your LLM connection and model settings.`,
+      );
+    }
+    throw error;
+  }
 }
 
 export async function getDecisionModelConfigurationError(params: {
@@ -232,6 +278,12 @@ export async function getDecisionModelConfigurationError(params: {
   // readable reason instead of falling through to the generic adapter message.
   // The existing adapter check below still runs: it is the execution gate, and
   // this one never accepts an adapter that gate rejects.
+  //
+  // LITEFUSE: decision-model support is narrowed to TypeSafe (LITEFUSE NOTE in
+  // `packages/shared/src/server/llm/types.ts`), so both checks below are now the
+  // same TypeSafe-only predicate. That is deliberate: the save-time check can no
+  // longer pass an adapter (e.g. OpenAI) that the worker execution gate would
+  // refuse on the first real run.
   const capabilityError = getDecisionModelCapabilityError({
     provider: params.definition.provider,
     adapter: modelConfig.config.apiKey.adapter,
