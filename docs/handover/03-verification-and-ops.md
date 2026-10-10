@@ -450,10 +450,11 @@ P "select id, provider, adapter, note from llm_api_keys where project_id='<proje
 | --- | --- |
 | 所有 Doris 读（`probe-doris-sql.cjs` / SQL）、Postgres 读、`docker exec psql` | 纯读 |
 | 类型检查 / lint / build / `build:check` | 纯本地计算 |
-| `_doris_be_proxy.cjs`、`_lf_session.cjs`、`probe-doris-redirect.cjs` | 内部转发与诊断 |
-| `ui-text.cjs` 一类 Playwright **文本断言**脚本 | 只渲染页面、读文本；**只要不在页面上点"运行/测试"就不会调用 LLM** |
-| `upstream-reconcile.cjs` | 只从 GitHub 拉上游文件做 diff |
-| `probe-vpn-socks.cjs` | 只做 TCP/SOCKS5 握手 |
+| `docs/handover/scripts/` 里的这些：`_doris_be_proxy.cjs`、`_lf_session.cjs`、`probe-doris-redirect.cjs`（⚠️ 可能尚在仓库外） | 内部转发与诊断 |
+| `docs/handover/scripts/ui-text.cjs` 及同目录 `ui-*.cjs`（共 6 个） | 只渲染页面、读文本；**只要不在页面上点"运行/测试"就不会调用 LLM** |
+| `docs/handover/scripts/upstream-reconcile.cjs` | 只从 GitHub 拉上游文件做 diff |
+| `probe-vpn-socks.cjs`（⚠️ 可能尚在仓库外） | 只做 TCP/SOCKS5 握手 |
+| `docs/handover/scripts/probe-listcursor-error.cjs` / `probe-listcursor-experiment.cjs` | 只复现 tRPC 报错，不触发评估 |
 | 用 curl 打 `/api/public/health`、`/api/auth/*`、`/api/trpc/*` 的**只读** query | 不触发评估 |
 
 ### 7.4 记账
@@ -530,7 +531,7 @@ curl -s http://localhost:3030/
 
 1. `web/jest.config.mjs` 里 `transformIgnorePatterns: ["/web/node_modules/(?!...)/"]` 在 macOS 上是否仍能命中（用 `--listTests` 实测）。
 2. 补上 `.env.test` 后 `jest --listTests --selectProjects server|client` 的实际文件数；以及缺文件时 `dotenv-cli` 的行为。
-3. 本文档 §7.2 里"仓库外"的脚本（`probe-v2-live-eval.cjs`、`seed-jev-demo-data.cjs`、`ui-*.cjs`）是否已放进 `docs/handover/scripts/`；若在，优先用仓库内版本。
+3. 脚本位置核实：`probe-v2-live-eval.cjs`、`seed-jev-demo-data.cjs`、6 个 `ui-*.cjs`、`upstream-reconcile.cjs`、`probe-apikey-create-500.cjs`、`probe-listcursor-*.cjs` **已经在** `docs/handover/scripts/`（权威清单与用法见同目录 `README.md`）；`probe-doris-redirect.cjs`、`_doris_redirect_shim.cjs`、`probe-vpn-socks.cjs` **尚在仓库外**。用 `ls docs/handover/scripts/` 自行确认最新状态。
 4. `probe-doris-sql.cjs` 依赖 `packages/shared/node_modules/mysql2`：新设备必须先 `pnpm install`（否则报找不到模块）。
 5. `ui-*.cjs` 依赖本机 **Chrome**（`chromium.launch({ channel: "chrome" })`）与 Playwright 浏览器（`web/node_modules/@playwright/test` + 可能需要的 `npx playwright install`）。
 6. `batchAction.runEvaluation.create` 的 `query.filter` 结构：建议从 UI 复制真实筛选条件，不要在脚本里手搓（本文档 §6.4 的手搓示例可能被过滤注册表拒绝）。
