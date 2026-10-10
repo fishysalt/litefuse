@@ -133,10 +133,12 @@ macOS 同命令（`pnpm` 跨平台）；只把工作目录换成你的仓库路�
 ## 二、已知缺口 / 未做项（可直接当任务卡片）
 
 > **本轮（2026-10-10 第二轮）逐条核对结果**：**D1 已修**（改动在工作树中、未提交，含剩余未验证项）；**D2 已核实为非缺口**（原前提错误，已改写）；**D3 / D4 / D5 / D6 / D7 / D8 均仍在原状**——D4 全仓只有 `packages/shared/src/server/llm/types.ts:279,283` 两处定义、无调用点；D5 `Add alert` 仍在 `EvaluatorAlertButton.tsx:349`（另有 `:221`）；D6 `web/src/pages/project/[projectId]/evals/` 顶层仍只有 `index/new/rules/[evaluatorId]/remap`，没有 `templates`/`default-model`/`configs` 壳；D7 `Evaluators/**` 下唯一的 `stopPropagation` 出现在 `EvaluatorSampleObservationSelector.tsx:71`，标记控件处仍无。
+>
+> ⚠️ **上面这段是第二轮的历史快照，部分已被第三轮推翻**：**D1 的改动已提交**、**D4 已接线并收窄到 TypeSafe**、**D6 的 3 个重定向壳已加（实测 307）**。请以每张卡片当前写的状态为准；D3 / D5 / D7 / D8 经第三轮复核**仍在原状**。
 
 ### D1 ✅ **已修**（`getEventsStream` / `getEventsStreamForDataset` 已改读 Doris `spans`）—— 附剩余未验证项
 
-**状态**：**已修**，但**改动当前只在工作树里、尚未 commit**（`git status` 显示 `worker/src/features/database-read-stream/event-stream.ts` 为 modified）。
+**状态**：**已修，并且已提交**（随 `fix(evals): close the remaining evaluator-v2 gaps and unblock the production build` 落地；`git status` 里 `worker/src/features/database-read-stream/event-stream.ts` 已不再是 modified）。原先本节记为"只在工作树里、尚未 commit"，第三轮已核实为历史描述。
 
 - **背景**：本模型**没有 `events` 表**（per-project `spans_<projectId>` / `traces_scalar_<projectId>`）。历史批量评估路径（`getEventsStreamForEval`，`worker/src/features/database-read-stream/event-stream.ts`）已在 `45791b4` 改成 `FROM ${tableFor(projectId,"spans")} o`。
 - **本轮修法**（与 `getEventsStreamForEval` 同构）：复用 `eventsTableUiColumnDefinitionsForDoris` + Doris SQL 工厂 + `dq()` + map 列 `to_json`；**root 的 `parent_span_id=''` 归一为 NULL**；**去掉 `is_deleted` 谓词**（`spans` 没有这一列）；latency 用 `milliseconds_diff` 现算。
@@ -183,20 +185,22 @@ Get-ChildItem -Recurse -File worker\src | Select-String -Pattern 'FROM events'  
 - **建议**：在 `web/src/features/evals/v2/server/rules/` 侧把 `filter` 的列 id 做白名单校验（对照 `ruleSearchRegistry.ts` 与 `observationForEval.ts` 的注册表），非法值直接 `BAD_REQUEST`。
 - **验证**：提交非法列 id 应当**报错**而不是静默保存。
 
-### D4 `supportsDecisionModels` / `isAllowedDecisionModel` 已移植但未接线
+### D4 决策模型能力门禁：已接线，且**已显式收窄到 TypeSafe**（与上游的差异是决定，不是漏移植）
 
-- **背景**：两个判定函数已在 `packages/shared/src/server/llm/types.ts` 里（连同 `DECISION_MODEL_ADAPTERS`、`typeSafeModels`、`resolveTypeSafeUpstream`），但**没有调用点**。
-- **影响**：决策模型的能力门禁/权限校验实际未生效；相关行为靠别处兜着（⚠️未核实是否已有等价校验）。
-- **最短定位**：
+- **状态**：✅ **已决**。两个判定函数已接到选择器 / 保存校验 / 测试运行三处；同时它们的语义被**有意收窄为「只有 TypeSafe 支持决策模型」**。这不是「上游有、我们没搬」，而是**明确不声称一个我们跑不通的能力**。
+- **上游 4.56 的做法**（只读参照 `D:\SelectDB\langfuse-deploy\langfuse`，`packages/shared/src/server/llm/types.ts:272-284`）：`supportsDecisionModels` 对 `LLMAdapter.OpenAI` 也返回 `true`，`isAllowedDecisionModel` 接受 `OPENAI_DECISION_MODEL_IDS`（`gpt-6-luna`）。上游**跑得通**，因为它有完整执行链路：OpenAI 决策模型客户端 `packages/shared/src/server/llm/openai/openAIDecisionModelClient.ts` + 分派器 `packages/shared/src/server/llm/createDecisionModelClient.ts` + `ai@7` / `@ai-sdk/openai` 依赖。
+- **我们的现状**：只有 TypeSafe 客户端（`packages/shared/src/server/llm/typesafe/typeSafeDecisionModelClient.ts`，手写 `fetch`），worker 执行链硬编码只建这一个客户端（`worker/src/features/evaluation/v2DecisionModelExecution.ts`），执行闸门是 `isDecisionModelAdapter` / `DECISION_MODEL_ADAPTERS`（只列 TypeSafe）。
+- **为什么必须收窄（原本是个陷阱）**：保存校验里的 capability 检查**已经放行 OpenAI**，只有后一层 `isDecisionModelAdapter` 兜底在挡 → OpenAI 连接会「**保存成功、首次真实运行才被 block**」，比直接拒绝更糟；`isOpenAIDecisionModel` 也已是**死代码**（除定义及 `isAllowedDecisionModel` 内部外全仓零引用）。收窄把「对外的声称」和「这个陷阱」一起消灭。
+- **做了什么**：
+  - `packages/shared/src/server/llm/types.ts`：`supportsDecisionModels` 只认 `LLMAdapter.TypeSafe`；`isAllowedDecisionModel` 只保留 TypeSafe 分支（非空模型名即允许）；**删除** `isOpenAIDecisionModel`（死代码）；`OPENAI_DECISION_MODEL_IDS` **保留**并注明是上游契约、**暂未启用**（加了一段 LITEFUSE NOTE 说明收窄的原因与回退路径）。
+  - 下游三处同步一致：`web/src/features/evals/v2/server/evaluators/decisionModelCapability.ts`（删掉已不可达的 OpenAI 分支与其措辞）、`.../DecisionModelSelector/DecisionModelSelector.tsx`（适配器过滤只留执行闸门，不再 AND 两个同义谓词）、同目录 `DecisionModelCapabilityNotice.tsx`（删掉「能服务决策模型，但本部署只用 TypeSafe」这条已不可达的提示分支）。
+  - **未改**：worker 执行闸门（`v2DecisionModelExecution.ts`）、两个保存期预检（决策模型 + 判官）的行为。
+  - **收窄后的语义**：`supportsDecisionModels` / `isAllowedDecisionModel` / `isDecisionModelAdapter`（= worker 执行闸门）**三层判断完全一致**，都只认 TypeSafe。
+- **若要补齐 OpenAI 决策模型（独立工作项，本轮未做）**：
+  - 需要新增：OpenAI 决策模型客户端 + worker 侧分派器接线 + `ai@7` / `@ai-sdk/openai` 依赖，并把两个判定函数放宽回上游形态；约 **10 个文件**改动（客户端、分派器、shared 谓词、worker 执行、web 校验、web UI 两处、依赖清单、测试）。
+  - **验证前提**：必须有一个**带 Decisions API 权限的 key** 才能端到端验证（`gpt-6-luna` 走 hosted Decisions API）。**没有这样的 key 就不可验证** —— 当前环境没有，所以本轮只做收窄，不做补齐。
+- **本轮验证（原始输出见当轮交接记录）**：`pnpm --filter @langfuse/shared run build` 成功；`worker` 的 `npx tsc --noEmit` 与 `web` 的 `npx tsgo -p tsconfig.build.json --noEmit --skipLibCheck` 均为 0；直接调用（零成本、不发任何真实 LLM 请求）打印 `supportsDecisionModels("typesafe")=true`、`("openai")=false`、`("anthropic")=false`，`isAllowedDecisionModel("typesafe","jev-latest")=true`、`("openai","gpt-6-luna")=false`。
 
-```powershell
-cd D:\SelectDB\litefuse-master\litefuse-master\dev_version\litefuse-main\litefuse-main
-Select-String -Path packages\shared\src\server\llm\types.ts -Pattern 'supportsDecisionModels|isAllowedDecisionModel' | ForEach-Object { $_.LineNumber.ToString() + ': ' + $_.Line.Trim() }
-# 全仓找调用点（应当找不到除定义外的引用）
-Get-ChildItem -Recurse -File -Include *.ts,*.tsx packages\shared\src,web\src,worker\src | Select-String -Pattern 'supportsDecisionModels|isAllowedDecisionModel' | ForEach-Object { $_.Path + ':' + $_.LineNumber }
-```
-
-- **建议**：接到决策模型选择/保存的校验路径上（选择器 + 服务端 router 双处），并补单测。
 
 ### D5 `Add alert` 按钮按 M1 应隐藏，但当前仍可见
 
@@ -205,7 +209,7 @@ Get-ChildItem -Recurse -File -Include *.ts,*.tsx packages\shared\src,web\src,wor
 - **最短验证**：打开 `http://localhost:3000/project/jevdemoproject01/evals/<evaluatorId>`，右上角应能看到 `Add alert`。
 - **建议**：按 M1 隐藏（保持组件不删，仅不渲染 —— 符合「组件只增不换」原则）；或明确决定保留并标注为 beta。
 
-### D6 legacy 书签 `/evals/templates`、`/evals/default-model`、`/evals/configs` 全部 404
+### D6 ✅ **已修** legacy 书签 `/evals/templates`、`/evals/default-model`、`/evals/configs` 现在 307 重定向
 
 - **背景**：旧 UI 已整体搬到 `/evals/legacy/**`，实际存在的文件是（✅文件级核实）：
 
@@ -216,11 +220,16 @@ evals/legacy/configs/{index,new,[configId]}.tsx
 evals/legacy/templates/{index,new,[id]}.tsx
 ```
 
-→ 旧的顶层地址 `/evals/templates`、`/evals/default-model`、`/evals/configs` 不再有对应文件，**旧书签/旧链接会 404**。
+→ 当时的顶层地址 `/evals/templates`、`/evals/default-model`、`/evals/configs` 没有对应文件，**旧书签/旧链接会 404**（而且会被动态路由 `/evals/[evaluatorId]` 吞掉，渲染 "evaluator not found"）。
 
-- **影响**：用户体验回退（书签失效）；外部文档里的旧链接同样失效。
-- **最短验证**：浏览器直接访问 `http://localhost:3000/project/jevdemoproject01/evals/templates` → 404；访问 `/evals/legacy/templates` → 正常。
-- **建议**：加 3 个**薄重定向壳**（照 `/evals/v2/*` 的 307 重定向写法），把旧路径 → `/evals/legacy/...`。成本很低，收益明确。
+- **修复**（随 `fix(evals): close the remaining evaluator-v2 gaps and unblock the production build` 提交）：加了 3 个**薄重定向壳**（`getServerSideProps` + `redirect: { permanent: false }`，照 `/evals/v2/*` 的写法，保留 query string），文件为 `web/src/pages/project/[projectId]/evals/{templates,configs,default-model}.tsx`。静态路由同时**遮蔽**了动态 `[evaluatorId]`，所以不再被吞。
+- **✅ 第三轮实测（2026-10-10，`curl.exe -s -o NUL -w "%{http_code} -> %{redirect_url}"`）**：
+
+| 请求 | 结果 |
+| --- | --- |
+| `/project/jevdemoproject01/evals/templates` | **307** → `.../evals/legacy/templates` |
+| `/project/jevdemoproject01/evals/configs` | **307** → `.../evals/legacy/configs` |
+| `/project/jevdemoproject01/evals/default-model` | **307** → `.../evals/legacy/default-model` |
 
 ### D7 评估器列表页的标记被行点击覆盖（缺 `stopPropagation`）
 

@@ -41,7 +41,7 @@
 
 ## 第 4 步：P2 —— 未接线与上游对齐
 
-1. `supportsDecisionModels` / `isAllowedDecisionModel` 已移植但**未接线**：目前决策模型的可选性没有走这两道闸门，接上后能防止把决策模型塞进不支持的地方。
+1. ~~`supportsDecisionModels` / `isAllowedDecisionModel` 已移植但**未接线**~~ → **已接线（选择器 / 保存校验 / 测试运行三处），并已显式收窄到 TypeSafe**：不再声称 OpenAI 决策模型能力（上游有完整 OpenAI 决策客户端，我们没有；不补齐就对外声称会留下「保存成功、首次运行被 block」的陷阱）。补齐 OpenAI 是独立工作项，详见 04 的 D4。
 2. 用 `scripts/upstream-reconcile.cjs` 对上游 `langfuse/langfuse` 4.43.0 逐项复核，产出差异清单（`docs/jev as judge/` 之外的那套"引用清单/差异总览"文档就是干这个的）。
 3. 复核完成后按需更新 `AGENTS.md`（仓库维护契约要求：架构/工作流发生实质变化时同 PR 更新）。
 

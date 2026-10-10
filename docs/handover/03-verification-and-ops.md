@@ -31,7 +31,47 @@
 - **web 的类型检查面由 `web/tsconfig.build.json` 决定**，它 `exclude` 了：`node_modules`、`sdk`、`src/__tests__/**`、`**/*.clienttest.*`、`**/*.servertest.*`。所以**测试文件里的类型错误不会被 `tsgo -p tsconfig.build.json` 发现** —— 改了测试就单独跑对应测试。
 - **`pnpm run build:check` 与 dev server 可以并行**（`next.config.mjs` 的 `distDir: process.env.NEXT_DIST_DIR || ".next"`，build:check 用 `.next-check`）✅。
 - **改 `packages/shared` 后的固定流程**：`build` → **重启 web**。webpack 模式下 web 解析 `@langfuse/shared` 的 `exports` → `packages/shared/dist/src/index.js`；worker 是 `tsx watch --include '../packages/shared/dist/*'`，会自动热载。**`tsx watch` 监视 dist 不监视 src**。
-- 基线状态：`01-state-and-history.md` 记录三项类型检查均为 0 错误（**⚠️ 由上一轮修复者报告，未独立复跑**）。接手后请先自己跑一遍当基线；**任一项不为 0，先修基线再谈新功能**。
+- 基线状态：✅ **2026-10-10 第三轮由验收方独立复跑，四条全部 exit 0** —— `pnpm --filter @langfuse/shared run build`、`cd worker && npx tsc --noEmit`、`cd web && npx tsgo -p tsconfig.build.json --noEmit --skipLibCheck`，以及下文 1.3 的构建阻塞检查。`01-state-and-history.md` 已同步。
+
+### 1.3 构建阻塞检查（`next build` 会检查的测试文件）✅ 2026-10-10 实测
+
+**坑**：`next build` 的类型检查**只忽略**这两类路径（Next 内建规则）：
+
+```text
+/[\\/]__(?:tests|mocks)__[\\/]/
+/(?<=[\\/.])(?:spec|test)\.[^\\/]+$/
+```
+
+所以 `web/src/__tests__/**` 会被忽略，但**就地**放在源码旁边的 `*.clienttest.*` / `*.servertest.*` **不会被忽略**（上面 1.1 的表说明 `tsconfig.build.json` 恰好把两类都排除了，于是出现"类型检查全绿但 `next build` 失败"）。
+
+**快速检查（不用跑完整 `next build`）**：
+
+```powershell
+cd web
+npx tsgo --noEmit -p tsconfig.json *> ..\output\_verify_web_tsgo_full.txt
+# 把输出里形如  <path>(line,col): error TS####  的行取出，
+# 用上面两条正则"取反"筛选：**结果必须 0 条**，否则 next build 一定失败。
+```
+
+**第三轮实测**：517 条错误起始行、72 个文件，**全部**位于 `web/src/__tests__/**` → 取反后 **0 条**，与"`next build` exit 0"一致。
+
+**完整生产构建（含重启 3000）**：
+
+```powershell
+# 1) 先停掉监听 3000 的 next start（Get-NetTCPConnection -LocalPort 3000 → Stop-Process）
+# 2) 构建（注意：不要用 Tee-Object，PowerShell 会把 stderr 当错误）
+cd web
+$env:NODE_OPTIONS="--max-old-space-size=8192"
+$env:LITEFUSE_ENABLE_EVENTS_TABLE_V2_APIS="true"
+npx dotenv -e ../.env -- next build *> ..\output\_build.log
+# 3) 原样重启
+$env:HTTP_PROXY="http://127.0.0.1:8899"; $env:HTTPS_PROXY="http://192.168.3.6:12450"; $env:NO_PROXY="localhost,127.0.0.1,::1"
+npx dotenv -e ../.env -- next start -p 3000 *> ..\output\_start.log
+```
+
+第三轮结果：`next build` **exit 0**（`✓ Compiled successfully in 2.9min`；仅有 prettier 格式类 warning，无 error），产物含 `/api/public/v2/evaluators`、`/api/public/v2/evaluators/[evaluatorId]`、`/api/public/v2/evaluators/[evaluatorId]/versions`、`/api/public/v2/evaluation-rules`、`/api/public/v2/evaluation-rules/[evaluationRuleId]`、`/api/public/v3/scores`。
+
+> ⚠️ **若要创建 LLM 判官评估器做冒烟**：保存会**真发一次 provider 调用**。给 web 进程加 `LANGFUSE_SKIP_EVALUATOR_MODEL_CALL_VALIDATION=true`（`web/src/features/evals/server/evaluator-preflight.ts` 会因此跳过 `testModelCall`），或改用 `code` 类型（会被拒，可作负例）。第三轮验收就是这么做的。
 
 ### 1.2 只跑某一处的最小组合
 
@@ -88,21 +128,69 @@ testMatch: ["**/*.servertest.[jt]s?(x)"],   // e2e-server
 | 列出 client 项目 | `cd web && npx jest --listTests --selectProjects client \| wc -l` | 同上 |
 | 跑 web server 测试（单文件/名字过滤） | `pnpm --filter web run test -- --testPathPatterns="<pattern>" --testNamePattern="<name>"` | 同上 |
 | 跑 web client 测试 | `pnpm --filter web run test-client -- --testPathPatterns="<pattern>"` | 同上 |
+| **跑 web server 测试（单文件，最安全）** ✅ | `pnpm --filter web run test -- --runTestsByPath src/__tests__/server/<file>.servertest.ts` | 同上；**优先用这条**，见下 |
 | 跑 worker 测试（vitest） | `pnpm --filter worker run test -- <file-or-pattern> -t "<name>"` | `.env` 可用 |
 | 跳过会连 LLM 的 worker 测试 | `pnpm --filter worker run test:exclude-llm-connections` | 同上；**这条能省真实 LLM 调用**，默认优先用它 |
 
-⚠️ **`web` 的测试脚本都带 `dotenv -e ../.env.test -e ../.env`，而本仓库根目录只有 `.env.test.example`，没有 `.env.test`** ✅（已核实文件列表）。因此：
+⛔ **绝不要不带过滤地跑 `pnpm test` / `pnpm run test`**：那会跑**整个 server 项目**（磁盘上近 100 个 `*.servertest.ts`，其中包含会 `pruneDatabase` / 清表 / 造数据的用例）。2026-10-10 出过一次事故：一次误跑把 `projects` 整表清空并损坏了一批数据（已从 dump 恢复）。**要跑测试只能单文件**（上表的 `--runTestsByPath`，或 `--testPathPatterns="<很窄的模式>"`）。
+
+**第三轮实测（2026-10-10，单文件、零真实 LLM 调用）**：
+
+```powershell
+cd <REPO>
+pnpm --filter web run test -- --runTestsByPath src/__tests__/server/evaluators-public-api.servertest.ts   # 14 passed / 14
+pnpm --filter web run test -- --runTestsByPath src/__tests__/server/scores-public-api-v3.servertest.ts    #  7 passed /  7
+```
+
+两个用例集都会**自建 org/project/api key 并在 `afterAll` 里删掉**（项目删除级联到 evaluator/version/rule/assignment），不需要预置数据；`scores-public-api-v3` 跑完会打印 `Jest did not exit one second after the test run has completed`（worker/redis 句柄未关净，**不影响结果**，用 `job_kill` 收掉即可）。
+
+⚠️ **`web` 的测试脚本都带 `dotenv -e ../.env.test -e ../.env`，而本仓库根目录只有 `.env.test.example`，没有 `.env.test`** ✅（已核实文件列表）。但**实测（2026-10-10）不需要补 `.env.test`**：缺文件时 `dotenv-cli` 不中断，测试照跑（因此跑测试时用的就是 `.env` 里的 `DATABASE_URL`/Redis，即**和 web/worker 同一套库**）。若确实要隔离，再按下面做：
 
 ```bash
 cd <REPO>
-cp .env.test.example .env.test      # 需要跑 web 测试时先做这一步
-# 注意：.env.test 里若是另一套数据库/Redis，会连到别的地方 —— 想清楚再改内容
+cp .env.test.example .env.test      # 可选；注意 .env.test 若指向另一套数据库/Redis，会连到别的地方
 ```
 
-**待在新设备确认**：`dotenv-cli` 在文件缺失时的具体行为（报错退出还是警告后继续），以及补上 `.env.test` 之后 `--listTests` 的实际数量。开发机 2026-09-21 的记录是"`--listTests --selectProjects server` 返回 0，磁盘上有 96 个 `*.servertest.ts`"（⚠️该记录早于 `testMatch` 修正，接手后请以实测为准）。
+⚠️ 另一个同类前置：`web/src/__tests__/test-utils.ts` 的 `ensureTestDatabaseExists()` 只在 `DATABASE_URL` 含 `langfuse_test` **且** `NODE_ENV=test` 时才动作（否则直接 return）。当前 `.env` 的 `DATABASE_URL` 是 `.../postgres`，**不含** `langfuse_test` ⇒ 不会跑 `prisma migrate dev`、不会建库、**不会 reset 数据**。**不要在 `.env` 里把库名改成含 `langfuse_test` 的库**，否则 `after-teardown` 会对它执行 `pnpm run db:migrate`。
+
+**待在新设备确认**：补上 `.env.test` 之后 `--listTests` 的实际数量。开发机 2026-09-21 的记录是"`--listTests --selectProjects server` 返回 0，磁盘上有 96 个 `*.servertest.ts`"（⚠️该记录早于 `testMatch` 修正，接手后请以实测为准）。
 
 > 实用建议（来自本项目的实际做法）：**不要只靠 jest 判断"功能对不对"**。这套环境的可信证据是
 > **真实 HTTP 调用（curl/tRPC）+ 直接查库（Postgres psql / Doris 9030）**，见 §3–§6。
+
+### 2.3 公开接口与页面验收（第三轮实测 2026-10-10）✅
+
+前置：3000 上有 `next start` 在跑（见 1.3），演示项目 id = `jevdemoproject01`。
+
+**① 未认证访问新接口 → 401 且响应体为结构化错误**：
+
+```powershell
+curl.exe -s -o NUL -w "%{http_code} %{redirect_url}" http://localhost:3000/<path>
+```
+
+| 请求 | 结果 |
+| --- | --- |
+| `GET /api/public/v2/evaluators` | **401** `{"message":"No authorization header","code":"authentication_failed"}` |
+| `GET /api/public/v2/evaluators/<id>` | 同上 |
+| `GET /api/public/v2/evaluators/<id>/versions` | 同上 |
+| `GET /api/public/v2/evaluation-rules` | 同上 |
+| `GET /api/public/v2/evaluation-rules/<id>` | 同上 |
+| `GET /api/public/v3/scores` | 同上 |
+
+**② legacy 书签仍 307**（`/evals/{templates,configs,default-model}` → `/evals/legacy/...`）：三条全部 `307`，`redirect_url` 分别为 `/project/jevdemoproject01/evals/legacy/templates`、`.../legacy/configs`、`.../legacy/default-model`。
+
+**③ 认证冒烟（create → get → delete）**：用演示项目 key 走 `curl.exe -u "<pk>:<sk>"`，**用 `zz-*` 这种不存在的 provider**，配合 `LANGFUSE_SKIP_EVALUATOR_MODEL_CALL_VALIDATION=true` 保证零真实调用。实测：`POST /api/public/v2/evaluators` → **201**；`GET /{id}` → **200**；`GET /{id}/versions` → **200**（1 个版本）；`POST /api/public/v2/evaluation-rules` → **201**；`GET /{id}` → **200**；`DELETE /{id}` → **200** `{"id":"..."}`；删后 `GET` → **404** `{"message":"Evaluator not found","code":"resource_not_found"}`（规则同理），且 `?limit=100` 列表里不再出现这两个 id。**临时资源已全部删除**。
+
+**④ 页面**（Playwright + 本机 Chrome，`channel: "chrome"`，**用 `page.evaluate` 量尺寸，不要用截图**；登录 `jev-demo@litefuse.local` / `jev-demo-pass`）：
+
+| 页面 | 验收点 | 实测 |
+| --- | --- | --- |
+| `/project/<pid>/evals/rules`（viewport 1600×900） | 面板容器 bottom ≈ 900（修复前 ~560） | `[data-slot="resizable-panel-group"]`（第二个，即 `ResizableFilterLayout` 那个）：`top=220 bottom=900 height=680`；`document.scrollHeight == body.scrollHeight == 900`（**页面下方无空白骨架**）；无 peek 元素 |
+| `/project/<pid>/evals` | 评估器列表仍正常 | `table tbody tr` = **8** 行 |
+| `/project/<pid>/scores` | Doris 读取链路 | `table tbody tr` = **50** 行 |
+| `/project/<pid>/traces` | Doris 读取链路 | `table tbody tr` = **11** 行 |
+
+控制台 `console.error` / `pageerror`：**0 条**。
 
 ---
 
