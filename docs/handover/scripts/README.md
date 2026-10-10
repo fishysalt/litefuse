@@ -14,6 +14,9 @@
   脚本明确标注了「**消耗真实额度**」。
 
 > ⚠️ 计费纪律：标「是」的脚本会真的花钱。跑之前先看清楚再用 `--max-calls` 之类的参数限制规模。
+>
+> 相关：Doris 在本机是靠一个仓库外的 docker compose override 从 4.0.4 顶到 4.0.6 才跑起来的，
+> 那个文件已归档在 `../overrides/`（用法与成因见 `../overrides/README.md`）。
 
 ---
 
@@ -37,6 +40,9 @@
 | `ui-sample-query.cjs` | 抓「新建评估器」页面实际向 `listCursor` / `filterOptions` 发的请求与收到的响应，用来区分「时间范围内真没数据」和「过滤器被丢了」。 | 否 | 同上 | `LF_PROBE_PASSWORD=... node ui-sample-query.cjs` |
 | `ui-stuck-check.cjs` | 诊断「卡在 Loading...」：打印可见文字、每个 tRPC 响应的状态与短响应体、所有 console / page / requestfailed 错误。 | 否 | 同上 | `LF_PROBE_PASSWORD=... node ui-stuck-check.cjs [/evals/v2/rules]` |
 | `upstream-reconcile.cjs` | 把本仓库改过的几个文件，与上游 langfuse `main` 的最新版逐文件 diff，打印精简差异，回答「上游多了什么、我们要不要跟」。 | 否（只下载源码文本） | 本地一份上游 clone + `curl` + 能访问 `raw.githubusercontent.com` | `LF_UPSTREAM_CLONE=/path/to/langfuse-latest node upstream-reconcile.cjs` |
+| `probe-doris-redirect.cjs` | 探测 Doris 写入路径的两个环境事实：FE 对 stream-load PUT 返回的 `Location` 是什么、那个 `Location` 从本机是否可达（决定你要不要用下面的代理/垫片）。PUT 不带 body，**不写入任何行**。 | 否 | Doris FE HTTP 端口在跑（默认 `127.0.0.1:8030`） | `node probe-doris-redirect.cjs` |
+| `_doris_redirect_shim.cjs` | 挡在 Doris FE 前面的本地开发垫片：只把 307 重定向里的 `Location` 主机改写成本机发布出来的 BE 端口，让 stream load 的第二跳从宿主机打通。把应用指到它即可（`DORIS_FE_HTTP_URL=http://127.0.0.1:8031`）。 | 否 | 上游 Doris FE HTTP（默认 8030）与 BE HTTP（默认 8040）都在跑 | `node _doris_redirect_shim.cjs`（默认监听 `127.0.0.1:8031`） |
+| `probe-vpn-socks.cjs` | 对本机 SOCKS5 代理做握手，逐目标域名打印 RFC1928 返回码，判断「出网失败」是代理没起、被规则拒绝、还是目标不可达。只握手不请求，**不消耗任何额度**。 | 否 | 本机一个 SOCKS5 代理在监听（默认 `127.0.0.1:12450`） | `node probe-vpn-socks.cjs`（`VPN_SOCKS_HOST` / `VPN_PORT` 可覆盖） |
 
 ---
 
@@ -44,7 +50,7 @@
 
 ### 1. Node 版本与运行环境
 
-- **Node 24**（仓库 `.nvmrc` 是 `v24.6.0`，`package.json` 的 `engines.node` 是 `24`）。本归档的 16 个脚本已在
+- **Node 24**（仓库 `.nvmrc` 是 `v24.6.0`，`package.json` 的 `engines.node` 是 `24`）。本归档的 19 个脚本已在
   Node `v24.19.0` 上全部通过 `node --check`。
 - 最低要求 Node ≥ 20：脚本用了全局 `fetch`、`Headers.getSetCookie()`、`BigInt` 字面量。
 - 依赖已装好：脚本会从仓库里直接 `require` 两个东西 ——
@@ -55,11 +61,13 @@
 
 | 端口 | 是什么 | 哪些脚本需要 |
 |---|---|---|
-| `3000` | Litefuse **web**（Next.js，UI + tRPC + OTLP 入口） | 除 `_doris_be_proxy.cjs` / `probe-doris-sql.cjs` / `upstream-reconcile.cjs` 外全部 |
+| `3000` | Litefuse **web**（Next.js，UI + tRPC + OTLP 入口） | 除 `_doris_be_proxy.cjs` / `_doris_redirect_shim.cjs` / `probe-doris-sql.cjs` / `probe-doris-redirect.cjs` / `probe-vpn-socks.cjs` / `upstream-reconcile.cjs` 外全部 |
 | `9030` | **Doris FE** 的 MySQL 查询端口 | `probe-doris-sql.cjs`、`probe-v2-live-eval.cjs`、`seed-jev-demo-data.cjs` |
-| `8040` | **Doris BE** 的 HTTP 端口（stream load） | `_doris_be_proxy.cjs` 需要它可达 |
-| `8899` | 本归档代理**自己监听**的端口 | 只有 `_doris_be_proxy.cjs`（运行它时占用） |
-| `8030` | Doris FE HTTP（脚本里预留，收 `DORIS_FE_URL`） | 可选，当前脚本未强制使用 |
+| `8030` | **Doris FE** 的 HTTP 端口（Web UI / stream-load 入口） | `probe-doris-redirect.cjs`（默认打它）、`_doris_redirect_shim.cjs`（把它作为上游） |
+| `8040` | **Doris BE** 的 HTTP 端口（stream load 的第二跳目标） | `_doris_be_proxy.cjs` 与 `_doris_redirect_shim.cjs` 都要它可达 |
+| `8899` | `_doris_be_proxy.cjs` **自己监听**的端口 | 只有 `_doris_be_proxy.cjs`（运行它时占用） |
+| `8031` | `_doris_redirect_shim.cjs` **自己监听**的端口 | 只有 `_doris_redirect_shim.cjs`（运行它时占用），并把应用指到它 |
+| `12450` | 本机 **SOCKS5 代理**端口（VPN 客户端的本地端口） | 只有 `probe-vpn-socks.cjs`（默认值，可用 `VPN_PORT` 覆盖） |
 
 另外还需要：
 
@@ -91,18 +99,53 @@ export LF_PROBE_PASSWORD='<demo 账号口令>'
 | `JEV_BASE_URL` / `JEV_UPSTREAM` | `null`（直连）/ `typesafe` | Jev 连接的 base URL 与上游选择。 |
 | `REPRO_JEV` | 未设 | 设为 `1` 才会跑 `probe-apikey-create-500.cjs` 里的真实 Jev 调用（**会消耗真实额度**）。 |
 | `PROXY_PORT` / `DORIS_BE_HTTP_PORT` / `DORIS_BE_REACHABLE_HOST` | `8899` / `8040` / `127.0.0.1` | `_doris_be_proxy.cjs` 的监听端口、BE 端口、以及重写后的可达地址。 |
+| `SHIM_PORT` / `SHIM_UPSTREAM_HOST` / `SHIM_UPSTREAM_PORT` / `SHIM_BE_TARGET` | `8031` / `127.0.0.1` / `8030` / `127.0.0.1:8040` | `_doris_redirect_shim.cjs` 的监听端口、上游 FE、以及重写后的 BE 目标。 |
+| `DORIS_FE_HTTP_URL` | `http://localhost:8030`（shim 场景下指 `:8031`） | `probe-doris-redirect.cjs` 打的目标；也是应用 stream-load 的入口。 |
+| `VPN_SOCKS_HOST` / `VPN_PORT` | `127.0.0.1` / `12450` | `probe-vpn-socks.cjs` 要握手的本地 SOCKS5 代理端点。 |
 | `LF_UPSTREAM_CLONE` / `LF_TMP_DIR` | 仓库同级 `langfuse-latest` / `os.tmpdir()` | 上游 clone 路径与临时目录。 |
 | `LF_JUDGE_MODEL` | `deepseek-flash` | `seed-jev-demo-data.cjs` 的 judge 模型。 |
 | `MAX_WAIT_MS` / `RUN_TAG` | `240000` / 时间戳后 6 位 | `probe-v2-live-eval.cjs` 的等待上限与本次运行标签。 |
 
-如果 Doris BE 的地址在 macOS 上依然不可达，需要让 worker 走代理，另设（这是**环境变量**，不是脚本里的硬编码值）：
+### 4. 代理：`HTTP_PROXY` 与 `HTTPS_PROXY` 不是一回事（重要，容易踩）
 
-```sh
-export HTTP_PROXY=http://127.0.0.1:8899
-export HTTPS_PROXY=http://127.0.0.1:8899
-```
+Doris 写入相关的问题，和 TypeSafe/Jev 出网的问题，**是两条独立的路，读的也不是同一个环境变量**。
+下面这段都是对着仓库代码核过的结论，不要按直觉混用：
 
-### 4. Windows → macOS 的差异小结
+| | Doris 的 HTTP / stream load 路径 | TypeSafe（Jev）决策模型 + LLM judge 路径 |
+|---|---|---|
+| 代码位置 | `packages/shared/src/server/doris/client.ts`，用的是 **axios** | `.../llm/typesafe/typeSafeDecisionModelClient.ts`、`.../llm/fetchLLMCompletion.ts`，用的是 **fetch + undici** |
+| 怎么选代理 | axios 没设 `config.proxy`，于是走 `proxy-from-env` 的 `getProxyForUrl()`，按 URL 协议读 `HTTP_PROXY` / `HTTPS_PROXY` | 只读 `env.HTTPS_PROXY`（`env.ts` 里声明的就是这一个），然后 `new ProxyAgent(proxyUrl)` 交给 fetch 当 dispatcher |
+| 会不会看 `NO_PROXY` | **会**（`proxy-from-env` 支持 `NO_PROXY`/`no_proxy`） | **不会**（undici 的 `ProxyAgent` 不实现 `NO_PROXY`） |
+| 支不支持 SOCKS5 | 取决于 axios/Node，不在此列 | **不支持** —— 仓库注释里写明了 `ProxyAgent` 只讲 HTTP(S) 代理，SOCKS5-only 的代理需要另搭桥或换支持 SOCKS 的 agent |
+
+具体到本归档的两个"改写型"代理：
+
+- `_doris_be_proxy.cjs` / `_doris_redirect_shim.cjs` 解决的是**「FE 返回的 `Location` 指向 Docker 容器内网 IP，
+  宿主机连不上」**这个问题，是本地重写代理，不是出网代理。它们服务的是 **Doris 写入**。
+- 如果你的 Doris 写入还需要应用经代理出去，那么设的是（axios 路径）：
+
+  ```sh
+  export HTTP_PROXY=http://127.0.0.1:8899
+  ```
+
+  并且注意 `NO_PROXY`：因为 axios 这条路径**会**尊重 `NO_PROXY`，所以要把本机/内网地址排除掉，
+  否则连 `localhost:8040`、`127.0.0.1:9030` 这类请求也会被塞进代理。
+
+- **这条设置对 TypeSafe 的 451 完全没用。** 原因有两层：
+  1. TypeSafe / LLM judge 路径**只读 `HTTPS_PROXY`**，`HTTP_PROXY` 设了它也不看；
+  2. 就算把 `HTTPS_PROXY` 指到本地的改写代理，也解决不了 451 —— 451 是**对端按地区/合规拒绝**（区域限制），
+     需要的是**一个真正能把流量送出去、且落在允许地区的出网代理**，而不是本地做地址重写的代理。
+- 所以要给 TypeSafe 配出网代理时，用（注意是 `HTTPS_PROXY`，且它会忽略 `NO_PROXY`）：
+
+  ```sh
+  export HTTPS_PROXY=http://<允许地区的出网代理>:<port>
+  ```
+
+  并且这个代理**必须是 HTTP(S) 代理** —— undici `ProxyAgent` 不支持 SOCKS5；如果手上只有 SOCKS5
+  （比如 VPN 客户端只给本地 SOCKS5 端口），需要再加一层 HTTP→SOCKS 桥，或者改用支持 SOCKS 的 agent。
+  诊断这类"到底是代理没起 / 被规则拒 / 目标不可达"的问题，用 `probe-vpn-socks.cjs`。
+
+### 5. Windows → macOS 的差异小结
 
 - PowerShell 的 `$env:JEV_KEY = "..."` 换成 `export JEV_KEY='...'`；`%TEMP%` 相关逻辑已改成 `os.tmpdir()`。
 - `D:\...\` 反斜杠路径已全部改为 `path.resolve/path.join`，`/` 与 `\` 都能正确解析。

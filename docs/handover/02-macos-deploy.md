@@ -218,6 +218,8 @@ services:
 YAML
 ```
 
+> ✅ **归档副本（推荐直接用这个）**：开发机上那份 override 已经收进本档案：`docs/handover/overrides/doris-4.0.6.override.yml`，用法与成因见 `docs/handover/overrides/README.md`。两种做法**内容等价**：直接 `-f docs/handover/overrides/doris-4.0.6.override.yml` 即可，**不要同时用两份**；如果你不想让工作树里多一个 yml，就照上面的方式在仓库外重建。另外提醒：override **只改镜像 tag**，它**不解决** `be_custom.conf` 没被挂载的问题（见本节末尾 ⚠️）。
+
 起容器（`--wait` 会等到 healthcheck 全绿；Doris FE 的 `start_period` 是 120s、BE 是 150s，**首次启动请耐心等 3–5 分钟**）：
 
 ```bash

@@ -1,0 +1,22 @@
+# ── Provenance (added when this file was archived into the repo for the macOS handover) ──
+# Original location: OUTSIDE the repo, on the Windows dev host, as `_doris406.override.yml`
+# (the repo-external working directory, i.e. the parent of the repository folder).
+# Note: the Doris containers that were actually running were started with a *copy* of this
+# file placed in the Windows %TEMP% directory (see docker inspect's
+# com.docker.compose.project.config_files label). That temp copy is transient and has already
+# been deleted, so this archived file is now the only durable copy.
+# Changes vs. the original: the filename in the `docker compose -f ...` example line below was
+# updated to the archived name, and this provenance block was added. The image pins — the
+# actual content — are unchanged.
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# Local-only override: run the dev Doris with 4.0.6 (the version the app is
+# verified against, and the one the main docker-compose.yml pins) instead of the
+# stale 4.0.4 images in docker-compose.dev.yml. 4.0.4 lacks JSON_OBJECT_FLATTEN,
+# which the Doris read path (traces / observations / events) requires.
+#
+#   docker compose -f docker-compose.dev.yml -f docs/handover/overrides/doris-4.0.6.override.yml up -d doris_fe doris_be
+services:
+  doris_fe:
+    image: apache/doris:fe-4.0.6
+  doris_be:
+    image: apache/doris:be-4.0.6
