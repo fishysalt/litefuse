@@ -61,7 +61,7 @@ export function LlmApiKeyList(props: { projectId: string }) {
   if (!hasAccess) {
     return (
       <div>
-        <Header title={t("LLM Connections")} />
+        <Header title={t("Model Connections")} />
         <Alert>
           <AlertTitle>{t("Access Denied")}</AlertTitle>
           <AlertDescription>
@@ -76,7 +76,7 @@ export function LlmApiKeyList(props: { projectId: string }) {
 
   return (
     <div id="llm-api-keys">
-      <Header title={t("LLM Connections")} />
+      <Header title={t("Model Connections")} />
       <p className="mb-4 text-sm">
         {t(
           "Connect your LLM services to enable evaluations and playground features. Your provider will charge based on usage.",
@@ -196,7 +196,7 @@ function DeleteApiKeyButton(props: { projectId: string; apiKeyId: string }) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="mb-5">
-            {t("Delete LLM Connection")}
+            {t("Delete Model Connection")}
           </DialogTitle>
           <DialogDescription>
             {t(

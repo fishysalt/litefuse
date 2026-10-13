@@ -33,7 +33,7 @@ async function prepareEvaluatorDefinition(params: {
   if (!modelConfig.valid) {
     return {
       valid: false as const,
-      error: `No valid LLM model found for evaluator "${params.template.name}". ${modelConfig.error}. Configure an LLM connection for this project under Settings → LLM Connections (/project/${params.projectId}/settings/llm-connections) before creating llm_as_judge evaluators.`,
+      error: `No valid LLM model found for evaluator "${params.template.name}". ${modelConfig.error}. Configure a connection for this project under Settings → Model Connections (/project/${params.projectId}/settings/llm-connections) before creating llm_as_judge evaluators.`,
     };
   }
 

@@ -240,7 +240,7 @@ export async function assertEvaluatorConfigurationValid(
       const timeoutSeconds =
         getClientInitiatedNonStreamingLlmTimeoutMs() / 1000;
       throw new EvaluatorConfigurationError(
-        `The model did not respond within ${timeoutSeconds} seconds during evaluator validation. The evaluator was not saved. Retry or check your LLM connection and model settings.`,
+        `The model did not respond within ${timeoutSeconds} seconds during evaluator validation. The evaluator was not saved. Retry or check the connection and model settings.`,
       );
     }
     if (llmError && (llmError.isRetryable || llmError.kind === "abort")) {
@@ -249,7 +249,7 @@ export async function assertEvaluatorConfigurationValid(
           ? "The model request was aborted during evaluator validation."
           : "The LLM provider could not complete the model request during evaluator validation.";
       throw new EvaluatorConfigurationError(
-        `${message} The evaluator was not saved. Retry or check your LLM connection and model settings.`,
+        `${message} The evaluator was not saved. Retry or check the connection and model settings.`,
       );
     }
     throw error;
@@ -270,7 +270,7 @@ export async function getDecisionModelConfigurationError(params: {
     params.definition.model,
   );
   if (!modelConfig.valid) {
-    return `No decision-model connection found for evaluator "${params.name}". ${modelConfig.error}. Add a TypeSafe connection under Settings → LLM Connections (/project/${params.projectId}/settings/llm-connections) first.`;
+    return `No decision-model connection found for evaluator "${params.name}". ${modelConfig.error}. Add a TypeSafe connection under Settings → Model Connections (/project/${params.projectId}/settings/llm-connections) first.`;
   }
   // LITEFUSE ADDITION (gap D4): `supportsDecisionModels` / `isAllowedDecisionModel`
   // answer the adapter *and* the model half of the question, so an unsupported

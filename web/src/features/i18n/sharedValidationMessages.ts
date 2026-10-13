@@ -46,13 +46,13 @@ export const SHARED_VALIDATION_MESSAGES = [
   i18nKey("Each rangeStart must be less than corresponding rangeEnd"),
   // Evaluator status banners, shown on the evaluator detail page.
   i18nKey(
-    "Evaluator paused: LLM authentication failed. Update the LLM connection used by this evaluator and then reactivate it.",
+    "Evaluator paused: LLM authentication failed. Update the model connection used by this evaluator and then reactivate it.",
   ),
   i18nKey(
     "Evaluator paused: model not found or unavailable. Update the evaluator template or default evaluation model, then reactivate it.",
   ),
   i18nKey(
-    "Evaluator paused: no LLM connection found for the provider used by this evaluator. Add or restore the LLM connection, then reactivate it.",
+    "Evaluator paused: no model connection found for the provider used by this evaluator. Add or restore the connection, then reactivate it.",
   ),
   i18nKey(
     "Evaluator paused: no default evaluation model is configured. Set a default evaluation model or update the evaluator template, then reactivate it.",
@@ -65,7 +65,7 @@ export const SHARED_VALIDATION_MESSAGES = [
   ),
   // EVALUATOR_BLOCK_METADATA.shortLabel, rendered by `evaluator-paused-callout`
   i18nKey("Authentication failed"),
-  i18nKey("LLM connection missing"),
+  i18nKey("Model connection missing"),
   i18nKey("Default evaluation model missing"),
   i18nKey("Evaluation model invalid"),
   i18nKey("Model unavailable"),

@@ -63,7 +63,7 @@ export function getDecisionModelCapabilityError(params: {
     return (
       `Connection "${params.provider}" uses adapter "${params.adapter}", which cannot answer ` +
       `decision-model questions. Decision-model evaluators need a TypeSafe connection — add one ` +
-      `under Settings → LLM Connections first.`
+      `under Settings → Model Connections first.`
     );
   }
 

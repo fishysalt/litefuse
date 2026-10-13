@@ -27,7 +27,7 @@ function getResolutionAction({
   ) {
     return {
       href: `/project/${projectId}/settings/llm-connections`,
-      label: "Open LLM connections",
+      label: "Open model connections",
     };
   }
 
