@@ -3,6 +3,7 @@ import {
   EVALUATOR_EMPTY_STATE_DOCS_HREF,
 } from "@/src/features/evals/v2/constants/evaluatorEmptyState";
 import { MANAGED_TEMPLATES_CATALOG } from "@/src/features/evals/v2/constants/managedTemplatesCatalog";
+import { isOfferedEvaluatorType } from "@/src/features/evals/v2/constants/offeredEvaluatorTypes";
 import { prepareEvaluatorEmptyState } from "./prepareEvaluatorEmptyState";
 
 describe("prepareEvaluatorEmptyState", () => {
@@ -11,7 +12,18 @@ describe("prepareEvaluatorEmptyState", () => {
 
     expect(emptyState.docsHref).toBe(EVALUATOR_EMPTY_STATE_DOCS_HREF);
     expect(emptyState.templateCount).toBe(
-      MANAGED_TEMPLATES_CATALOG.templates.length,
+      MANAGED_TEMPLATES_CATALOG.templates.filter((template) =>
+        isOfferedEvaluatorType(template.evaluator.type),
+      ).length,
+    );
+    // Code templates ship with the catalog but are not offered, so the count
+    // shown next to the gallery must leave them out.
+    expect(
+      MANAGED_TEMPLATES_CATALOG.templates.length - emptyState.templateCount,
+    ).toBe(
+      MANAGED_TEMPLATES_CATALOG.templates.filter(
+        (template) => template.evaluator.type === "CODE",
+      ).length,
     );
     expect(
       emptyState.startingPoints.map(({ template, action }) => ({

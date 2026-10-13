@@ -1,6 +1,6 @@
 /* eslint-disable no-nested-ternary */
 import { useCallback, type RefObject } from "react";
-import { Code2, Scale, Search, Sparkles } from "lucide-react";
+import { Scale, Search, Sparkles } from "lucide-react";
 import { EvalTemplateTypeEnum, type EvalTemplateType } from "@langfuse/shared";
 
 import { Button } from "@/src/components/ui/button";
@@ -164,15 +164,6 @@ export function EvaluatorGalleryView({
                 >
                   <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                   New LLM-as-a-judge
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="flex-1 shrink-0 gap-1.5 @2xl:flex-none"
-                  onClick={() => onCreateFromScratch(EvalTemplateTypeEnum.CODE)}
-                >
-                  <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  New code evaluator
                 </Button>
                 <Button
                   type="button"

@@ -3,6 +3,7 @@ import {
   EVALUATOR_EMPTY_STATE_STARTING_POINTS,
 } from "@/src/features/evals/v2/constants/evaluatorEmptyState";
 import { managedEvaluatorTemplateService } from "@/src/features/evals/v2/fns/templateGallery/managedEvaluatorTemplateService";
+import { isOfferedEvaluatorType } from "@/src/features/evals/v2/constants/offeredEvaluatorTypes";
 import type { GalleryTemplate } from "@/src/features/evals/v2/types/templateGallery";
 
 type ManagedGalleryTemplate = Extract<GalleryTemplate, { source: "managed" }>;
@@ -31,7 +32,11 @@ export function prepareEvaluatorEmptyState(): EvaluatorEmptyStateModel {
       const template = managedEvaluatorTemplateService.get(point.templateKey);
       return template ? [toStartingPoint(point, template)] : [];
     }),
-    templateCount: managedEvaluatorTemplateService.list().templates.length,
+    templateCount: managedEvaluatorTemplateService
+      .list()
+      .templates.filter((template) =>
+        isOfferedEvaluatorType(template.evaluator.type),
+      ).length,
     docsHref: EVALUATOR_EMPTY_STATE_DOCS_HREF,
   };
 }

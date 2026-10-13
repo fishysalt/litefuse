@@ -1,9 +1,14 @@
-import { Code2, Scale, Sparkles } from "lucide-react";
+import { Scale, Sparkles } from "lucide-react";
 import { EvalTemplateTypeEnum, type EvalTemplateType } from "@langfuse/shared";
 
 import { Tabs } from "@/src/components/design-system/Tabs/Tabs";
 
-/** Selects the evaluator implementation. */
+/**
+ * Selects the evaluator implementation.
+ *
+ * Code evaluators are not offered here: this build has no execution path for
+ * them, so their form could never be saved. See `OFFERED_EVALUATOR_TYPES`.
+ */
 export function EvaluationTypeToggle({
   value,
   onValueChange,
@@ -25,14 +30,6 @@ export function EvaluationTypeToggle({
             disabled={disabled}
             icon={Sparkles}
             label="LLM-as-a-judge"
-          />
-        ) : null}
-        {!disabled || value === EvalTemplateTypeEnum.CODE ? (
-          <Tabs.Trigger
-            value={EvalTemplateTypeEnum.CODE}
-            disabled={disabled}
-            icon={Code2}
-            label="Code evaluator"
           />
         ) : null}
         {!disabled || value === EvalTemplateTypeEnum.DECISION_MODEL ? (

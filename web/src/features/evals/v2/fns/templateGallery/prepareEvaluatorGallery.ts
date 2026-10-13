@@ -6,6 +6,7 @@ import type {
 import { getGalleryCategoryPresentation } from "@/src/features/evals/v2/fns/templateGallery/galleryCategoryPresentation";
 import { managedEvaluatorTemplateService } from "@/src/features/evals/v2/fns/templateGallery/managedEvaluatorTemplateService";
 import { EVALUATOR_GALLERY_PROJECT_SECTION_KEY } from "@/src/features/evals/v2/constants/evaluatorGallery";
+import { isOfferedEvaluatorType } from "@/src/features/evals/v2/constants/offeredEvaluatorTypes";
 
 const RECOMMENDED_TEMPLATE_ORDER = [
   "topic-decision-model",
@@ -39,13 +40,18 @@ export function prepareEvaluatorGallery({
     !query ||
     name.toLowerCase().includes(query) ||
     description?.toLowerCase().includes(query);
-  const filteredCustom = customTemplates.filter((template) =>
-    matches(template.name, template.description),
+  const filteredCustom = customTemplates.filter(
+    (template) =>
+      matches(template.name, template.description) &&
+      isOfferedEvaluatorType(template.type),
   );
   const managedCatalog = managedEvaluatorTemplateService.list({ search });
+  const managedTemplates = managedCatalog.templates.filter((template) =>
+    isOfferedEvaluatorType(template.evaluator.type),
+  );
   const managedByCategory = new Map(
     managedCatalog.categories.map((category) => {
-      const templatesInCategory = managedCatalog.templates.filter((template) =>
+      const templatesInCategory = managedTemplates.filter((template) =>
         template.categories.includes(category.key),
       );
       const replacedKeys = new Set(

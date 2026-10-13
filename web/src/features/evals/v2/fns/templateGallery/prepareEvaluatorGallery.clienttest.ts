@@ -1,11 +1,20 @@
 import { prepareEvaluatorGallery } from "@/src/features/evals/v2/fns/templateGallery/prepareEvaluatorGallery";
 
-const customTemplate = {
+const judgeTemplate = {
   id: "evaluator-1",
   name: "Project exact match",
+  type: "LLM_AS_JUDGE" as const,
+  updatedAt: new Date("2026-08-11T10:00:00.000Z"),
+  version: 1,
+  createdByUser: null,
+};
+
+const codeTemplate = {
+  id: "evaluator-2",
+  name: "Project keyword match",
   type: "CODE" as const,
   sourceCodeLanguage: "TYPESCRIPT" as const,
-  updatedAt: new Date("2026-08-11T10:00:00.000Z"),
+  updatedAt: new Date("2026-08-12T10:00:00.000Z"),
   version: 1,
   createdByUser: null,
 };
@@ -13,7 +22,7 @@ const customTemplate = {
 describe("prepareEvaluatorGallery", () => {
   it("groups project and managed examples for navigation", () => {
     const gallery = prepareEvaluatorGallery({
-      customTemplates: [customTemplate],
+      customTemplates: [judgeTemplate, codeTemplate],
       customTemplateCount: 12,
       search: "",
     });
@@ -57,7 +66,6 @@ describe("prepareEvaluatorGallery", () => {
       "chat-intent",
       "out-of-scope-request",
       "user-disagreement",
-      "all-caps",
       "user-distress",
       "out-of-scope-decision-model",
       "frustration-decision-model",
@@ -65,9 +73,32 @@ describe("prepareEvaluatorGallery", () => {
     ]);
   });
 
+  it("offers no code evaluators, neither as templates nor as project evaluators", () => {
+    const gallery = prepareEvaluatorGallery({
+      customTemplates: [judgeTemplate, codeTemplate],
+      customTemplateCount: 12,
+      search: "",
+    });
+
+    const managedTypes = gallery.sections.flatMap(({ templates }) =>
+      templates.flatMap((template) =>
+        template.source === "managed" ? [template.evaluator.type] : [],
+      ),
+    );
+    expect(managedTypes).not.toContain("CODE");
+
+    const customNames = gallery.sections.flatMap(({ templates }) =>
+      templates.flatMap((template) =>
+        template.source === "custom" ? [template.name] : [],
+      ),
+    );
+    expect(customNames).toContain(judgeTemplate.name);
+    expect(customNames).not.toContain(codeTemplate.name);
+  });
+
   it("searches custom and managed template descriptions", () => {
     const gallery = prepareEvaluatorGallery({
-      customTemplates: [customTemplate],
+      customTemplates: [judgeTemplate, codeTemplate],
       customTemplateCount: 0,
       search: "grounded",
     });

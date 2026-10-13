@@ -40,7 +40,7 @@ const evaluatorsRegistry = fieldRegistryFromColumns(
     },
     allowFreeText: true,
     freeTextScopeLabel: "evaluator names",
-    searchExamples: ["quality", "status:ACTIVE", "type:CODE"],
+    searchExamples: ["quality", "status:ACTIVE", "type:DECISION_MODEL"],
     recentSearches: true,
   },
 );
