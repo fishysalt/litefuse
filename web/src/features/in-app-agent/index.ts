@@ -1,7 +1,7 @@
 // ── LITEFUSE NOTE (authored stub, not upstream code) ────────────────────────
 // Upstream ships a whole in-app agent (conversation runtime, tools, watch route,
 // model provider). Litefuse has none of it, and the decision is to PARK the
-// feature — see docs/jev as judge/待办-应用内AI与代码评估.md.
+// feature pending a full review.
 //
 // These two hooks are all the evaluator tree needs. \`useIsInAppAgentLauncherVisible\`
 // returning false makes \`EvaluatorsEmptyState\` pass \`undefined\` for \`onDetectTopics\`,

@@ -11,7 +11,7 @@
 // playground use. This file provides the same symbol names on top of it, so the
 // migrated evaluator code compiles and runs without a second LLM stack.
 //
-// Deviations, all deliberate and listed in docs/jev as judge/进度-错误基线.md:
+// Deviations from that stack, all deliberate:
 //   - `generateLLMText` returns zero token usage. Our `fetchLLMCompletion` does not
 //     report usage (LangChain, streamUsage disabled), and decision L1 accepts that
 //     the test-run cost estimate is not shown rather than changing the shared LLM

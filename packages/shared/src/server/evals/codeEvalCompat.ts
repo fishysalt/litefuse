@@ -4,8 +4,8 @@
 // which logs an "insecure local execution" warning). Both introduce an
 // "execute untrusted user code" surface.
 //
-// Litefuse decision (docs/jev as judge/待办-应用内AI与代码评估.md): keep the
-// evaluator type, its UI entry point and its messaging, but ship NO execution path.
+// Litefuse decision: keep the evaluator type, its UI entry point and its
+// messaging, but ship NO execution path.
 // This file expresses that in one place:
 //   - \`resolveConfiguredCodeEvalDispatcher\` always returns null, so every caller
 //     takes its existing "dispatcher is not configured" branch and the user sees a
@@ -14,7 +14,8 @@
 //     compiles, and throws if anyone ever reaches it.
 //
 // Replacement suggestion: when code evaluation is wanted, decide the sandbox story
-// first (see the to-do doc's route A/B), then implement a real dispatcher here.
+// first (AWS Lambda vs. in-process local execution), then implement a real
+// dispatcher here.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**

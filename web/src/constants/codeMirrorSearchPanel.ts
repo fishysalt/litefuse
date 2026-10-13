@@ -1,9 +1,6 @@
 /**
  * Source: upstream Langfuse 4.43.0
- * `web/src/constants/codeMirrorSearchPanel.ts`
- * (copied verbatim; local read-only clone at
- * D:\SelectDB\litefuse-master\langfuse-latest, upstream commit checked as
- * Langfuse 4.43.0 / main branch).
+ * `web/src/constants/codeMirrorSearchPanel.ts` (copied verbatim).
  *
  * LITEFUSE ADDITION: this file did not exist in our repo. It is the shared
  * top-mounted CodeMirror search panel (Ctrl-F) that the editors on the

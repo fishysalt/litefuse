@@ -11,7 +11,7 @@
 // Litefuse's `AuthHeaderValidVerificationResult` scope has no policy layer
 // (`web/src/features/public-api/server/createAuthedProjectAPIRoute.ts` only
 // checks basic auth + project access level), so the action is not accepted
-// here. See the port report, section "RBAC/scope".
+// here.
 // ─────────────────────────────────────────────────────────────────────────────
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { type ZodType } from "zod/v4";

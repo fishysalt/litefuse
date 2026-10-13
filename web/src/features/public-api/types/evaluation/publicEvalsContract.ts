@@ -2,7 +2,7 @@
 // Port of upstream Langfuse 4.56.0
 // `web/src/features/public-api/types/evaluation/publicEvalsContract.ts`.
 //
-// Deliberate differences from upstream (all listed in the port report):
+// Deliberate differences from upstream:
 //   1. `publicApiPaginationLimitZod` → `paginationLimitZod`: Litefuse's shared
 //      package exports the schema under the pre-alias name only
 //      (`packages/shared/src/utils/zod.ts`). Identical definition
@@ -14,8 +14,7 @@
 //      factory map below simply omits it.
 //   4. Filter columns come from OUR `observationEvalFilterColumns` registry, so
 //      the accepted column set is exactly the set Litefuse's rule validation
-//      (`validateEvaluatorFiltersForTarget`) accepts. See the report for the
-//      upstream-vs-Litefuse column diff.
+//      (`validateEvaluatorFiltersForTarget`) accepts.
 // ─────────────────────────────────────────────────────────────────────────────
 import {
   arrayOptionsFilter,

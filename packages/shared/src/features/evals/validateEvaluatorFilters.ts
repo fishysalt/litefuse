@@ -57,8 +57,7 @@ const findMatchingColumnDefinition = (
   columns: ColumnDefinition[],
 ): ColumnDefinition | undefined =>
   // LITEFUSE NOTE: upstream also matches `column.aliases`; our ColumnDefinition
-  // has no `aliases` field. Kept our filter types and adapted this call site, per
-  // the filter decision in docs/jev as judge/现状-改动与差异总览.md.
+  // has no `aliases` field. Kept our filter types and adapted this call site.
   columns.find(
     (column) => column.id === filterColumn || column.name === filterColumn,
   );

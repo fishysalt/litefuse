@@ -15,8 +15,8 @@ import type { TracingSearchType } from "@langfuse/shared";
  * (persisted view state may carry them) but degrade to the combined full-text
  * search instead of turning search off.
  *
- * Tracked in `docs/jev as judge/待决问题登记.md` (待决 1): if Doris ever gains a
- * per-column index, extend `TracingSearchType` and restore the branches.
+ * Open item (待决 1): if Doris ever gains a per-column index, extend
+ * `TracingSearchType` and restore the branches.
  * ───────────────────────────────────────────────────────────────────────────
  */
 

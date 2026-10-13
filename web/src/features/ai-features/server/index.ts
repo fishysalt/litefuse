@@ -6,9 +6,8 @@
 // the whole in-app-agent subsystem.
 //
 // Litefuse decision: the whole in-app AI agent is PARKED pending a full review,
-// which must consider the Cloud build as well as self-hosted — see
-// docs/jev as judge/待办-应用内AI与代码评估.md. Until that review happens, this
-// answers "unavailable", so every caller takes its already-written
+// which must consider the Cloud build as well as self-hosted. Until that review
+// lands, this answers "unavailable", so every caller takes its already-written
 // \`if (!availability.available) return null\` branch and no AI affordance appears.
 //
 // Replacement suggestion: when the review lands, decide once whether self-hosted

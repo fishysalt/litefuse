@@ -3,8 +3,8 @@
 // it asks a fixed set of questions (`evaluator_versions.questions`) against the
 // extracted variables and maps the answers to scores. Upstream runs it from its
 // observation/event path; we dispatch it from the trace/dataset path as well —
-// documented in `docs/jev as judge/待决问题登记.md` (our rule UI lets a rule target
-// a decision-model evaluator, upstream's trace path filters those rules out).
+// our rule UI lets a rule target a decision-model evaluator, upstream's trace
+// path filters those rules out.
 //
 // Deviations from upstream's `decisionModel/runDecisionModelEvaluation.ts`, all
 // deliberate:

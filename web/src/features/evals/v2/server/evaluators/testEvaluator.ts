@@ -273,7 +273,6 @@ async function testLlmEvaluator(params: {
         // estimate is left unset — `estimatedCostUsd` stays null and the UI, which
         // already accepts null, simply does not show the line. This also matches
         // the earlier decision to drop per-rule cost reporting.
-        // See docs/jev as judge/进度-错误基线.md.
         return result.output;
       },
     });

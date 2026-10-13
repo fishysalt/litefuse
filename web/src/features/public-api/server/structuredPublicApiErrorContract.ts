@@ -1,7 +1,7 @@
 // ── LITEFUSE PORT ───────────────────────────────────────────────────────────
 // Copied from upstream Langfuse 4.56.0
 // `web/src/features/public-api/server/structuredPublicApiErrorContract.ts`,
-// with two deliberate differences, both documented in the port report:
+// with two deliberate differences:
 //   1. Upstream also maps `ClickHouseResourceError` (422). Litefuse has no such
 //      error class, so that branch is absent. Doris replaces ClickHouse here and
 //      raises no analogue.

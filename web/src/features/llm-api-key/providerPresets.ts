@@ -1,7 +1,7 @@
 import { LLMAdapter, typeSafeModels } from "@langfuse/shared";
 
 /**
- * Provider presets for the "LLM Connections" settings page.
+ * Provider presets for the "Model Connections" settings page.
  *
  * Each preset fills the connection form (adapter + provider name + base URL +
  * model list) so users do not have to look up the OpenAI/Anthropic-compatible
@@ -12,9 +12,8 @@ import { LLMAdapter, typeSafeModels } from "@langfuse/shared";
  * connection is stored (see `web/src/features/llm-api-key/server/router.ts`).
  * Keep the first model a valid, cheap, generally available model ID.
  *
- * Every `baseURL` here was read from the vendor's own documentation; the
- * sources are listed in `docs/model-pricing-verification.md`
- * (section "预设清单"). Providers whose endpoint could not be confirmed from
+ * Every `baseURL` here was read from the vendor's own documentation.
+ * Providers whose endpoint could not be confirmed from
  * official docs (Groq, Mistral, Volcengine Ark/Doubao, 01.AI/Yi, iFlytek
  * Spark) are intentionally absent — configure those with the "Custom" option.
  */

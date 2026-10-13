@@ -48,7 +48,7 @@ export function stringFilterToPrisma(
       return { endsWith: filter.value, ...insensitive };
     // LITEFUSE NOTE: upstream also handles "is not empty" here; our string filter
     // operators have no such member (long-standing filter divergence — we kept our
-    // filter types and adapt upstream code, see docs/jev as judge/现状-改动与差异总览.md).
+    // filter types and adapt upstream code instead).
   }
 }
 

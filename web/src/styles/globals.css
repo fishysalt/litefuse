@@ -33,8 +33,7 @@
   /* Tokens the evaluator v2 UI needs. Upstream's design-system components
      (web/src/components/design-system/**) are copied from it and reference
      these names; they were not part of our older palette. Purely additive:
-     new names, so no existing component's styling changes.
-     See docs/jev as judge/进度-错误基线.md. */
+     new names, so no existing component's styling changes. */
   --color-light-violet: hsl(var(--light-violet));
   --color-dark-violet: hsl(var(--dark-violet));
   --color-light-teal: hsl(var(--light-teal));

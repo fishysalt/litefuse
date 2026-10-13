@@ -3,7 +3,7 @@
 // strings for previous contract versions, and its format/validate helpers import
 // \`@astral-sh/ruff-wasm-web\` and prettier's estree plugin — packages we do not
 // install. All of that belongs to code evaluation, which Litefuse deliberately
-// does not wire up (docs/jev as judge/待办-应用内AI与代码评估.md).
+// does not wire up.
 //
 // The evaluator tree only uses \`getDefaultCodeEvalSource\` (to seed the editor),
 // so that is all this file provides: a small, honest starter snippet per language

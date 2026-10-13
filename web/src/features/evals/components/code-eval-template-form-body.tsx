@@ -6,10 +6,10 @@
 // evaluation, which Litefuse does not wire up, and it needs CodeMirror language
 // packages we do not install (@codemirror/lang-python, lang-javascript).
 //
-// Per the decision recorded in docs/jev as judge/待办-应用内AI与代码评估.md, the
-// evaluator type and its UI entry point are kept, but this body is a placeholder
-// that states the situation instead of pretending to be an editor. The prop
-// contract is preserved so the surrounding setup flow compiles unchanged.
+// The evaluator type and its UI entry point are kept, but this body is a
+// placeholder that states the situation instead of pretending to be an editor.
+// The prop contract is preserved so the surrounding setup flow compiles
+// unchanged.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { AlertCircle } from "lucide-react";

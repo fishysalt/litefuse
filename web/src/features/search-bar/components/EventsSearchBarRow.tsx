@@ -6,8 +6,8 @@
 // for a natural-language prompt (components/SearchBarAiPrompt.tsx) and calls the
 // `searchBar.generateFilter` tRPC route (features/search-bar/server/*).
 //
-// Litefuse does not ship in-app AI — see
-// `docs/jev as judge/待办-应用内AI与代码评估.md` (搁置，待整体评估). When this
+// Litefuse does not ship in-app AI: the feature is parked pending a full review
+// (搁置，待整体评估). When this
 // module was copied, the AI sub-mode, its server router, and the org-level
 // `aiFeaturesEnabled` lookup it needed (`useQueryProject`) were deliberately
 // left out. Everything else below is upstream's code.

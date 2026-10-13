@@ -3,7 +3,6 @@
 // bundled tsc and lints Python with a WASM ruff build. Both depend on packages
 // we do not install (@typescript/typescript6, @astral-sh/ruff-wasm-web), and the
 // whole feature belongs to code evaluation, which Litefuse does not wire up.
-// See docs/jev as judge/待办-应用内AI与代码评估.md.
 //
 // The RESULT CONTRACT is kept intact so the UI that consumes it (the code
 // editor's diagnostics panel, the setup footer's validity gate) compiles and

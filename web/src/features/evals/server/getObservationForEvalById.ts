@@ -14,8 +14,7 @@
 // inventing one keeps the eval-facing shape identical.
 //
 // This is one of the two storage-boundary functions for the evaluator system; the
-// other is the score write path. See
-// docs/jev as judge/现状-改动与差异总览.md §3.2.
+// other is the score write path.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {

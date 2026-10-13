@@ -853,7 +853,6 @@ function lowerScores(
     // `booleanObject` filter. Our `FilterCondition` union has no such variant
     // (and no server-side translation for it), so instead of emitting a filter
     // the backend cannot execute we report it as an unsupported condition.
-    // Tracked in `docs/jev as judge/待决问题登记.md` (boolean score filtering).
     errors.push(
       `${path} is a boolean score — filtering on boolean scores is not supported yet`,
     );

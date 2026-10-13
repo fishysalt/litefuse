@@ -3,7 +3,7 @@
 // `web/src/features/public-api/server/evaluation/evaluatorsApiHandler.ts`.
 // Upstream passes `action: "evaluator:read" | "evaluator:CUD"` for its RBAC
 // policy layer; Litefuse's public REST auth has no policy layer, so that field
-// is omitted (see the port report).
+// is omitted.
 // ─────────────────────────────────────────────────────────────────────────────
 import {
   createStablePublicApiRoute,

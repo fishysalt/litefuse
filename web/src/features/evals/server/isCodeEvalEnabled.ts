@@ -3,7 +3,6 @@
 // (aws-lambda / insecure-local). Litefuse deliberately ships NEITHER dispatcher:
 // code evaluation keeps its type, its UI entry point and its "not wired yet"
 // messaging, but has no execution path — no Lambda, no local code execution.
-// See docs/jev as judge/待办-应用内AI与代码评估.md.
 //
 // That decision is expressed here, in one place: capabilities are always empty, so
 // every caller takes its "code evals are not enabled" branch.

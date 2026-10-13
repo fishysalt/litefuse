@@ -3,7 +3,6 @@
 // every settle. Litefuse has no code-eval engine, so this keeps the hook's shape
 // — the consumers read \`isPending\` / \`isValid\` / \`validationResult\` and call
 // \`validate()\` before saving — but resolves immediately with "valid".
-// See docs/jev as judge/待办-应用内AI与代码评估.md.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useMemo, useState } from "react";

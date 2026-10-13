@@ -1,8 +1,8 @@
 /* eslint-disable no-nested-ternary */
 // Reusable property-test harness for the search bar — the universal safety net
-// described in README.md ("Round-trip property test", "Extending to other
-// views"). It is PURE (no vitest import, no global state) so it is safe in the
-// build and so any *.clienttest.ts can drive it. A view wires its registry in
+// for the bar's grammar and lowering. It is PURE (no vitest import, no
+// global state) so it is safe in the build and so any *.clienttest.ts can
+// drive it. A view wires its registry in
 // once; the harness generates the field × operator × value matrix from that
 // registry and checks three invariants that have each regressed in this PR's
 // history:
@@ -20,17 +20,16 @@
 //          column in the URL that the bar does not expose, and emitting a token
 //          for it renders an "unknown field" the user cannot fix.
 //   INV-3  serialize ↔ parse symmetry — a free-text value always re-parses to
-//          itself and stays valid. (Regressed in #4: serializeValue emitted a
+//          itself and stays valid. (Regressed: serializeValue emitted a
 //          bare reserved token — `or`, `!important` — that the parser rejects.)
 //
 // "Repeats itself per view": when a second filterable view adopts the bar, call
 // runSearchBarInvariants({ name, fields, extraKeys, ... }) with that view's
 // registry. The generators read `view.fields`, so they cover new/changed fields
 // automatically. Today parse/validate/lower close over the single global FIELDS
-// registry; when the grammar is parameterized over an injected registry (the
-// seam in README "Extending to other views"), thread `view.registry` into the
-// parse/validate/lower calls below — the generators and assertions do not
-// change.
+// registry; when the grammar is parameterized over an injected registry, thread
+// `view.registry` into the parse/validate/lower calls below — the generators
+// and assertions do not change.
 
 import type { FieldRegistry } from "./fields";
 import { type ScoreTypeContext, astToFilterState } from "./adapter";
