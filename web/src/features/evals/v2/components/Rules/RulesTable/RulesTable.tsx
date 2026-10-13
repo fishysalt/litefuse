@@ -43,7 +43,6 @@ import {
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
 import { api, type RouterInputs } from "@/src/utils/api";
-import { usdFormatter } from "@/src/utils/numbers";
 import { trpcErrorToast } from "@/src/utils/trpcErrorToast";
 import {
   isLegacyEvalTarget,
@@ -214,10 +213,6 @@ export function RulesTable({
     () => rules.data?.rules.map(({ id }) => id) ?? [],
     [rules.data?.rules],
   );
-  const costs = api.evalsV2.rules.costByRuleIds.useQuery(
-    { projectId, ruleIds },
-    { enabled: ruleIds.length > 0, meta: { silentHttpCodes: [503] } },
-  );
   const recentExecutions = api.evalsV2.rules.recentExecutions.useQuery(
     { projectId, ruleIds },
     { enabled: ruleIds.length > 0, meta: { silentHttpCodes: [503] } },
@@ -301,26 +296,10 @@ export function RulesTable({
           />
         ),
       },
-      createNumberTableColumn<RuleTableRow>({
-        accessorFn: (row) => costs.data?.[row.id],
-        id: "totalCost",
-        header: "Total cost (7d)",
-        size: 140,
-        enableHiding: true,
-        // Hidden by default: the cost reader returns no real numbers in this
-        // deployment, so the column only ever showed an empty placeholder.
-        // The column stays in the definition so the cost wiring is untouched;
-        // to show it again, tick it in "Column Visibility", or delete this
-        // line to make it visible for everyone again.
-        defaultHidden: true,
-        formatter: (value) => usdFormatter(value, 2, 4),
-        getValue: (value) => {
-          if (costs.isPending) return { type: "loading" };
-          if (value === null || value === undefined) return undefined;
-
-          return value;
-        },
-      }),
+      // The "Total cost (7d)" column was removed: the cost reader returns no
+      // real numbers in this deployment, so it only ever rendered an empty
+      // placeholder. Restore it from git history if the reader starts
+      // returning data again.
       {
         accessorKey: "executionTraces",
         id: "executionTraces",
@@ -489,8 +468,6 @@ export function RulesTable({
     ],
     [
       hasWriteAccess,
-      costs.data,
-      costs.isPending,
       projectId,
       recentExecutions.data,
       recentExecutions.isPending,

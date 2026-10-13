@@ -55,8 +55,6 @@ import { useRouter } from "next/router";
 import { DeleteEvalConfigButton } from "@/src/components/deleteButton";
 import { MaintainerTooltip } from "@/src/features/evals/components/maintainer-tooltip";
 import { useHasProjectAccess } from "@/src/features/rbac/utils/checkProjectAccess";
-import { Skeleton } from "@/src/components/ui/skeleton";
-import { usdFormatter } from "@/src/utils/numbers";
 import { Callout } from "@/src/components/ui/callout";
 import Link from "next/link";
 import { Badge } from "@/src/components/ui/badge";
@@ -203,39 +201,10 @@ export default function EvaluatorTable({ projectId }: { projectId: string }) {
         );
       },
     }),
-    columnHelper.accessor("totalCost", {
-      header: "Total Cost (7d)",
-      id: "totalCost",
-      size: 120,
-      // enableHiding must be set for the default visibility below to have any
-      // effect: useColumnVisibility only seeds a default for columns that opt
-      // in via enableHiding.
-      enableHiding: true,
-      // Hidden by default: the cost reader returns no real numbers in this
-      // deployment, so the column only ever showed a loading skeleton. The
-      // column definition stays intact so the cost wiring is untouched; to show
-      // it again, tick it in "Column Visibility", or delete this line (plus the
-      // enableHiding line above to restore the original definition).
-      defaultHidden: true,
-      cell: (row) => {
-        const totalCost = row.getValue();
-
-        if (row.row.original.isCostLoading) {
-          return <Skeleton className="h-4 w-16" />;
-        }
-
-        if (totalCost != null) return usdFormatter(totalCost, 2, 4);
-
-        return "–";
-      },
-      // TanStack's own column type does not know `defaultHidden`, so annotate
-      // the options with the Langfuse column type (minus `accessorKey`, which
-      // the helper adds) to keep the option type-checked instead of silently
-      // dropping it.
-    } as Omit<
-      LangfuseColumnDef<EvaluatorDataRow, number | null | undefined>,
-      "accessorKey"
-    >),
+    // The "Total Cost (7d)" column was removed: the cost reader returns no real
+    // numbers in this deployment, so it only ever rendered an empty
+    // placeholder. Restore it from git history if the reader starts returning
+    // data again.
     columnHelper.accessor("result", {
       header: "Result",
       id: "result",
