@@ -308,7 +308,7 @@ describe("Memberships APIs", () => {
         );
         expect(result.status).toBe(404);
         expect(result.body.error).toContain(
-          "User is not a member of this organization",
+          "User does not belong to this organization",
         );
 
         // Clean up

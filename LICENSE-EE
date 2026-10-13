@@ -172,24 +172,22 @@ Portions of this repository are derived from Langfuse
 
 - The Litefuse core is derived from the MIT-licensed Langfuse core and remains
   licensed under the MIT license in "/LICENSE".
-- Files listed in ANNEX A adapt code that Langfuse licenses commercially under
-  its own Enterprise License. Langfuse's license draws that boundary by
-  directory (see https://github.com/langfuse/langfuse/blob/main/ee/LICENSE);
-  none of those directories ("ee/", "web/src/ee/", "worker/src/ee/") exists in
-  this repository, but individual files here share substantial text with files
-  inside them. Identified so far, with the upstream file each one adapts:
-
-    web/src/features/enterprise/projects/createProject.ts
-      <- web/src/ee/features/admin-api/server/projects/createProject.ts
-
-  Those portions are not relicensed by this file. The Langfuse Enterprise
-  License continues to apply to them, and Langfuse's own terms restrict copying,
-  publishing and distributing them beyond development and testing. Distributing
-  this repository therefore relies on an authorization from the Langfuse
-  copyright holder for those portions, which the distributing Litefuse entity
-  must hold and record here before the repository is distributed. Any further
-  file that adapts Langfuse's commercially licensed code must be added to this
-  list, with its authorization, before it is distributed.
+- Langfuse licenses part of its own repository commercially and draws that
+  boundary by directory: "ee/", "web/src/ee/" and "worker/src/ee/" (see
+  https://github.com/langfuse/langfuse/blob/main/ee/LICENSE). None of those
+  directories exists in this repository, and the paths in ANNEX A are Litefuse's
+  own implementations of the same feature areas rather than copies of them: no
+  file in this repository shares substantive text with Langfuse's commercially
+  licensed files. What a file here may share with the upstream code is the
+  interface it has to implement and the idioms it has to be written in — route
+  and hook signatures, database call shapes, provider identifiers and other
+  values fixed by the framework or by the protocol.
+- That is a property to keep, not a coincidence to lean on. A change that adapts
+  Langfuse's commercially licensed code must not be merged: if such a portion is
+  ever included, the Langfuse Enterprise License continues to apply to it, it is
+  not relicensed by this file, and it must be listed here together with the
+  authorization from the Langfuse copyright holder under which it is
+  distributed.
 - The Litefuse Enterprise License above is modelled on the Langfuse Enterprise
   License and is adapted to Litefuse's repository layout, in which the
   enterprise code is not contained in a single top-level directory.
