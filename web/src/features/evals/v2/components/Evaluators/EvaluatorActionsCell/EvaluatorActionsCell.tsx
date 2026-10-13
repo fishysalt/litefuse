@@ -3,16 +3,22 @@ import {
   ListTree,
   MoreVertical,
   Pencil,
+  Route,
   SquarePercent,
   Trash2,
 } from "lucide-react";
 
 import { Button } from "@/src/components/ui/button";
-import { DropdownMenu } from "@/src/components/design-system/DropdownMenu/DropdownMenu";
+import {
+  DropdownMenu,
+  type DropdownMenuItemDefinition,
+} from "@/src/components/design-system/DropdownMenu/DropdownMenu";
 import { usePostHogClientCapture } from "@/src/features/posthog-analytics";
 
 export function EvaluatorActionsCell({
   canViewExecutions,
+  canViewScores,
+  ruleTracesLinks,
   onViewScores,
   onViewExecutions,
   onClone,
@@ -20,6 +26,15 @@ export function EvaluatorActionsCell({
   onDelete,
 }: {
   canViewExecutions: boolean;
+  /** False until the evaluator's own score names are known (or if it has none). */
+  canViewScores: boolean;
+  /**
+   * The rules this evaluator is attached to, one entry per rule, each carrying
+   * the `/traces` URL for the traces THAT rule evaluates. An evaluator has no
+   * filter of its own — it is mounted by rules — so "View traces" is only
+   * meaningful per rule. Empty when it is not attached to any rule.
+   */
+  ruleTracesLinks: Array<{ ruleId: string; ruleName: string; href: string }>;
   onViewScores: () => void;
   onViewExecutions: () => void;
   onClone: () => void;
@@ -33,6 +48,45 @@ export function EvaluatorActionsCell({
     onViewScores();
   };
 
+  const ruleTracesHrefs = ruleTracesLinks.map(({ ruleName, href }) => ({
+    type: "item" as const,
+    id: `view-traces-${href}`,
+    title: ruleName,
+    href,
+  }));
+
+  // One rule → go straight there. Several → the rule picker is the honest
+  // shape, because the evaluator's traces are the union of its rules' filters
+  // and a single union filter is not expressible on the traces surface.
+  const viewTracesItem: DropdownMenuItemDefinition =
+    ruleTracesHrefs.length === 1
+      ? {
+          type: "item",
+          id: "view-traces",
+          title: "View traces",
+          icon: Route,
+          href: ruleTracesHrefs[0].href,
+        }
+      : ruleTracesHrefs.length > 1
+        ? {
+            type: "submenu",
+            id: "view-traces",
+            title: "View traces",
+            icon: Route,
+            search: { placeholder: "Search rules" },
+            items: ruleTracesHrefs,
+          }
+        : {
+            type: "item",
+            id: "view-traces",
+            title: "View traces",
+            icon: Route,
+            disabled: {
+              reason: "This evaluator is not attached to any rule",
+            },
+            onClick: () => undefined,
+          };
+
   return (
     <div className="flex w-full min-w-0 items-center justify-start gap-1">
       <Button
@@ -40,6 +94,12 @@ export function EvaluatorActionsCell({
         variant="link"
         size="sm"
         className="text-foreground hover:text-foreground h-auto px-0 py-0"
+        disabled={!canViewScores}
+        title={
+          canViewScores
+            ? undefined
+            : "This evaluator has not produced any scores yet"
+        }
         onClick={handlePrimaryAction}
       >
         View scores
@@ -48,6 +108,7 @@ export function EvaluatorActionsCell({
       <DropdownMenu
         placement="bottom-end"
         items={[
+          viewTracesItem,
           ...(canViewExecutions
             ? [
                 {

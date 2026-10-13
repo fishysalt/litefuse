@@ -6,37 +6,27 @@ import {
   encodeFiltersGeneric,
 } from "@langfuse/shared";
 
-export function evaluatorScoresUrl(
-  projectId: string,
-  evaluatorId: string,
-  evaluatorName: string,
-  evaluatorType: EvalTemplateType,
-) {
-  const evaluatorFilter: FilterState[number] =
-    evaluatorType === EvalTemplateTypeEnum.CODE
-      ? {
-          column: "evaluatorId",
-          type: "stringOptions",
-          operator: "any of",
-          value: [evaluatorId],
-        }
-      : {
-          column: "name",
-          type: "stringOptions",
-          operator: "any of",
-          value: [evaluatorName],
-        };
+import { scoreNamesScoresUrl } from "../scoreNamesScoresUrl";
 
-  const filter: FilterState = [
-    evaluatorFilter,
-    {
-      column: "source",
-      type: "stringOptions",
-      operator: "any of",
-      value: ["EVAL"],
-    },
-  ];
-  return `/project/${projectId}/scores?showAllEnvironments=true&filter=${encodeURIComponent(encodeFiltersGeneric(filter))}`;
+/**
+ * "View scores" on an evaluator: the scores THIS evaluator wrote.
+ *
+ * The names are real, read from Doris by `metadata['evaluator_id']` (see
+ * `getScoreNamesByEvaluatorIds`), and that matters most for decision models: the
+ * evaluator's own name is NOT a score name there. One decision model writes one
+ * score per question, so `ZZ jev flow — 2026-10-13` produced
+ * `… / choice`, `… / score` and `… / boolean (noul)` — a name filter built from
+ * the evaluator name would find nothing, and an `evaluatorId` filter is not a
+ * column on the scores surface at all.
+ *
+ * Returns `null` when there is nothing to filter on; the caller must leave the
+ * action disabled rather than navigate to an unfiltered scores list.
+ */
+export function evaluatorScoresUrl(params: {
+  projectId: string;
+  scoreNames: string[];
+}): string | null {
+  return scoreNamesScoresUrl(params);
 }
 
 export function evaluatorExecutionsUrl(

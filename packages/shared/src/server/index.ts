@@ -56,6 +56,7 @@ export * from "./doris/splitTableTemplates";
 export * from "./doris/measureAndReturn";
 export * from "./repositories/definitions";
 export * from "./repositories/evalCostCompat";
+export * from "./repositories/evalScoreNames";
 export * from "../utils/IORepresentation/chatML/types";
 export * from "../server/ingestion/types";
 export * from "../server/ingestion/modelMatch";

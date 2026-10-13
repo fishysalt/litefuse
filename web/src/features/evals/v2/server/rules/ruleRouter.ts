@@ -7,6 +7,7 @@ import {
   type ProjectAuthedContext,
 } from "@/src/server/api/trpc";
 import { RuleService } from "./ruleService";
+import { getRuleLinkTargets } from "../evalLinkTargets";
 import {
   CreateOrAttachFromEvaluatorFiltersSchema,
   CreateRuleSchema,
@@ -105,6 +106,26 @@ export const ruleRouter = createTRPCRouter({
       return serviceForContext(ctx).getTotalCosts({
         ...input,
         projectId: ctx.session.projectId,
+      });
+    }),
+
+  /**
+   * The score names each rule's runs produced, read from Doris by
+   * `metadata['evaluation_rule_id']`. This is what the rules table's
+   * "View scores" link filters on. Read-only; ids capped at 100 by
+   * `RuleIdsSchema`.
+   */
+  linkTargets: protectedProjectProcedure
+    .input(RuleIdsSchema)
+    .query(({ input, ctx }) => {
+      throwIfNoProjectAccess({
+        session: ctx.session,
+        projectId: ctx.session.projectId,
+        scope: "evaluationRule:read",
+      });
+      return getRuleLinkTargets({
+        projectId: ctx.session.projectId,
+        ruleIds: input.ruleIds,
       });
     }),
 
