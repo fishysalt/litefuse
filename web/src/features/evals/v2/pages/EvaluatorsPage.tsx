@@ -52,7 +52,6 @@ import {
   type EvaluatorsTableStore,
 } from "../store/evaluatorsTableStore";
 import { api, type RouterInputs, type RouterOutputs } from "@/src/utils/api";
-import { usdFormatter } from "@/src/utils/numbers";
 import { trpcErrorToast } from "@/src/utils/trpcErrorToast";
 import {
   evaluatorExecutionsUrl,
@@ -73,7 +72,6 @@ import {
 } from "../constants/tableFilterColumns";
 import type { GalleryTemplate } from "../types/templateGallery";
 import { V4MigrationUpdateRequiredBadge } from "@/src/features/v4-migration/V4MigrationDelayBadge";
-import { createNumberTableColumn } from "@/src/components/design-system/table/columns/createNumberTableColumn";
 import { useOrderByState } from "@/src/features/orderBy";
 import { createUserTableColumn } from "@/src/components/design-system/table/columns/createUserTableColumn";
 import { EvaluatorAlertButton } from "@/src/features/evals/v2/components/Evaluators/EvaluatorAlertButton/EvaluatorAlertButton";
@@ -308,13 +306,6 @@ export default function EvaluatorsPage() {
             : {},
         }
       : null;
-  const costs = api.evalsV2.costByEvaluatorIds.useQuery(
-    { projectId, evaluatorIds },
-    {
-      enabled: hasExecutionReadAccess && evaluatorIds.length > 0,
-      meta: { silentHttpCodes: [503] },
-    },
-  );
   const recentExecutions = api.evalsV2.recentExecutions.useQuery(
     { projectId, evaluatorIds },
     {
@@ -437,28 +428,10 @@ export default function EvaluatorsPage() {
         enableSorting: true,
         cell: ({ row }) => <EvaluatorTypeBadge type={row.original.type} />,
       },
-      createNumberTableColumn<EvaluatorRow>({
-        accessorFn: (row) => costs.data?.[row.id],
-        id: "totalCost",
-        header: "Total cost (7d)",
-        size: 140,
-        enableHiding: true,
-        // Hidden by default: the cost reader returns no real numbers in this
-        // deployment, so the column only ever showed an empty placeholder.
-        // The column stays in the definition so the cost wiring is untouched;
-        // to show it again, tick it in "Column Visibility", or delete this
-        // line to make it visible for everyone again.
-        defaultHidden: true,
-        formatter: (value) => usdFormatter(value, 2, 4),
-        getValue: (value) => {
-          if (costs.isPending && hasExecutionReadAccess) {
-            return { type: "loading" };
-          }
-          if (value === null || value === undefined) return undefined;
-
-          return value;
-        },
-      }),
+      // The "Total cost (7d)" column was removed: the cost reader returns no
+      // real numbers in this deployment, so it only ever rendered an empty
+      // placeholder. Restore it from git history if the reader starts
+      // returning data again.
       {
         accessorKey: "model",
         id: "model",
@@ -549,8 +522,6 @@ export default function EvaluatorsPage() {
       },
     ],
     [
-      costs.data,
-      costs.isPending,
       hasExecutionReadAccess,
       projectId,
       recentExecutions.data,
