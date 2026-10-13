@@ -45,6 +45,7 @@ import { UnrecoverableError } from "../../errors/UnrecoverableError";
 import { buildExecutionMetadata } from "./evalExecutionUtils";
 import { type EvalExecutionDeps } from "./evalExecutionDeps";
 import { persistV2Scores, type V2ScoreData } from "./v2ScorePersistence";
+import { writeEvaluatorExecutionFailureTrace } from "./v2InternalTrace";
 import { createW3CTraceId } from "../utils";
 
 /** The evaluator-version fields this executor needs (a `evaluator_versions` row). */
@@ -132,20 +133,8 @@ export function buildEvaluatorTraceSinkParams(params: {
   };
 }
 
-export async function runV2LlmEvaluatorEvaluation({
-  projectId,
-  jobExecutionId,
-  job,
-  evaluatorId,
-  evaluationRuleId,
-  assignmentId,
-  scoreName,
-  version,
-  variableMapping,
-  extractedVariables,
-  environment,
-  deps,
-}: {
+/** Everything one v2 LLM-as-a-judge execution needs. */
+type V2LlmEvaluatorExecutionParams = {
   projectId: string;
   jobExecutionId: string;
   job: JobExecution;
@@ -165,7 +154,128 @@ export async function runV2LlmEvaluatorEvaluation({
   extractedVariables: ExtractedVariable[];
   environment: string;
   deps: EvalExecutionDeps;
-}): Promise<void> {
+};
+
+/** What the wrapper computes once per execution and the inner call reuses. */
+type V2LlmEvaluatorExecutionTraceContext = {
+  executionTraceId: string;
+  traceStartTime: Date;
+  executionMetadata: Record<string, string>;
+};
+
+/**
+ * The metadata the execution trace (and the score) of this evaluator carries: the
+ * identity in `EvalExecutionMetadataKey` plus the rule and assignment behind this
+ * run. The evaluator's execution history is read back out of the trace metadata,
+ * so these keys are what attribute one run to one evaluator when a rule has
+ * several attached.
+ */
+function buildV2LlmEvaluatorExecutionMetadata(params: {
+  jobExecutionId: string;
+  job: JobExecution;
+  evaluatorId: string;
+  evaluationRuleId: string | null;
+  assignmentId: string | null;
+  version: V2EvaluatorVersionForExecution;
+}): Record<string, string> {
+  return {
+    ...buildExecutionMetadata({
+      jobExecutionId: params.jobExecutionId,
+      jobConfigurationId:
+        params.evaluationRuleId ?? params.job.jobConfigurationId,
+      targetTraceId: params.job.jobInputTraceId,
+      targetObservationId: params.job.jobInputObservationId,
+      targetDatasetItemId: params.job.jobInputDatasetItemId,
+    }),
+    evaluator_id: params.evaluatorId,
+    evaluator_version_id: params.version.id,
+    // Absent on ruleless manual batch runs.
+    ...(params.evaluationRuleId
+      ? { evaluation_rule_id: params.evaluationRuleId }
+      : {}),
+    // Same conditional-shape contract as upstream
+    // (`packages/shared/src/server/evals/evalExecutionMetadata.ts:48-53`): the
+    // key is omitted rather than written as null when there is no assignment.
+    ...(params.assignmentId
+      ? {
+          [EvalExecutionMetadataKey.EVALUATION_RULE_ASSIGNMENT_ID]:
+            params.assignmentId,
+        }
+      : {}),
+  };
+}
+
+/**
+ * Runs one v2 LLM-as-a-judge execution and records its outcome: the success trace
+ * comes from `fetchLLMCompletion`'s trace sink, a failure is written here as an
+ * internal trace at `level=ERROR` carrying the reason.
+ *
+ * Without this a failed judge run would leave either nothing or a partial trace,
+ * and the evaluator's "Last 5 runs" column — which reads those traces — would
+ * lose the failure entirely instead of showing a red marker. Tracing stays
+ * best-effort: the original error is rethrown unchanged.
+ */
+export async function runV2LlmEvaluatorEvaluation(
+  params: V2LlmEvaluatorExecutionParams,
+): Promise<void> {
+  const {
+    projectId,
+    jobExecutionId,
+    job,
+    evaluatorId,
+    evaluationRuleId,
+    assignmentId,
+    scoreName,
+    version,
+  } = params;
+
+  const executionTraceId = createW3CTraceId(jobExecutionId);
+  const traceStartTime = new Date();
+  const executionMetadata = buildV2LlmEvaluatorExecutionMetadata({
+    jobExecutionId,
+    job,
+    evaluatorId,
+    evaluationRuleId,
+    assignmentId,
+    version,
+  });
+
+  try {
+    await executeV2LlmEvaluatorEvaluation({
+      ...params,
+      executionTraceId,
+      traceStartTime,
+      executionMetadata,
+    });
+  } catch (error) {
+    await writeEvaluatorExecutionFailureTrace({
+      projectId,
+      executionTraceId,
+      traceName: `Execute evaluator: ${scoreName}`,
+      traceStartTime,
+      metadata: executionMetadata,
+      error,
+    });
+    throw error;
+  }
+}
+
+async function executeV2LlmEvaluatorEvaluation({
+  projectId,
+  jobExecutionId,
+  job,
+  evaluatorId,
+  evaluationRuleId,
+  scoreName,
+  version,
+  variableMapping,
+  extractedVariables,
+  environment,
+  deps,
+  executionTraceId,
+  executionMetadata,
+}: V2LlmEvaluatorExecutionParams &
+  V2LlmEvaluatorExecutionTraceContext): Promise<void> {
   return instrumentAsync(
     { name: "eval.execute-v2-llm-evaluator" },
     async (span) => {
@@ -198,30 +308,9 @@ export async function runV2LlmEvaluatorEvaluation({
         );
       }
 
-      const executionTraceId = createW3CTraceId(jobExecutionId);
-      const executionMetadata = {
-        ...buildExecutionMetadata({
-          jobExecutionId,
-          jobConfigurationId: evaluationRuleId ?? job.jobConfigurationId,
-          targetTraceId: job.jobInputTraceId,
-          targetObservationId: job.jobInputObservationId,
-          targetDatasetItemId: job.jobInputDatasetItemId,
-        }),
-        evaluator_id: evaluatorId,
-        evaluator_version_id: version.id,
-        // Absent on ruleless manual batch runs.
-        ...(evaluationRuleId ? { evaluation_rule_id: evaluationRuleId } : {}),
-        // Same conditional-shape contract as upstream
-        // (`packages/shared/src/server/evals/evalExecutionMetadata.ts:48-53`): the
-        // key is omitted rather than written as null when there is no assignment.
-        ...(assignmentId
-          ? {
-              [EvalExecutionMetadataKey.EVALUATION_RULE_ASSIGNMENT_ID]:
-                assignmentId,
-            }
-          : {}),
-      };
-
+      // `executionTraceId`, `traceStartTime` and `executionMetadata` are built by
+      // the wrapper, before the first throw site, so the failure trace written
+      // from there carries the same identity as the success trace.
       /** Pauses the evaluator row (the field the migrated UI reads). */
       const pauseEvaluator = async (
         blockReason: EvaluatorBlockReason,

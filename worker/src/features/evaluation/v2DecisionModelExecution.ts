@@ -40,7 +40,10 @@ import { UnrecoverableError } from "../../errors/UnrecoverableError";
 import { buildExecutionMetadata } from "./evalExecutionUtils";
 import { type EvalExecutionDeps } from "./evalExecutionDeps";
 import { persistV2Scores, type V2ScoreData } from "./v2ScorePersistence";
-import { writeDecisionModelExecutionTrace } from "./v2InternalTrace";
+import {
+  writeDecisionModelExecutionTrace,
+  writeEvaluatorExecutionFailureTrace,
+} from "./v2InternalTrace";
 import { createW3CTraceId } from "../utils";
 
 /** The decision-model evaluator-version fields this executor needs. */
@@ -53,19 +56,8 @@ export type V2DecisionModelVersionForExecution = {
   modelParams: unknown;
 };
 
-export async function runV2DecisionModelEvaluation({
-  projectId,
-  jobExecutionId,
-  job,
-  evaluatorId,
-  evaluationRuleId,
-  assignmentId,
-  scoreName,
-  version,
-  extractedVariables,
-  environment,
-  deps,
-}: {
+/** Everything one decision-model execution needs. */
+type V2DecisionModelExecutionParams = {
   projectId: string;
   jobExecutionId: string;
   job: JobExecution;
@@ -84,7 +76,129 @@ export async function runV2DecisionModelEvaluation({
   extractedVariables: ExtractedVariable[];
   environment: string;
   deps: EvalExecutionDeps;
-}): Promise<void> {
+};
+
+/** What the wrapper computes once per execution and the inner call reuses. */
+type V2DecisionModelExecutionTraceContext = {
+  executionTraceId: string;
+  traceStartTime: Date;
+  executionMetadata: Record<string, string>;
+};
+
+/**
+ * The metadata every execution trace of this evaluator carries: the identity the
+ * score records too (`EvalExecutionMetadataKey`) plus the rule and assignment
+ * that produced it. This is what makes one execution attributable to ONE
+ * evaluator when several are attached to the same rule — `job_executions` has no
+ * such column, so the evaluator's execution history is read back out of it.
+ */
+function buildDecisionModelExecutionMetadata(params: {
+  jobExecutionId: string;
+  job: JobExecution;
+  evaluatorId: string;
+  evaluationRuleId: string | null;
+  assignmentId: string | null;
+  version: V2DecisionModelVersionForExecution;
+}): Record<string, string> {
+  return {
+    ...buildExecutionMetadata({
+      jobExecutionId: params.jobExecutionId,
+      jobConfigurationId:
+        params.evaluationRuleId ?? params.job.jobConfigurationId,
+      targetTraceId: params.job.jobInputTraceId,
+      targetObservationId: params.job.jobInputObservationId,
+      targetDatasetItemId: params.job.jobInputDatasetItemId,
+    }),
+    evaluator_id: params.evaluatorId,
+    evaluator_version_id: params.version.id,
+    // Absent on ruleless manual batch runs.
+    ...(params.evaluationRuleId
+      ? { evaluation_rule_id: params.evaluationRuleId }
+      : {}),
+    // Same conditional-shape contract as upstream
+    // (`packages/shared/src/server/evals/evalExecutionMetadata.ts:48-53`): the
+    // key is omitted rather than written as null when there is no assignment.
+    ...(params.assignmentId
+      ? {
+          [EvalExecutionMetadataKey.EVALUATION_RULE_ASSIGNMENT_ID]:
+            params.assignmentId,
+        }
+      : {}),
+  };
+}
+
+/**
+ * Runs one decision-model execution and records its outcome as an internal
+ * execution trace: the success record comes from inside the execution, a failed
+ * one is written here as `level=ERROR` with the failure reason.
+ *
+ * The evaluator's "Last 5 runs" column reads exactly these traces
+ * (`getRecentEvaluatorExecutionTraces`), so a run that throws has to leave one
+ * too — otherwise a failing evaluator would show fewer and fewer runs instead of
+ * red markers. Tracing stays best-effort: the original error is rethrown
+ * unchanged.
+ */
+export async function runV2DecisionModelEvaluation(
+  params: V2DecisionModelExecutionParams,
+): Promise<void> {
+  const {
+    projectId,
+    jobExecutionId,
+    job,
+    evaluatorId,
+    evaluationRuleId,
+    assignmentId,
+    scoreName,
+    version,
+  } = params;
+
+  const executionTraceId = createW3CTraceId(jobExecutionId);
+  const traceStartTime = new Date();
+  const executionMetadata = buildDecisionModelExecutionMetadata({
+    jobExecutionId,
+    job,
+    evaluatorId,
+    evaluationRuleId,
+    assignmentId,
+    version,
+  });
+
+  try {
+    await executeV2DecisionModelEvaluation({
+      ...params,
+      executionTraceId,
+      traceStartTime,
+      executionMetadata,
+    });
+  } catch (error) {
+    await writeEvaluatorExecutionFailureTrace({
+      projectId,
+      executionTraceId,
+      traceName: `Execute evaluator: ${scoreName}`,
+      traceStartTime,
+      metadata: executionMetadata,
+      error,
+    });
+    throw error;
+  }
+}
+
+async function executeV2DecisionModelEvaluation({
+  projectId,
+  jobExecutionId,
+  job,
+  evaluatorId,
+  evaluationRuleId,
+  scoreName,
+  version,
+  extractedVariables,
+  environment,
+  deps,
+  executionTraceId,
+  traceStartTime,
+  executionMetadata,
+}: V2DecisionModelExecutionParams &
+  V2DecisionModelExecutionTraceContext): Promise<void> {
   return instrumentAsync(
     { name: "eval.execute-v2-decision-model" },
     async (span) => {
@@ -183,32 +297,9 @@ export async function runV2DecisionModelEvaluation({
         );
       }
 
-      // 3. Ask the decision model.
-      const executionTraceId = createW3CTraceId(jobExecutionId);
-      const traceStartTime = new Date();
-      const executionMetadata = {
-        ...buildExecutionMetadata({
-          jobExecutionId,
-          jobConfigurationId: evaluationRuleId ?? job.jobConfigurationId,
-          targetTraceId: job.jobInputTraceId,
-          targetObservationId: job.jobInputObservationId,
-          targetDatasetItemId: job.jobInputDatasetItemId,
-        }),
-        evaluator_id: evaluatorId,
-        evaluator_version_id: version.id,
-        // Absent on ruleless manual batch runs.
-        ...(evaluationRuleId ? { evaluation_rule_id: evaluationRuleId } : {}),
-        // Same conditional-shape contract as upstream
-        // (`packages/shared/src/server/evals/evalExecutionMetadata.ts:48-53`): the
-        // key is omitted rather than written as null when there is no assignment.
-        ...(assignmentId
-          ? {
-              [EvalExecutionMetadataKey.EVALUATION_RULE_ASSIGNMENT_ID]:
-                assignmentId,
-            }
-          : {}),
-      };
-
+      // 3. Ask the decision model. `executionTraceId`, `traceStartTime` and
+      //    `executionMetadata` were built by the wrapper before the first throw
+      //    site, so a failure recorded from there carries the same identity.
       span.setAttributes({
         "eval.execution.trace_id": executionTraceId,
         "eval.execution.stage": "call_decision_model",

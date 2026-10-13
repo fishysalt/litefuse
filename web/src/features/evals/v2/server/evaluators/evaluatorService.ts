@@ -130,10 +130,23 @@ function prepareEvaluatorDefinitionForPersistence(
   };
 }
 
+/**
+ * One evaluator execution, as the "Last 5 runs" column consumes it.
+ *
+ * `id` is the evaluator's OWN execution trace (Doris
+ * `spans_<projectId>.trace_id`, environment `langfuse-llm-as-a-judge`), not a
+ * `job_executions` row: that table cannot attribute a run to an evaluator when a
+ * rule has several of them attached. `failed`/`statusMessage`/`durationMs` are
+ * carried for the marker tooltip.
+ */
 type EvaluatorExecutionTrace = {
   id: string;
   level: string;
   timestamp: Date;
+  failed: boolean;
+  name: string | null;
+  statusMessage: string | null;
+  durationMs: number | null;
 };
 
 export type EvaluatorAuditEvent = {
@@ -261,6 +274,14 @@ export class EvaluatorService {
     };
   }
 
+  /**
+   * The newest executions of each evaluator, read from that evaluator's own
+   * execution traces in Doris (see `getRecentEvaluatorExecutionTraces`).
+   *
+   * `job_executions` is deliberately NOT used here: it only carries
+   * `job_configuration_id`, so with two evaluators on one rule both would be
+   * shown the same rows.
+   */
   async listRecent(params: { projectId: string; evaluatorIds: string[] }) {
     const result = Object.fromEntries(
       params.evaluatorIds.map((evaluatorId) => [evaluatorId, []]),
@@ -277,6 +298,10 @@ export class EvaluatorService {
         id: trace.id,
         level: trace.level,
         timestamp: trace.timestamp,
+        failed: trace.failed,
+        name: trace.name,
+        statusMessage: trace.statusMessage,
+        durationMs: trace.durationMs,
       });
     }
 
