@@ -2,7 +2,7 @@
 // Upstream answers "which traces did this evaluator/rule run against recently?"
 // from ClickHouse, and "what did this evaluator/rule cost?" likewise. Our split
 // `spans_<projectId>` tables have no execution-ownership COLUMN either, but the
-// dodge is different per side (see docs/evals/evaluators-internal.md §11):
+// dodge is different per side:
 //
 //   * a RULE's recent runs  = Postgres `job_executions` rows. Our worker records
 //     the v2 RULE id in `job_executions.job_configuration_id` — a documented

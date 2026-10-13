@@ -293,8 +293,7 @@ export function isDecisionModelAdapterType(adapter: string): boolean {
 //
 // To re-enable OpenAI decision models: add the OpenAI decision-model client plus
 // the AI SDK dependencies and dispatch to it from the worker, then widen the two
-// predicates below back to their upstream form. See
-// `docs/handover/04-open-items-and-decisions.md` (D4) for the work item.
+// predicates below back to their upstream form.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Kept verbatim from upstream 4.56 for contract parity: the model ids the hosted
