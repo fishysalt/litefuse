@@ -23,6 +23,7 @@ import {
 import { EvaluatorService } from "./evaluatorService";
 import { ruleRouter } from "../rules/ruleRouter";
 import { getActivationCostEstimates } from "./activationCostService";
+import { getEvaluatorLinkTargets } from "../evalLinkTargets";
 
 const TestEvaluatorSchema = z.object({
   projectId: z.string(),
@@ -156,6 +157,27 @@ export const evaluatorRouter = createTRPCRouter({
       return serviceForContext(ctx).listRecent({
         ...input,
         projectId: ctx.session.projectId,
+      });
+    }),
+
+  /**
+   * What the evaluator table's "View traces" / "View scores" links need: the
+   * rules each evaluator is attached to (with their filters — an evaluator is
+   * mounted by rules and has no filter of its own) and the score names it
+   * actually wrote. Read-only; ids arrive capped at 100 by `EvaluatorIdsSchema`.
+   */
+  linkTargets: protectedProjectProcedure
+    .input(EvaluatorIdsSchema)
+    .query(({ input, ctx }) => {
+      throwIfNoProjectAccess({
+        session: ctx.session,
+        projectId: ctx.session.projectId,
+        scope: "evaluator:read",
+      });
+      return getEvaluatorLinkTargets({
+        prisma: ctx.prisma,
+        projectId: ctx.session.projectId,
+        evaluatorIds: input.evaluatorIds,
       });
     }),
 

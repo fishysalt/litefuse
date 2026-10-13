@@ -57,6 +57,7 @@ import {
   evaluatorExecutionsUrl,
   evaluatorScoresUrl,
 } from "../fns/evaluators/evaluatorScoresUrl";
+import { ruleTracesUrl } from "../fns/rules/ruleLinkUrls";
 import { EVALS_V2_TABS, getEvalsV2Tabs } from "@/src/features/navigation";
 import { DefaultModelChangeConfirmationDialog } from "../components/Evaluators/ProjectDefaultModel/DefaultModelChangeConfirmationDialog";
 import { useProjectDefaultModel } from "@/src/features/evals/v2/hooks/useProjectDefaultModel";
@@ -313,6 +314,12 @@ export default function EvaluatorsPage() {
       meta: { silentHttpCodes: [503] },
     },
   );
+  // What "View traces" / "View scores" need per evaluator: the rules it is
+  // attached to (each carrying its own filter) and the score names it wrote.
+  const linkTargets = api.evalsV2.linkTargets.useQuery(
+    { projectId, evaluatorIds },
+    { enabled: evaluatorIds.length > 0, meta: { silentHttpCodes: [503] } },
+  );
   const utils = api.useUtils();
   const deleteMany = api.evalsV2.deleteMany.useMutation({
     onError: trpcErrorToast,
@@ -484,41 +491,53 @@ export default function EvaluatorsPage() {
         isFixedPosition: true,
         enableSorting: false,
         enableResizing: false,
-        cell: ({ row }) => (
-          <div className="w-full" onClick={(event) => event.stopPropagation()}>
-            <EvaluatorActionsCell
-              canViewExecutions={hasExecutionReadAccess}
-              onViewScores={() =>
-                router.push(
-                  evaluatorScoresUrl(
-                    projectId,
-                    row.original.id,
-                    row.original.name,
-                    row.original.type,
-                  ),
-                )
-              }
-              onViewExecutions={() =>
-                router.push(
-                  evaluatorExecutionsUrl(
-                    projectId,
-                    row.original.name,
-                    row.original.type,
-                  ),
-                )
-              }
-              onEdit={() =>
-                router.push(`/project/${projectId}/evals/${row.original.id}`)
-              }
-              onClone={() =>
-                router.push(
-                  `/project/${projectId}/evals/new?evaluatorId=${encodeURIComponent(row.original.id)}`,
-                )
-              }
-              onDelete={() => setDeleteIds([row.original.id])}
-            />
-          </div>
-        ),
+        cell: ({ row }) => {
+          const target = linkTargets.data?.[row.original.id];
+          const scoresUrl = evaluatorScoresUrl({
+            projectId,
+            scoreNames: target?.scoreNames ?? [],
+          });
+          // An evaluator is evaluated BY rules and has no filter of its own, so
+          // its "View traces" is per rule: one rule goes straight there, several
+          // open a picker (see EvaluatorActionsCell).
+          const ruleTracesLinks = (target?.rules ?? []).map((rule) => ({
+            ruleId: rule.id,
+            ruleName: rule.name,
+            href: ruleTracesUrl({ projectId, filter: rule.filter }),
+          }));
+
+          return (
+            <div className="w-full" onClick={(event) => event.stopPropagation()}>
+              <EvaluatorActionsCell
+                canViewExecutions={hasExecutionReadAccess}
+                canViewScores={scoresUrl !== null}
+                ruleTracesLinks={ruleTracesLinks}
+                onViewScores={() => {
+                  if (!scoresUrl) return;
+                  router.push(scoresUrl);
+                }}
+                onViewExecutions={() =>
+                  router.push(
+                    evaluatorExecutionsUrl(
+                      projectId,
+                      row.original.name,
+                      row.original.type,
+                    ),
+                  )
+                }
+                onEdit={() =>
+                  router.push(`/project/${projectId}/evals/${row.original.id}`)
+                }
+                onClone={() =>
+                  router.push(
+                    `/project/${projectId}/evals/new?evaluatorId=${encodeURIComponent(row.original.id)}`,
+                  )
+                }
+                onDelete={() => setDeleteIds([row.original.id])}
+              />
+            </div>
+          );
+        },
       },
     ],
     [
@@ -526,6 +545,7 @@ export default function EvaluatorsPage() {
       projectId,
       recentExecutions.data,
       recentExecutions.isPending,
+      linkTargets.data,
       router,
       selectActionColumn,
     ],

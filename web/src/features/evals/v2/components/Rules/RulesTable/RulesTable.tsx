@@ -1,7 +1,7 @@
 /* eslint-disable no-nested-ternary */
 import { useMemo, useRef, useState } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
-import { Copy, ExternalLink, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, MoreVertical, Pencil, SquarePercent, Trash2 } from "lucide-react";
 import { useRouter } from "next/router";
 import { StringParam, useQueryParam, withDefault } from "use-query-params";
 import { DataTable } from "@/src/components/table/data-table";
@@ -52,7 +52,7 @@ import {
   getRuleNavigationAction,
   getRuleNavigationUrl,
 } from "@/src/features/evals/v2/utils/ruleNavigation";
-import { ruleExecutionsUrl } from "@/src/features/evals/v2/fns/rules/ruleExecutionsUrl";
+import { ruleScoresUrl, ruleTracesUrl } from "@/src/features/evals/v2/fns/rules/ruleLinkUrls";
 import { TableViewPresetTableName, type OrderByState } from "@langfuse/shared";
 import {
   omitFilterFacets,
@@ -217,6 +217,13 @@ export function RulesTable({
     { projectId, ruleIds },
     { enabled: ruleIds.length > 0, meta: { silentHttpCodes: [503] } },
   );
+  // Score names each rule's runs produced, read from Doris. Only used to build
+  // the "View scores" link, which stays disabled until the names are known — a
+  // link to an unfiltered scores list would be a lie.
+  const linkTargets = api.evalsV2.rules.linkTargets.useQuery(
+    { projectId, ruleIds },
+    { enabled: ruleIds.length > 0, meta: { silentHttpCodes: [503] } },
+  );
   const deleteMany = api.evalsV2.rules.deleteMany.useMutation({
     onError: trpcErrorToast,
     onSuccess: async (result) => {
@@ -317,7 +324,12 @@ export function RulesTable({
               aria-label={`View runs for ${row.original.name}`}
               onClick={(event) => {
                 event.stopPropagation();
-                router.push(ruleExecutionsUrl(projectId, row.original.id));
+                router.push(
+                  ruleTracesUrl({
+                    projectId,
+                    filter: row.original.filter,
+                  }),
+                );
               }}
             >
               <EvaluatorExecutionHistory
@@ -395,6 +407,14 @@ export function RulesTable({
         enableResizing: false,
         cell: ({ row }) => {
           const navigationAction = getRuleNavigationAction(row.original);
+          // `null` means "no honest link exists" (no scores recorded yet, or a
+          // single name too long for the query string) — the action is disabled
+          // rather than pointed at an unfiltered list.
+          const scoresUrl = ruleScoresUrl({
+            projectId,
+            scoreNames: linkTargets.data?.[row.original.id]?.scoreNames ?? [],
+            filter: row.original.filter,
+          });
           return (
             <div
               className="flex w-full min-w-0 items-center justify-start gap-1"
@@ -407,7 +427,12 @@ export function RulesTable({
                 className="text-foreground hover:text-foreground h-auto px-0 py-0"
                 onClick={(event) => {
                   event.stopPropagation();
-                  router.push(ruleExecutionsUrl(projectId, row.original.id));
+                  router.push(
+                    ruleTracesUrl({
+                      projectId,
+                      filter: row.original.filter,
+                    }),
+                  );
                 }}
               >
                 View traces <ExternalLink className="ml-1 h-3.5 w-3.5" />
@@ -415,6 +440,26 @@ export function RulesTable({
               <DropdownMenu
                 placement="bottom-end"
                 items={[
+                  scoresUrl
+                    ? {
+                        type: "item" as const,
+                        id: "view-scores",
+                        title: "View scores",
+                        icon: SquarePercent,
+                        href: scoresUrl,
+                      }
+                    : {
+                        type: "item" as const,
+                        id: "view-scores",
+                        title: "View scores",
+                        icon: SquarePercent,
+                        disabled: {
+                          reason: linkTargets.isPending
+                            ? "Looking up the scores this rule produced…"
+                            : "This rule has not produced any scores yet",
+                        },
+                        onClick: () => undefined,
+                      },
                   ...(navigationAction === "edit"
                     ? [
                         {
@@ -471,6 +516,8 @@ export function RulesTable({
       projectId,
       recentExecutions.data,
       recentExecutions.isPending,
+      linkTargets.data,
+      linkTargets.isPending,
       router,
       capture,
       selectActionColumn,

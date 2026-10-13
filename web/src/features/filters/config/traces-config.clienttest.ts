@@ -2,13 +2,18 @@
  * LITEFUSE ADDITION.
  *
  * The traces sidebar has to survive the filter ids our own deep links emit: the
- * evaluators v2 and rules v2 "last 5 runs" markers navigate to
- * `/project/<id>/traces?filter=...` with a column set the traces table does not
- * list verbatim. `traceName` is a real traces filter (the shared Doris mapping
- * aliases it onto `trace_name`), so it is rewritten onto this surface's own
- * `name` column; `isRootObservation` / `ruleId` cannot be applied by the traces
- * query at all and are declared as such, so they are dropped with a readable
- * message instead of the generic "unknown filter column" warning.
+ * evaluators v2 "last 5 runs" marker navigates to `/project/<id>/traces?filter=…`
+ * with a column set the traces table does not list verbatim. `traceName` is a
+ * real traces filter (the shared Doris mapping aliases it onto `trace_name`), so
+ * it is rewritten onto this surface's own `name` column; `isRootObservation`
+ * cannot be applied by the traces query at all and is declared as such, so it is
+ * dropped with a readable message instead of the generic "unknown filter column"
+ * warning.
+ *
+ * The rules table no longer emits `ruleId` (it forwards the rule's own filter,
+ * narrowed to what this surface can apply — see `ruleLinkUrls`), and that
+ * narrowing is what the last case here pins down: nothing the rule link encodes
+ * is ever dropped by the page.
  */
 import {
   LangfuseInternalTraceEnvironment,
@@ -16,7 +21,10 @@ import {
 } from "@langfuse/shared";
 
 import { evaluatorExecutionsUrl } from "@/src/features/evals/v2/fns/evaluators/evaluatorScoresUrl";
-import { ruleExecutionsUrl } from "@/src/features/evals/v2/fns/rules/ruleExecutionsUrl";
+import {
+  ruleFilterToTraceFilter,
+  ruleTracesUrl,
+} from "@/src/features/evals/v2/fns/rules/ruleLinkUrls";
 import { traceFilterConfig } from "./traces-config";
 import {
   decodeAndNormalizeFilters,
@@ -83,26 +91,78 @@ describe("traceFilterConfig column handling for deep-link filters", () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it("keeps the rules link environment filter and reports the unsupported ruleId filter", () => {
-    const href = ruleExecutionsUrl("project-1", "rule-1");
+  it("carries a rule's own filter onto the traces surface", () => {
+    const href = ruleTracesUrl({
+      projectId: "project-1",
+      filter: [
+        {
+          column: "environment",
+          type: "stringOptions",
+          operator: "any of",
+          value: ["zm_demo"],
+        },
+      ],
+    });
 
-    const filters = filtersOf(href);
-
-    expect(filters).toEqual([
+    expect(filtersOf(href)).toEqual([
       {
         column: "environment",
         type: "stringOptions",
         operator: "any of",
-        value: [
-          LangfuseInternalTraceEnvironment.CodeEval,
-          LangfuseInternalTraceEnvironment.LLMJudge,
-        ],
+        value: ["zm_demo"],
       },
     ]);
-    expect(infoSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Filter on "ruleId" is not applied on this view'),
-    );
     expect(warnSpy).not.toHaveBeenCalled();
+    expect(infoSpy).not.toHaveBeenCalled();
+  });
+
+  it("drops rule conditions this surface cannot apply before they reach the page", () => {
+    // `type` / `isRootObservation` describe a single observation; `/traces`
+    // filters whole traces, so the link must not claim them.
+    const ruleFilter: FilterState = [
+      {
+        column: "environment",
+        type: "stringOptions",
+        operator: "any of",
+        value: ["zm_demo"],
+      },
+      {
+        column: "type",
+        type: "stringOptions",
+        operator: "any of",
+        value: ["GENERATION"],
+      },
+      {
+        column: "isRootObservation",
+        type: "boolean",
+        operator: "=",
+        value: true,
+      },
+    ];
+
+    expect(ruleFilterToTraceFilter(ruleFilter)).toEqual([
+      {
+        column: "environment",
+        type: "stringOptions",
+        operator: "any of",
+        value: ["zm_demo"],
+      },
+    ]);
+
+    const href = ruleTracesUrl({ projectId: "project-1", filter: ruleFilter });
+
+    expect(filtersOf(href)).toEqual([
+      {
+        column: "environment",
+        type: "stringOptions",
+        operator: "any of",
+        value: ["zm_demo"],
+      },
+    ]);
+    // Nothing was dropped by the page: the builder already removed what the
+    // surface cannot apply, so there is no warning to hide.
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 
   it("still warns about columns this surface has never heard of", () => {
