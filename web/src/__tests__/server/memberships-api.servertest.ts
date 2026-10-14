@@ -380,9 +380,7 @@ describe("Memberships APIs", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(response.body.message).toBe(
-          "Project membership deleted successfully",
-        );
+        expect(response.body.message).toBe("Project membership removed");
         expect(response.body.userId).toBe(testUserId);
 
         // Verify the membership was deleted from the database
@@ -639,7 +637,7 @@ describe("Memberships APIs", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(response.body.message).toBe("Membership deleted successfully");
+        expect(response.body.message).toBe("Organization membership removed");
         expect(response.body.userId).toBe(testUserId);
 
         // Verify the membership was deleted from the database
