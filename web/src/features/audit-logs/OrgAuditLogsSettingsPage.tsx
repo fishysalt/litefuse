@@ -5,30 +5,29 @@ import { useHasEntitlement } from "@/src/features/entitlements/hooks";
 import { useHasOrganizationAccess } from "@/src/features/rbac/utils/checkOrganizationAccess";
 
 import { useTranslation } from "react-i18next";
-export function OrgAuditLogsSettingsPage(props: { orgId: string }) {
+export function OrgAuditLogsSettingsPage({ orgId }: { orgId: string }) {
   const { t } = useTranslation();
-  const hasAccess = useHasOrganizationAccess({
-    organizationId: props.orgId,
+  const canReadAuditLogs = useHasOrganizationAccess({
+    organizationId: orgId,
     scope: "auditLogs:read",
   });
-  const hasEntitlement = useHasEntitlement("audit-logs");
+  const auditLogsEntitled = useHasEntitlement("audit-logs");
 
-  const body = !hasEntitlement ? (
+  // Shown instead of the table when the plan or the RBAC scope is missing.
+  const restricted = !auditLogsEntitled ? (
     <p className="text-muted-foreground text-sm">
       {t(
         "Audit logs are an Enterprise feature. Upgrade your plan to track all changes made to your organization.",
       )}
     </p>
-  ) : !hasAccess ? (
+  ) : !canReadAuditLogs ? (
     <Alert>
       <AlertTitle>{t("Access Denied")}</AlertTitle>
       <AlertDescription>
         {t("Contact your organization administrator to request access.")}
       </AlertDescription>
     </Alert>
-  ) : (
-    <AuditLogsTable scope="organization" orgId={props.orgId} />
-  );
+  ) : null;
 
   return (
     <>
@@ -38,7 +37,7 @@ export function OrgAuditLogsSettingsPage(props: { orgId: string }) {
           "Track who changed what in your organization and when. Monitor organization settings, project creation/deletion, and membership changes over time.",
         )}
       </p>
-      {body}
+      {restricted ?? <AuditLogsTable scope="organization" orgId={orgId} />}
     </>
   );
 }

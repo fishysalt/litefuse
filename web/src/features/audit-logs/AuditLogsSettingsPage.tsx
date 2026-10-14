@@ -5,30 +5,29 @@ import { useHasEntitlement } from "@/src/features/entitlements/hooks";
 import { useHasProjectAccess } from "@/src/features/rbac/utils/checkProjectAccess";
 
 import { useTranslation } from "react-i18next";
-export function AuditLogsSettingsPage(props: { projectId: string }) {
+export function AuditLogsSettingsPage({ projectId }: { projectId: string }) {
   const { t } = useTranslation();
-  const hasAccess = useHasProjectAccess({
-    projectId: props.projectId,
+  const canReadAuditLogs = useHasProjectAccess({
+    projectId,
     scope: "auditLogs:read",
   });
-  const hasEntitlement = useHasEntitlement("audit-logs");
+  const auditLogsEntitled = useHasEntitlement("audit-logs");
 
-  const body = !hasEntitlement ? (
+  // Shown instead of the table when the plan or the RBAC scope is missing.
+  const restricted = !auditLogsEntitled ? (
     <p className="text-muted-foreground text-sm">
       {t(
         "Audit logs are an Enterprise feature. Upgrade your plan to track all changes made to your project.",
       )}
     </p>
-  ) : !hasAccess ? (
+  ) : !canReadAuditLogs ? (
     <Alert>
       <AlertTitle>{t("Access Denied")}</AlertTitle>
       <AlertDescription>
         {t("Contact your project administrator to request access.")}
       </AlertDescription>
     </Alert>
-  ) : (
-    <AuditLogsTable scope="project" projectId={props.projectId} />
-  );
+  ) : null;
 
   return (
     <>
@@ -38,7 +37,7 @@ export function AuditLogsSettingsPage(props: { projectId: string }) {
           "Track who changed what in your project and when. Monitor settings, configurations, and data changes over time.",
         )}
       </p>
-      {body}
+      {restricted ?? <AuditLogsTable scope="project" projectId={projectId} />}
     </>
   );
 }
