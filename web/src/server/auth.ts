@@ -55,13 +55,13 @@ import {
   buildSsoProviders,
   resolveSsoProviderIdForDomain,
   resolveMultiTenantSsoConfig,
-} from "@/src/features/enterprise/sso/ssoProviders";
+} from "@/src/features/auth/sso/enterpriseSso";
 import { ENTERPRISE_SSO_REQUIRED_MESSAGE } from "@/src/features/auth/constants";
 import { projectRoleAccessRights } from "@/src/features/rbac/constants/projectAccessRights";
 import { getSSOBlockedDomains } from "@/src/features/auth-credentials/server/signupApiHandler";
 import { createSupportEmailHash } from "@/src/features/support-chat/createSupportEmailHash";
 import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/hasEntitlement";
-import { resolveSelfHostedPlan } from "@/src/features/enterprise/plan/resolvePlan";
+import { resolveSelfHostedPlan } from "@/src/features/entitlements/server/resolveSelfHostedPlan";
 
 function canCreateOrganizations(userEmail: string | null): boolean {
   const instancePlan = resolveSelfHostedPlan(

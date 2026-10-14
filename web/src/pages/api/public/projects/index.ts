@@ -3,8 +3,6 @@ import { cors, runMiddleware } from "@/src/features/public-api/server/cors";
 import { prisma } from "@langfuse/shared/src/db";
 import { logger, redis } from "@langfuse/shared/src/server";
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { requireAdminApi } from "@/src/features/enterprise/auth/requireAdminApi";
-import { createProject } from "@/src/features/enterprise/projects/createProject";
 
 export default async function handler(
   req: NextApiRequest,
@@ -19,8 +17,19 @@ export default async function handler(
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  // POST: create a project (organization-level key + admin-api entitlement)
+  // POST: create a project (organization-level key + admin-api entitlement).
+  //
+  // This is the enterprise half of a deliberately mixed route (see ANNEX A/B of
+  // LICENSE-EE): the GET below is the community operation SDKs use for
+  // `auth_check`, and only this branch is licensed material. The enterprise
+  // modules are therefore imported dynamically, inside the branch, so a
+  // community deployment never loads them.
   if (req.method === "POST") {
+    const [{ requireAdminApi }, { createProject }] = await Promise.all([
+      import("@/src/features/enterprise/auth/requireAdminApi"),
+      import("@/src/features/enterprise/projects/createProject"),
+    ]);
+
     const scope = await requireAdminApi(req, res);
     if (!scope) return;
     return createProject(req, res, scope);

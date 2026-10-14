@@ -4,7 +4,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { env } from "@/src/env.mjs";
 import { logger } from "@langfuse/shared/src/server";
 import { AdminApiAuthService } from "@/src/server/adminApiAuth";
-import { isMultiTenantSsoAvailable } from "@/src/features/enterprise/sso/ssoAvailable";
+import { isMultiTenantSsoAvailable } from "@/src/features/auth/sso/isMultiTenantSsoAvailable";
 import { ssoProviderSchema } from "@/src/features/enterprise/sso/ssoConfigSchema";
 
 /**

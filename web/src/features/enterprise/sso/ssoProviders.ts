@@ -18,7 +18,7 @@ import {
   logger,
   traceException,
 } from "@langfuse/shared/src/server";
-import { isMultiTenantSsoAvailable } from "@/src/features/enterprise/sso/ssoAvailable";
+import { isMultiTenantSsoAvailable } from "@/src/features/auth/sso/isMultiTenantSsoAvailable";
 import {
   ssoProviderSchema,
   type SsoProviderConfig,

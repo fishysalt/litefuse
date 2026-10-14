@@ -58,17 +58,17 @@ Deployments of Litefuse Cloud are covered by the subscription governing that
 deployment; they require no separate self-hosted license key.
 
 Community edition. A deployment that enables no enterprise feature requires no
-Litefuse Enterprise License: the license key gates enterprise features at
-runtime, it does not gate the community edition. This covers the modules inside
-the paths listed in ANNEX A that every build loads regardless of the plan — in
-particular the self-hosted plan resolution used by the entitlement checks and the
-multi-tenant SSO availability check used by the sign-in page, together with the
-modules they depend on. You may copy, build, run and deploy the Software as part
-of a build of this repository for that purpose. This permission covers only those
-bundled components: it does not extend to enabling or using the enterprise
-features themselves (for example multi-tenant SSO, SCIM user provisioning, or the
-organization and project admin APIs), and it does not permit copying or modifying
-the paths listed in ANNEX A for use outside such a build.
+Litefuse Enterprise License, and needs no permission for licensed material to run
+one: no file outside ANNEX A imports a file inside ANNEX A at module scope. Where
+a community code path has to reach an enterprise-only operation, it does so
+through a dynamic import that only a valid license gates
+(web/src/features/auth/sso/enterpriseSso.ts for enterprise SSO; the POST branch
+of web/src/pages/api/public/projects/index.ts for project creation), so a
+deployment without a license neither loads nor runs the Software. You may copy,
+build, run and deploy the community edition freely; enabling or using the
+enterprise features themselves still requires a Litefuse Enterprise License, and
+this paragraph does not permit copying or modifying the paths listed in ANNEX A
+for use outside such a build.
 
 The technical availability checks in the Software (for example the
 LITEFUSE_EE_LICENSE_KEY environment variable and the entitlement checks in
@@ -154,16 +154,23 @@ enterprise functionality:
 - web/src/pages/api/admin/api-keys/**, web/src/pages/api/admin/bullmq/**,
   web/src/pages/api/admin/evals.ts, web/src/pages/api/admin/ingestion-replay.ts
   (operational endpoints protected by ADMIN_API_KEY)
+- web/src/features/auth/sso/** (community-edition SSO boundary: the availability
+  check and the license-gated dynamic-import gateway the sign-in page and the
+  NextAuth configuration use; contains no enterprise SSO logic)
 - web/src/pages/api/public/projects/index.ts (route wrapper plus the
   community-edition GET; only the enterprise POST implementation it calls,
   web/src/features/enterprise/projects/createProject.ts, is licensed under this
-  Enterprise License)
+  Enterprise License, and it is loaded dynamically inside that branch)
 
-Note: enterprise features in this fork are not physically separated from the OSS
-core - they compile into the same build and share modules with it. If a path
-above should become commercially licensed, it must first be moved into an
-EE-only directory, so that the boundary of this license is a directory rather
-than a judgement call. See ANNEX C for the upstream model.
+Note: enterprise features in this fork are not contained in a single directory,
+so the boundary of this license is the explicit path list in ANNEX A rather than
+a directory rule. The OSS core does not import any ANNEX A path at module scope:
+where an enterprise-only operation needs licensed code, the OSS side loads it
+through a dynamic import that a valid license gates, so a deployment without a
+license does not load or run licensed materials at all. Adding an enterprise
+module therefore follows two rules: put it under web/src/features/enterprise/**,
+and reach it from OSS code only through such a gated dynamic import. See ANNEX C
+for the upstream model.
 
 ANNEX C - UPSTREAM AND THIRD-PARTY ATTRIBUTION
 
