@@ -949,9 +949,8 @@ export async function cancelSubscriptionImmediatelyForOrganization(
   const organization = await prisma.organization.findUnique({
     where: { id: orgId },
   });
-  const subscriptionId =
-    parseCloudConfig(organization?.cloudConfig ?? null)?.stripe
-      ?.activeSubscriptionId;
+  const subscriptionId = parseCloudConfig(organization?.cloudConfig ?? null)
+    ?.stripe?.activeSubscriptionId;
   if (!subscriptionId) return;
 
   await getStripeClient().subscriptions.cancel(subscriptionId);

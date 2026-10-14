@@ -737,7 +737,8 @@ export async function getAuthOptions(): Promise<NextAuthOptions> {
               // cloud_config plan, otherwise a leftover LITEFUSE_EE_LICENSE_KEY
               // would grant enterprise-gated UI (org API keys, admin-api, …)
               // to every org regardless of its actual plan.
-              selfHostedInstancePlan: process.env.NEXT_PUBLIC_LITEFUSE_CLOUD_REGION
+              selfHostedInstancePlan: process.env
+                .NEXT_PUBLIC_LITEFUSE_CLOUD_REGION
                 ? null
                 : resolveSelfHostedPlan(env.LITEFUSE_EE_LICENSE_KEY),
             },

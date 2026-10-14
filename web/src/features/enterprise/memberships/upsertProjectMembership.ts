@@ -31,11 +31,12 @@ export async function upsertProjectMembership(
 
   const { userId, role } = parsed.data;
 
-  const organizationMembership =
-    await prisma.organizationMembership.findUnique({
+  const organizationMembership = await prisma.organizationMembership.findUnique(
+    {
       where: { orgId_userId: { orgId, userId } },
       include: { user: { select: { email: true, name: true } } },
-    });
+    },
+  );
 
   if (!organizationMembership) {
     return res.status(404).json({
