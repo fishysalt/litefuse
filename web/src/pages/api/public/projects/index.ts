@@ -1,4 +1,5 @@
 import { ApiAuthService } from "@/src/features/public-api/server/apiAuth";
+import { requireAdminApiScope } from "@/src/features/public-api/server/adminApiGuard";
 import { cors, runMiddleware } from "@/src/features/public-api/server/cors";
 import { prisma } from "@langfuse/shared/src/db";
 import { logger, redis } from "@langfuse/shared/src/server";
@@ -19,19 +20,21 @@ export default async function handler(
 
   // POST: create a project (organization-level key + admin-api entitlement).
   //
-  // This is the enterprise half of a deliberately mixed route (see ANNEX A/B of
+  // The enterprise half of a deliberately mixed route (see ANNEX A/B of
   // LICENSE-EE): the GET below is the community operation SDKs use for
-  // `auth_check`, and only this branch is licensed material. The enterprise
-  // modules are therefore imported dynamically, inside the branch, so a
-  // community deployment never loads them.
+  // `auth_check`, and only this branch is licensed material.
+  //
+  // ORDER MATTERS. The guard runs first and is MIT code, so an unauthenticated or
+  // unentitled request — which is every POST on a community deployment — is
+  // rejected before any licensed module is loaded. Only an authorized request
+  // reaches the dynamic import of the enterprise implementation.
   if (req.method === "POST") {
-    const [{ requireAdminApi }, { createProject }] = await Promise.all([
-      import("@/src/features/enterprise/auth/requireAdminApi"),
-      import("@/src/features/enterprise/projects/createProject"),
-    ]);
-
-    const scope = await requireAdminApi(req, res);
+    const scope = await requireAdminApiScope(req, res);
     if (!scope) return;
+
+    const { createProject } = await import(
+      "@/src/features/enterprise/projects/createProject"
+    );
     return createProject(req, res, scope);
   }
 

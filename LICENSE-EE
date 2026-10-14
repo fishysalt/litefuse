@@ -58,17 +58,36 @@ Deployments of Litefuse Cloud are covered by the subscription governing that
 deployment; they require no separate self-hosted license key.
 
 Community edition. A deployment that enables no enterprise feature requires no
-Litefuse Enterprise License, and needs no permission for licensed material to run
-one: no file outside ANNEX A imports a file inside ANNEX A at module scope. Where
-a community code path has to reach an enterprise-only operation, it does so
-through a dynamic import that only a valid license gates
-(web/src/features/auth/sso/enterpriseSso.ts for enterprise SSO; the POST branch
-of web/src/pages/api/public/projects/index.ts for project creation), so a
-deployment without a license neither loads nor runs the Software. You may copy,
-build, run and deploy the community edition freely; enabling or using the
-enterprise features themselves still requires a Litefuse Enterprise License, and
-this paragraph does not permit copying or modifying the paths listed in ANNEX A
-for use outside such a build.
+Litefuse Enterprise License.
+
+No file outside ANNEX A imports a file inside ANNEX A at module scope. Where a
+community code path has to reach an enterprise-only operation, the request is
+authenticated and its entitlement checked by code outside ANNEX A first, and the
+licensed implementation is loaded only if that check passes:
+web/src/features/auth/sso/enterpriseSso.ts for enterprise SSO (loaded only on a
+licensed instance, and it fails closed if it cannot be loaded rather than
+reporting the feature as absent), and the POST branch of
+web/src/pages/api/public/projects/index.ts, whose guard
+(web/src/features/public-api/server/adminApiGuard.ts) rejects unauthenticated or
+unentitled requests before the enterprise implementation is imported.
+
+Permitted without an Enterprise License: copying, building, running and deploying
+a build of this repository that enables no enterprise feature, and reproducing and
+distributing such a build, or the source it is built from, provided that (a) the
+enterprise features are not enabled or used, (b) this license and the LICENSE file
+are included unchanged, (c) the paths in ANNEX A are not modified, relicensed, or
+presented as MIT, and (d) you do not charge for, or separately license, the
+enterprise features. This repository does not currently produce a build with the
+paths in ANNEX A removed, so those paths are present in the artifact; this
+paragraph is what permits distributing the combined build with the enterprise
+features switched off.
+
+Also permitted is loading licensed material where that loading is incidental to
+rejecting an unavailable operation — for example a module that a bundler evaluates
+before the guard above can run, or the enterprise SSO implementation on a licensed
+instance. Enabling or using the enterprise features themselves still requires a
+Litefuse Enterprise License, and nothing in this paragraph permits copying or
+modifying the paths listed in ANNEX A for use outside such a build.
 
 The technical availability checks in the Software (for example the
 LITEFUSE_EE_LICENSE_KEY environment variable and the entitlement checks in
@@ -157,17 +176,20 @@ enterprise functionality:
 - web/src/features/auth/sso/** (community-edition SSO boundary: the availability
   check and the license-gated dynamic-import gateway the sign-in page and the
   NextAuth configuration use; contains no enterprise SSO logic)
+- web/src/features/public-api/server/adminApiGuard.ts (the auth + entitlement
+  guard for the organization admin API, kept outside ANNEX A so a community route
+  can reject an unavailable operation without loading licensed code first)
 - web/src/pages/api/public/projects/index.ts (route wrapper plus the
   community-edition GET; only the enterprise POST implementation it calls,
   web/src/features/enterprise/projects/createProject.ts, is licensed under this
-  Enterprise License, and it is loaded dynamically inside that branch)
+  Enterprise License, and it is loaded dynamically after that guard passes)
 
 Note: enterprise features in this fork are not contained in a single directory,
 so the boundary of this license is the explicit path list in ANNEX A rather than
-a directory rule. The OSS core does not import any ANNEX A path at module scope:
-where an enterprise-only operation needs licensed code, the OSS side loads it
-through a dynamic import that a valid license gates, so a deployment without a
-license does not load or run licensed materials at all. Adding an enterprise
+a directory rule. The OSS core does not import any ANNEX A path at module scope,
+and it guards enterprise-only operations before loading the licensed
+implementation; licensed material can nevertheless be present in a community
+artifact, which the Community edition paragraph above permits. Adding an enterprise
 module therefore follows two rules: put it under web/src/features/enterprise/**,
 and reach it from OSS code only through such a gated dynamic import. See ANNEX C
 for the upstream model.
@@ -182,19 +204,29 @@ Portions of this repository are derived from Langfuse
 - Langfuse licenses part of its own repository commercially and draws that
   boundary by directory: "ee/", "web/src/ee/" and "worker/src/ee/" (see
   https://github.com/langfuse/langfuse/blob/main/ee/LICENSE). None of those
-  directories exists in this repository, and the paths in ANNEX A are Litefuse's
-  own implementations of the same feature areas rather than copies of them: no
-  file in this repository shares substantive text with Langfuse's commercially
-  licensed files. What a file here may share with the upstream code is the
-  interface it has to implement and the idioms it has to be written in — route
-  and hook signatures, database call shapes, provider identifiers and other
-  values fixed by the framework or by the protocol.
+  directories exists in this repository; the paths in ANNEX A cover the same
+  feature areas, and the interface a file has to implement — route and hook
+  signatures, database call shapes, provider identifiers and other values fixed by
+  the framework or by the protocol — is therefore necessarily the same.
+- NO ASSERTION OF INDEPENDENT AUTHORSHIP IS MADE HERE. Earlier revisions of this
+  repository adapted a number of the ANNEX A files from Langfuse's commercially
+  licensed code. Those files were subsequently rewritten to reduce verbatim
+  overlap, and the measured overlap and the nature of the change per file are
+  recorded in "LICENSE-EE-PROVENANCE.md". Reduced overlap is evidence about the
+  text, not about provenance: re-wording or restructuring a derivative work does
+  not make it independently authored, and copyright in the preexisting material
+  is unaffected. Where a file is, or may be, a derivative of licensed material,
+  the Langfuse Enterprise License continues to apply to it and it is not
+  relicensed by this file. Distributing such a file requires either the
+  authorization of the Langfuse copyright holder or a documented independent
+  reimplementation; see "LICENSE-EE-PROVENANCE.md" for the affected files and the
+  open question.
 - That is a property to keep, not a coincidence to lean on. A change that adapts
   Langfuse's commercially licensed code must not be merged: if such a portion is
   ever included, the Langfuse Enterprise License continues to apply to it, it is
-  not relicensed by this file, and it must be listed here together with the
-  authorization from the Langfuse copyright holder under which it is
-  distributed.
+  not relicensed by this file, and it must be listed in "LICENSE-EE-PROVENANCE.md"
+  together with the authorization from the Langfuse copyright holder under which
+  it is distributed.
 - The Litefuse Enterprise License above is modelled on the Langfuse Enterprise
   License and is adapted to Litefuse's repository layout, in which the
   enterprise code is not contained in a single top-level directory.
