@@ -1,80 +1,63 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { prisma, type Prisma } from "@langfuse/shared/src/db";
-import { logger } from "@langfuse/shared/src/server";
 import { auditLog } from "@/src/features/audit-logs/auditLog";
 import { organizationNameSchema } from "@/src/features/organizations/utils/organizationNameSchema";
+import { prisma, type Prisma } from "@langfuse/shared/src/db";
+import { logger } from "@langfuse/shared/src/server";
+import { type NextApiRequest, type NextApiResponse } from "next";
 
-/**
- * Result of reading the optional `metadata` field of an admin request body.
- */
-type MetadataField =
+type MetadataResult =
   | { ok: true; value: Prisma.InputJsonValue | undefined }
   | { ok: false; error: string };
 
-/**
- * Admin callers may send `metadata` either as a JSON object or as a string that
- * encodes one. Anything else — arrays, null, scalars, malformed JSON — is
- * rejected here so that only a JSON object is ever handed to the database.
- */
-function readMetadata(body: unknown): MetadataField {
-  const requestBody = body as { metadata?: unknown } | null | undefined;
-  const rawMetadata = requestBody?.metadata;
-
-  if (rawMetadata === undefined) {
+function parseOrganizationMetadata(metadata: unknown): MetadataResult {
+  if (metadata === undefined) {
     return { ok: true, value: undefined };
   }
 
-  let candidate: unknown = rawMetadata;
-  if (typeof rawMetadata !== "object") {
+  let value = metadata;
+  if (typeof metadata === "string") {
     try {
-      candidate = JSON.parse(String(rawMetadata));
-    } catch (parseError) {
+      value = JSON.parse(metadata);
+    } catch (error) {
       return {
         ok: false,
-        error: `Invalid metadata. Should be a valid JSON object: ${parseError}`,
+        error: `Invalid metadata. Should be a valid JSON object: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       };
     }
   }
 
-  const isJsonObject =
-    typeof candidate === "object" &&
-    candidate !== null &&
-    !Array.isArray(candidate);
-
-  if (!isJsonObject) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return {
       ok: false,
       error: "Invalid metadata. Should be a valid JSON object.",
     };
   }
 
-  return { ok: true, value: candidate as Prisma.InputJsonValue };
+  return { ok: true, value: value as Prisma.InputJsonValue };
 }
 
-/**
- * Create an organization (POST /api/admin/organizations, instance admin).
- */
 export async function createOrganization(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  const validationResult = organizationNameSchema.safeParse(req.body);
-  if (!validationResult.success) {
+  const parsedBody = organizationNameSchema.safeParse(req.body);
+  if (!parsedBody.success) {
     return res.status(400).json({
       error: "Invalid request body",
-      details: validationResult.error.format(),
+      details: parsedBody.error.format(),
     });
   }
 
-  const metadataField = readMetadata(req.body);
-  if (!metadataField.ok) {
-    return res.status(400).json({ error: metadataField.error });
+  const metadata = parseOrganizationMetadata(req.body?.metadata);
+  if (!metadata.ok) {
+    return res.status(400).json({ error: metadata.error });
   }
 
   const organization = await prisma.organization.create({
     data: {
-      name: validationResult.data.name,
-      metadata: metadataField.value,
+      name: parsedBody.data.name,
+      metadata: metadata.value,
     },
     select: {
       id: true,
@@ -82,6 +65,7 @@ export async function createOrganization(
       createdAt: true,
       metadata: true,
       projects: {
+        where: { deletedAt: null },
         select: {
           id: true,
           name: true,
@@ -89,7 +73,6 @@ export async function createOrganization(
           createdAt: true,
           updatedAt: true,
         },
-        where: { deletedAt: null },
       },
     },
   });
@@ -103,15 +86,10 @@ export async function createOrganization(
     after: organization,
   });
 
-  logger.info("Admin API created an organization", {
-    organizationId: organization.id,
-  });
+  logger.info(`Created organization ${organization.id}`);
 
   return res.status(201).json({
-    id: organization.id,
-    name: organization.name,
-    createdAt: organization.createdAt,
+    ...organization,
     metadata: organization.metadata ?? {},
-    projects: organization.projects,
   });
 }

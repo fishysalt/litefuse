@@ -1,11 +1,8 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
+import { type NextApiRequest, type NextApiResponse } from "next";
 
-/**
- * Get a single organization (GET /api/admin/organizations/{id}, instance admin).
- */
 export async function getOrganization(
-  req: NextApiRequest,
+  _req: NextApiRequest,
   res: NextApiResponse,
   organizationId: string,
 ) {
@@ -17,6 +14,7 @@ export async function getOrganization(
       createdAt: true,
       metadata: true,
       projects: {
+        where: { deletedAt: null },
         select: {
           id: true,
           name: true,
@@ -24,7 +22,6 @@ export async function getOrganization(
           createdAt: true,
           updatedAt: true,
         },
-        where: { deletedAt: null },
       },
     },
   });
@@ -36,6 +33,5 @@ export async function getOrganization(
   return res.status(200).json({
     ...organization,
     metadata: organization.metadata ?? {},
-    projects: organization.projects,
   });
 }

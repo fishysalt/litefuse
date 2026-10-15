@@ -174,8 +174,8 @@ deleteOrganization(req: NextApiRequest, res: NextApiResponse, organizationId: st
      - 否则若 `projectCount > 0`（只剩软删除/异步删除中的项目）→ **400**
        `{"error": "Organization cannot be deleted while it still has projects", "message": "Deletion of your projects is still being processed, please try deleting the organization later"}`
   3. 取消计费订阅：`cancelSubscriptionImmediatelyForOrganization(id)`。若 `STRIPE_SECRET_KEY` 未配置，直接返回；否则读取该组织 `cloudConfig.stripe.activeSubscriptionId`，存在则调用 Stripe 立即取消。**Stripe 抛错会中止删除**（异常冒泡 → 路由 500，组织保留）。
-  4. `organization.delete({where:{id}})` — **硬删除**。`projects` / `api_keys` 等通过 `onDelete: Cascade` 级联删除（`Project.organization` 是 `onDelete: Cascade`）。此刻组织已无任何项目（含软删除的），所以级联通常无对象。
-  5. `new ApiAuthService(prisma, redis).invalidateCachedOrgApiKeys(id)` — 清除 Redis 中该组织的 API key 缓存。
+  4. `new ApiAuthService(prisma, redis).invalidateCachedOrgApiKeys(id)` — 清除 Redis 中该组织的 API key 缓存。**必须在下一步的硬删除之前执行**：该 helper 通过回查 `api_keys` 得到要失效的 key，而硬删除会级联删掉这些行，放在删除之后等于什么都没清（缺陷与修复见 §K.1；`deleteProject` 本来就是先失效再删）。
+  5. `organization.delete({where:{id}})` — **硬删除**。`projects` / `api_keys` 等通过 `onDelete: Cascade` 级联删除（`Project.organization` 是 `onDelete: Cascade`）。此刻组织已无任何项目（含软删除的），所以级联通常无对象。
   6. 审计行：`type=API_KEY`、`apiKeyId="admin-api"`、`orgId = 被删组织 id`（此时行已不存在；`audit_logs` 无外键，写入成功）、`resourceType="organization"`、`resourceId = 被删 id`、`action="delete"`、`before = JSON.stringify(<delete 返回的完整组织行>)`。
   7. 日志一条。
 - 响应 **200** `{"success": true}`。
@@ -429,7 +429,7 @@ deleteProject(req: NextApiRequest, res: NextApiResponse, projectId: string, scop
 | 35 | 组织只含 1 个 `deletedAt` 非空的项目；DELETE → 400，`body.error` 同上，`body.message` 含 `"still being processed"` | new |
 | 36 | DELETE 无 admin 头 → 401 且 `body.error` 含 `"Unauthorized"` | `organizations-api.servertest.ts` › `should return 401 when no authorization header is provided` |
 | 37 | 删除成功 → `audit_logs` 新增 `action="delete"`、`resource_type="organization"`、`resource_id=<id>`、`org_id=<id>`、`before` 可解析且 `id` 匹配 | new |
-| 38 | 组织有组织级 API key（Redis 缓存已热）；DELETE 成功后再用该 key 调 admin API → 401 | new（需 Redis） |
+| 38 | 组织有组织级 API key（Redis 缓存已热）；DELETE 成功后再用该 key 调 admin API → 401（**必须先失效缓存再硬删除**，见 §K.1） | new（需 Redis） |
 | 39 | 组织有 `cloudConfig.stripe.activeSubscriptionId` 且 Stripe 取消调用抛错；DELETE → 500（或按实现冒泡的状态）且组织仍存在；Stripe 取消被调用一次 | new（需 Stripe 桩） |
 
 ### H.2 项目（§C）
@@ -550,3 +550,35 @@ deleteProject(req: NextApiRequest, res: NextApiResponse, projectId: string, scop
 11. **非 JSON 请求体**（`req.body` 为字符串/`undefined`）的行为未定义：`organizationNameSchema` 会 400，而项目函数解构 `req.body` 可能抛错并走到 500。规格未固化，验收测试也不覆盖。
 12. **Stripe 取消失败时 `deleteOrganization` 的响应**：异常冒泡到路由包装器的 catch，返回 500 `{"error":"Internal server error"}`。这一点由包装器语义推出，但未在测试中直接验证；第 39 条按此预期编写，若实际行为不同以测试跑出的现状为准。
 13. **`organizations-api.servertest.ts` 中 “无授权头” 用例实际发送的是 `Basic pk-lf-1234567890:sk-lf-1234567890`**（`makeAPICall` 的默认回退），并非真正缺失 `Authorization` 头。真正缺失头时的错误串 `"Unauthorized: authorization header is missing"`（§A.3）未由既有测试直接断言。
+
+---
+
+## K. 规格修订与测试阶段判定（由特征测试阶段回填，2026-10-15）
+
+写测试时以**原实现的实测行为**为准。凡规格与实测冲突，除 §K.1 外一律**以实现行为为准**（本批次契约是"保留现状"）。
+
+### K.1 唯一一处例外：删除组织后其 API key 仍可用（缺陷，已先修复再固化）
+
+- **规格原文（§B.5 第 5 步 / 用例 H38）**：删除组织时清除该组织的 API key 缓存，随后同一把 key 应 **401**。
+- **实测**：删除组织后同一把 key 仍得 **200**。原因是 `invalidateCachedOrgApiKeys` 被放在 `prisma.organization.delete` **之后**，而该 helper 通过回查 `api_keys` 才能算出要失效的 key —— 硬删除已级联删掉这些行，于是什么都没清，Redis 里的旧条目在 TTL（默认 300s）内继续放行。
+- **判定**：这不是"现状"而是**缺陷**（凭据在组织删除后仍然有效）。按主控决策**先修缺陷、再把它写成契约**：
+  - 修复提交 **`d6a6567`** `fix(ee): stop a deleted organization's API key from staying valid`（把失效调用移到硬删除之前，与 `deleteProject` 既有的顺序一致）；
+  - 差分证据（同一脚本，每轮新建组织与 key）：修复前 `200 → DELETE 200 → 同一 key 200`；修复后同一三步为 `200 → 200 → 401`（日志 `~/SelectDB/litefuse-local/checks/20261015-155531-batch2b-orgkey-fix.log`）；
+  - 本文档 §B.5 与 H38 已按**修复后**的顺序与结果改写。**实现者必须按"先失效缓存、再硬删除"的顺序实现。**
+- 之所以单独成一个提交而不是混进本批次：本批次的契约是"行为等价"，行为变更必须显式、可单独回退。
+
+### K.2 判定为不可断言、不写断言的用例（实现仍须保留对应分支）
+
+| 用例 | 原因 |
+| --- | --- |
+| H101 | **实测不可达**：`GET /api/admin/organizations/abc?organizationId=xyz&organizationId=def` → 404 `{"error":"Organization not found"}`；`DELETE …/apiKeys/def?apiKeyId=1&apiKeyId=2` → 404。**路径参数优先**，重复 query 参数不会变成数组 |
+| H39 | 需要 Stripe 失败打桩；本机 `STRIPE_SECRET_KEY` 未配置，`cancelSubscriptionImmediatelyForOrganization` 直接返回 |
+| H65 / H85 | 需要对服务进程内的依赖做故障注入（`provisionSplitForNewProject` / `ProjectDeleteQueue.getInstance()` 返回 null），HTTP 层无法复现且未做 mock |
+| H102–H104 | 需要以**不同许可 / 云区域 / `ADMIN_API_KEY`** 重启同一服务；一个门禁只跑一个服务实例 |
+
+> 上表各项对应的分支/文案仍属本批次实现的一部分，必须原样保留；只是**没有断言**，故不作为回归信号。
+
+### K.3 次要澄清
+
+- §A.4 把典型 `auth.error` 写作 `"Invalid credentials"`；实测运行中的 `ApiAuthService` 返回的是 `"Invalid credentials. Confirm that you've configured the correct host."`（`web/src/features/public-api/server/apiAuth.ts:250`）。相关的 H112 因此按 `toContain("Invalid credentials")` 断言。
+- `tsconfig.build.json` 排除了 `**/*.servertest.*`，所以**验收测试文件本身不被 tsgo 检查**；测试的正确性靠实际运行（46/46 全绿）而非类型检查兜底。
