@@ -55,6 +55,10 @@
 import { prisma, Prisma, type JobExecutionStatus } from "../../db";
 import { LangfuseInternalTraceEnvironment } from "../llm/types";
 import { tableFor } from "../doris/tableRouting";
+import {
+  isMissingSplitTableReadError,
+  logMissingReadTarget,
+} from "../doris/crossProjectTableRouting";
 import { parseDorisUTCDateTimeFormat, queryDoris } from "./doris";
 
 /** How many markers the "Last 5 runs" column shows per row (upstream: 5). */
@@ -342,6 +346,17 @@ export async function getRecentEvaluatorExecutionTraces(
       kind: "analytic",
       projectId,
     },
+  }).catch((e: unknown) => {
+    // A project only gets `spans_<projectId>` when it first ingests telemetry, so
+    // a project that has evaluators but no traces yet has no table to read. Reads
+    // are specified to degrade to an empty result in that case (the cross-project
+    // fan-out does the same via `executeDorisProjectFanout`); without this the
+    // evaluators page fails with a 500 instead of showing "no runs yet".
+    if (isMissingSplitTableReadError(e)) {
+      logMissingReadTarget("spans", tableFor(projectId, "spans"));
+      return [] as DorisEvaluatorExecutionRow[];
+    }
+    throw e;
   });
 
   return rows.map((row) => {

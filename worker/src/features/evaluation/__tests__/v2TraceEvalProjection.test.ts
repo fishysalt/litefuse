@@ -49,7 +49,9 @@ function buildRule(overrides: {
           provider: "openai",
           model: "gpt-4o-mini",
           modelParams: { temperature: 0 },
-          variableMapping: [{ templateVariable: "input", selectedColumnId: "input" }],
+          variableMapping: [
+            { templateVariable: "input", selectedColumnId: "input" },
+          ],
           outputDefinition: { dataType },
           ...versionOverrides,
         },
@@ -62,7 +64,14 @@ function buildRule(overrides: {
     updatedAt: new Date("2026-01-02T00:00:00.000Z"),
     projectId: "project-1",
     status: ruleOverrides.status ?? "ACTIVE",
-    filter: [{ column: "environment", operator: "none of", value: ["langfuse"], type: "stringOptions" }],
+    filter: [
+      {
+        column: "environment",
+        operator: "none of",
+        value: ["langfuse"],
+        type: "stringOptions",
+      },
+    ],
     targetObject: "trace",
     sampling: "0.5",
     delay: 0,
@@ -113,7 +122,9 @@ describe("toLegacyTraceConfigRow", () => {
   });
 
   it("prefers the assignment variable mapping when present", () => {
-    const mapping = [{ templateVariable: "output", selectedColumnId: "output" }];
+    const mapping = [
+      { templateVariable: "output", selectedColumnId: "output" },
+    ];
     const row = toLegacyTraceConfigRow(
       buildRule({ assignmentVariableMapping: mapping }),
     );
@@ -121,7 +132,9 @@ describe("toLegacyTraceConfigRow", () => {
   });
 
   it("skips rules with more than one assignment (event/experiment shape)", () => {
-    expect(toLegacyTraceConfigRow(buildRule({ assignmentCount: 2 }))).toBeNull();
+    expect(
+      toLegacyTraceConfigRow(buildRule({ assignmentCount: 2 })),
+    ).toBeNull();
   });
 
   it("skips blocked evaluators", () => {
@@ -143,7 +156,9 @@ describe("toLegacyTraceConfigRow", () => {
 
   it("skips evaluator types this path cannot run", () => {
     expect(
-      toLegacyTraceConfigRow(buildRule({ evaluatorType: EvalTemplateType.CODE })),
+      toLegacyTraceConfigRow(
+        buildRule({ evaluatorType: EvalTemplateType.CODE }),
+      ),
     ).toBeNull();
   });
 
@@ -159,6 +174,28 @@ describe("toLegacyTraceConfigRow", () => {
       expect(row, dataType).not.toBeNull();
       expect(row?.eval_template_id, dataType).toBe("version-1");
     }
+  });
+
+  it("projects a migrated legacy evaluator whose output definition is the legacy shape", () => {
+    // Every pre-v2 row goes through the evaluators v2 backfill, which copies
+    // `eval_templates.output_schema` verbatim into `evaluator_versions.
+    // output_definition` — and that column holds `{ score, reasoning }` for those
+    // rows, not the dataType-discriminated shape. The shared resolver normalises
+    // it to NUMERIC (what the legacy UI labelled "Numeric"), which is exactly what
+    // `executeLlmEvaluator` compiles with, so the rule must stay executable here.
+    const row = toLegacyTraceConfigRow(
+      buildRule({
+        versionOverrides: {
+          outputDefinition: {
+            score: "A number between 0 and 1",
+            reasoning: "Why that score was given",
+          },
+        } as never,
+      }),
+    );
+
+    expect(row).not.toBeNull();
+    expect(row?.eval_template_id).toBe("version-1");
   });
 
   it("skips rules whose output definition is missing or unknown", () => {
