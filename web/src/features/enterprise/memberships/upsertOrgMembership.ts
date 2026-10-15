@@ -1,46 +1,52 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "@langfuse/shared/src/db";
 import { Role } from "@langfuse/shared";
-import { z } from "zod/v4";
+import { type NextApiRequest, type NextApiResponse } from "next";
+import * as z from "zod/v4";
 
-const OrgMembershipBody = z.object({
+const UpsertOrgMembershipBody = z.object({
   userId: z.string(),
   role: z.enum(Role),
 });
 
-/**
- * Create or update an organization membership (PUT /api/public/organizations/memberships).
- * Validates userId + role, then upserts organizationMembership.
- */
 export async function upsertOrgMembership(
   req: NextApiRequest,
   res: NextApiResponse,
   orgId: string,
 ) {
-  const parsed = OrgMembershipBody.safeParse(req.body);
-  if (!parsed.success) {
+  const parsedBody = UpsertOrgMembershipBody.safeParse(req.body);
+  if (!parsedBody.success) {
     return res.status(400).json({
       error: "Invalid request body",
-      details: parsed.error.issues,
+      details: parsedBody.error.issues,
     });
   }
 
+  const { userId, role } = parsedBody.data;
+
   const user = await prisma.user.findUnique({
-    where: { id: parsed.data.userId },
+    where: { id: userId },
   });
   if (!user) {
     return res.status(404).json({ error: "User not found" });
   }
 
-  // Last-OWNER protection (matches the UI's membersRouter.updateOrgMembership):
-  // reject demoting the only OWNER to a non-OWNER role, so the organization never ends up ownerless.
-  const existing = await prisma.organizationMembership.findUnique({
-    where: { orgId_userId: { orgId, userId: parsed.data.userId } },
+  const existingMembership = await prisma.organizationMembership.findUnique({
+    where: {
+      orgId_userId: { orgId, userId },
+    },
   });
-  if (existing?.role === Role.OWNER && parsed.data.role !== Role.OWNER) {
+
+  if (existingMembership?.role === "OWNER" && role !== "OWNER") {
     const otherOwners = await prisma.organizationMembership.count({
-      where: { orgId, role: Role.OWNER, id: { not: existing.id } },
+      where: {
+        orgId,
+        role: "OWNER",
+        id: {
+          not: existingMembership.id,
+        },
+      },
     });
+
     if (otherOwners === 0) {
       return res.status(403).json({
         error:
@@ -51,14 +57,10 @@ export async function upsertOrgMembership(
 
   const membership = await prisma.organizationMembership.upsert({
     where: {
-      orgId_userId: { orgId, userId: parsed.data.userId },
+      orgId_userId: { orgId, userId },
     },
-    update: { role: parsed.data.role },
-    create: {
-      orgId,
-      userId: parsed.data.userId,
-      role: parsed.data.role,
-    },
+    update: { role },
+    create: { orgId, userId, role },
   });
 
   return res.status(200).json({

@@ -1,13 +1,13 @@
+import { requireAdminApi } from "@/src/features/enterprise/auth/requireAdminApi";
+import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/hasEntitlement";
+import { allowMethods, routeByMethod } from "@/src/features/enterprise/http";
+import { deleteProjectMembership } from "@/src/features/enterprise/memberships/deleteProjectMembership";
+import { listProjectMemberships } from "@/src/features/enterprise/memberships/listProjectMemberships";
+import { upsertProjectMembership } from "@/src/features/enterprise/memberships/upsertProjectMembership";
 import { cors, runMiddleware } from "@/src/features/public-api/server/cors";
 import { prisma } from "@langfuse/shared/src/db";
 import { logger } from "@langfuse/shared/src/server";
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { requireAdminApi } from "@/src/features/enterprise/auth/requireAdminApi";
-import { allowMethods, routeByMethod } from "@/src/features/enterprise/http";
-import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/hasEntitlement";
-import { listProjectMemberships } from "@/src/features/enterprise/memberships/listProjectMemberships";
-import { upsertProjectMembership } from "@/src/features/enterprise/memberships/upsertProjectMembership";
-import { deleteProjectMembership } from "@/src/features/enterprise/memberships/deleteProjectMembership";
 
 export default async function handler(
   req: NextApiRequest,
@@ -25,7 +25,6 @@ export default async function handler(
   const scope = await requireAdminApi(req, res);
   if (!scope) return;
 
-  // Project membership management additionally requires the rbac-project-roles entitlement
   if (
     !hasEntitlementBasedOnPlan({
       plan: scope.plan,
@@ -37,27 +36,28 @@ export default async function handler(
     });
   }
 
-  // Verify the project belongs to the current organization
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, orgId: scope.orgId, deletedAt: null },
-  });
-  if (!project) {
-    return res.status(404).json({
-      error: "Project not found or does not belong to this organization",
-    });
-  }
-
   try {
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        orgId: scope.orgId,
+        deletedAt: null,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        error: "Project not found or does not belong to this organization",
+      });
+    }
+
     return routeByMethod(req, res, {
       GET: () => listProjectMemberships(req, res, projectId, scope.orgId),
       PUT: () => upsertProjectMembership(req, res, projectId, scope.orgId),
       DELETE: () => deleteProjectMembership(req, res, projectId, scope.orgId),
     });
   } catch (error) {
-    logger.error(
-      `Error handling project memberships for ${req.method} on project ${projectId}`,
-      error,
-    );
+    logger.error("Failed to process project memberships request", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 }

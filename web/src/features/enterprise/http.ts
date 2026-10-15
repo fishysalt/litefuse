@@ -1,18 +1,21 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 
-type MethodHandler = (req: NextApiRequest, res: NextApiResponse) => unknown;
-
 /**
- * Early method allowlist check. Returns true when the request method is one of
- * `allowed`; otherwise writes a 405 and returns false so the caller can bail out
- * before doing auth or database work.
+ * Method whitelist for a route. Returns true when the request method is
+ * allowed (nothing is written); otherwise answers 405 with the allowed
+ * methods and returns false so the caller can return early.
  */
 export function allowMethods(
   req: NextApiRequest,
   res: NextApiResponse,
   allowed: readonly string[],
 ): boolean {
-  if (allowed.includes(req.method ?? "")) return true;
+  const method = req.method ?? "";
+
+  if (allowed.includes(method)) {
+    return true;
+  }
+
   res.status(405).json({
     error: `Method not allowed. Allowed methods: ${allowed.join(", ")}`,
   });
@@ -20,26 +23,25 @@ export function allowMethods(
 }
 
 /**
- * Method allowlist + dispatch.
- *
- * Given a { method: handler } map:
- *   1. method not in the map → 405 (the error lists the allowed methods)
- *   2. method in the map → invoke the matching handler
- *
- * Adding a new HTTP method later only needs one new map entry; there is no
- * separate allowlist array or switch to keep in sync.
+ * Dispatches to the handler registered under the request method. The
+ * handler's return value (including a promise) is passed through untouched;
+ * unknown methods produce a 405 listing the registered method names.
  */
 export function routeByMethod(
   req: NextApiRequest,
   res: NextApiResponse,
-  handlers: Record<string, MethodHandler>,
+  handlers: Record<
+    string,
+    (req: NextApiRequest, res: NextApiResponse) => unknown
+  >,
 ): unknown {
   const handler = handlers[req.method ?? ""];
-  if (!handler) {
-    const allowed = Object.keys(handlers).join(", ");
-    return res
-      .status(405)
-      .json({ error: `Method not allowed. Allowed methods: ${allowed}` });
+
+  if (handler) {
+    return handler(req, res);
   }
-  return handler(req, res);
+
+  return res.status(405).json({
+    error: `Method not allowed. Allowed methods: ${Object.keys(handlers).join(", ")}`,
+  });
 }
