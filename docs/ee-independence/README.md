@@ -24,10 +24,12 @@
 4. **变异测试**：故意改坏 1–2 处行为，必须**恰好**命中预期的那几条断言、其余仍绿——否则"全绿"没有意义。
 5. **隔离实现**（Zhang Mo）：换入，原位替换。
 6. **四级门禁**（Select DB，工具 `~/SelectDB/litefuse-local/bin/ee-refactor-check.sh`）：
-   - **L0 静态**：prettier（改动文件）、web/worker tsgo、EE 边界（静态 MIT→EE 必须为 0）、i18n；
+   - **L0 静态**：prettier（**只查 CI 同口径的 js/jsx/ts/tsx/css**，markdown 为便于评审手工排版）、web/worker tsgo、EE 边界（静态 MIT→EE 必须为 0）、i18n；
    - **L1 行为**：特征测试改后仍绿；
    - **L2 批次回归**：重建 + 重启（服务必须由**被测 worktree**提供）+ smoke + 本族 servertest，与**冻结基线做集合等价比对**；
    - **L3 高风险 e2e**：仅 SSO / billing 等文件族。
+
+**本地前置（否则会得到方向相反的假结果）**：① `:3000` 必须由被测 worktree 提供，且 **license worktree 的 `.env` 才有 EE 许可密钥**——用另一个 worktree 启动会让 admin 接口按社区版返回 403；② 跑 EE servertest 前先补跑一次 CI 的 seed：`pnpm --filter=shared run db:seed`（依赖 `seed-org-id` 的套件缺失 fixture 时会以"外键冲突"形式红，看着像产品缺陷）。
 7. **相似度自查**（`bin/ee-similarity-report.mjs` → `similarity.md`）：EE-only 共享实质行、≥2 连续行共享块、token 5-gram Jaccard，**残余逐条给理由**。
 8. **留痕与提交**：每批次一个提交，含 `spec.md` / `record.md` / `similarity.md` / `verification.md`。
 
@@ -39,10 +41,12 @@
 | --- | --- | --- | --- | --- |
 | 0 | `SupportOrUpgradePage.tsx`（试点） | 33 行 | 已换入（`0d81779`） | `00-support-or-upgrade-page/` |
 | 1 | audit-logs 三个 UI 文件 | 285 行 | 已换入（`3c926c8`） | `01-audit-logs/` |
-| 2a | `enterprise/{apiKeys,memberships}` + 6 个路由包装器 | 19 文件 / 915 行 | 规格 + 44 条特征测试就绪，实现进行中 | `02-keys-and-memberships/` |
-| 2b | `enterprise/{organizations,projects}` + 5 个路由包装器 | 14 文件 / 1090 行 | 规格就绪（112 条用例） | `02-organizations-and-projects/` |
-| 3 | auth / SSO / SCIM（含 `adminApiAuth`、SCIM 三件套） | 待核定 | 未开始；前置＝修复 3 个既有环境红套件 | — |
+| 2a | `enterprise/{apiKeys,memberships}` + 6 个路由包装器 | 19 文件 / 915 行 | **已换入**（`602afc5`） | `02-keys-and-memberships/` |
+| 2b | `enterprise/{organizations,projects}` + 5 个路由包装器 | 14 文件 / 1090 行 | **已换入**（`dbd6292`；含一处先修复后固化的安全缺陷 `d6a6567`） | `02-organizations-and-projects/` |
+| 3 | auth / SSO / SCIM（含 `adminApiAuth`、SCIM 三件套） | 待核定 | 未开始；**前置已完成**（`e88728a`：3 个历史红套件已修，EE servertests 8/8 全绿） | — |
 | 4 | worker / billing（含 `billingService.ts` 969 行） | 待核定 | 未开始 | — |
+
+**门禁现状（2026-10-15，`e88728a` 之后）**：`ee-refactor-check.sh l2` **整项 PASS**——重建+重启（含"服务来源必须是被测 worktree"断言）、smoke 失败集合 8=8 与冻结快照一致、**EE servertests 8 套件 257 用例 0 失败**、SSO clienttest 3/3、worker billing units 10/10。新基线快照 `checks/baseline-ee-servertests.txt`（期望失败数 0）。smoke 的 8 项失败是本分支内容差异（2 项 legacy 重定向壳 + 6 项该分支不存在的 evaluator-v2 公共 API），保留为冻结快照。
 
 ## 4. 证据分三层（各自能证明什么）
 
