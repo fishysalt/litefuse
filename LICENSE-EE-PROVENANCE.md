@@ -8,6 +8,13 @@ independently authored.
 > Status: **open**. The evidence below measures text overlap. It does not, and
 > cannot, establish authorship of material that was previously adapted from
 > licensed code.
+>
+> Precise conclusion, so it is not read as more or less than it is: **sufficient
+> evidence has not been recorded in this repository** to state the applicable
+> license and the distribution basis of the affected files. This is *not* a
+> finding that any file infringes, and *not* a finding that no authorization
+> exists anywhere. Recording a maintainer's decision to merge would not itself
+> supply that authorization.
 
 ## 1. What is established
 
@@ -49,12 +56,19 @@ parameter):
    literals. It separates "re-worded" from "restructured" and is not a legal
    classification.
 
-Re-run with:
+Re-run with the scripts checked in beside this file:
 
 ```bash
-node recheck-derivation.mjs <repo> <upstream> --leftovers     # overlap
-node provenance-report.mjs <repo> <upstream> 5fb90ea          # this table
+# overlap of the current tree with upstream's commercial tree
+node scripts/license/recheck-derivation.mjs <repo> <upstreamRoot> --leftovers
+# regenerate the table in §4
+node scripts/license/provenance-report.mjs <repo> <upstreamRoot> 5fb90ea
 ```
+
+Verified against `langfuse/langfuse` at `main` = `0ea9fde`: the second command
+reproduces §4 exactly (29 rows). `<upstreamRoot>` is a checkout of upstream at
+that revision; the upstream revision is pinned here so the numbers stay
+comparable.
 
 ## 4. Evidence
 
@@ -133,3 +147,41 @@ Until one of those exists, the interim position is the one ANNEX C states: the
 Langfuse Enterprise License continues to apply to any file that is a derivative
 of the licensed material, and this repository's own license does not relicense
 it.
+
+## 6. Per-file applicable license and basis (required, currently incomplete)
+
+`LICENSE-EE` scopes itself by ANNEX A and `LICENSE` preserves third party
+components' own licenses, so "outside ANNEX A" alone does **not** mean MIT.
+Each affected file therefore needs its own line: which upstream material it
+corresponds to, which license that implicates, and what basis this repository
+has for distributing it. Filling this table is what "settling provenance"
+means in practice; moving a file into or out of ANNEX A does not.
+
+Legend — **Basis**: `authorization` (recorded grant) · `clean-room` (recorded
+independent implementation) · `upstream-MIT` (the file exists in upstream's MIT
+core) · **`—` = not recorded**, which is the current state for most rows.
+
+| File | Upstream correspondence (evidence) | Applicable license | Basis |
+| --- | --- | --- | --- |
+| `web/src/__tests__/server/memberships-api.servertest.ts` | upstream `web/src/__tests__/server/…` (MIT core, not `ee/`); `5fb90ea` only rewrote one expected response string | MIT | **upstream-MIT** |
+| `web/src/__tests__/server/organizations-api.servertest.ts` | same (one assertion string) | MIT | **upstream-MIT** |
+| `web/src/__tests__/server/projects-api.servertest.ts` | same (four assertion strings) | MIT | **upstream-MIT** |
+| `web/src/components/BatchExportTableButton.tsx` | upstream `web/src/components/BatchExportTableButton.tsx` (MIT core, not `ee/`) | MIT | **upstream-MIT** |
+| `web/src/components/SupportOrUpgradePage.tsx` | upstream has it **only** at `web/src/ee/features/billing/components/SupportOrUpgradePage.tsx` | Langfuse Enterprise | `—` (clean-room replacement written, see `docs/ee-independence/00-support-or-upgrade-page/`) |
+| `web/src/features/audit-logs/AuditLogsTable.tsx` | upstream has it **only** at `web/src/ee/features/audit-log-viewer/AuditLogsTable/AuditLogsTable.tsx` | Langfuse Enterprise | `—` (clean-room replacement written, see `docs/ee-independence/01-audit-logs/`) |
+| `web/src/features/audit-logs/AuditLogsSettingsPage.tsx` | upstream has it **only** at `web/src/ee/features/audit-log-viewer/AuditLogsSettingsPage.tsx` | Langfuse Enterprise | `—` (clean-room replacement written) |
+| `web/src/features/audit-logs/OrgAuditLogsSettingsPage.tsx` | upstream has it **only** at `web/src/ee/features/audit-log-viewer/OrgAuditLogsSettingsPage.tsx` | Langfuse Enterprise | `—` (clean-room replacement written) |
+| `web/src/server/adminApiAuth.ts` | upstream `web/src/ee/features/admin-api/server/adminApiAuth.ts` (12/15 distinctive identifiers shared) | Langfuse Enterprise | `—` |
+| `web/src/features/enterprise/**` (admin-api CRUD family) | upstream `web/src/ee/features/admin-api/server/**` (identifier correspondence 5/7–8/14 per file) | Langfuse Enterprise (ANNEX A) | `—` |
+| `web/src/features/enterprise/sso/{ssoProviders,createSsoConfig,ssoConfigSchema}.ts` | upstream `web/src/ee/features/multi-tenant-sso/**` (`ssoProviders.ts` shares 24/39 identifiers) | Langfuse Enterprise (ANNEX A) | `—` |
+| `worker/src/features/billing/{usageMetering,usageThresholds}.ts` | upstream `worker/src/ee/cloudUsageMetering/…`, `worker/src/ee/usageThresholds/…` | Langfuse Enterprise | `—` |
+| `web/src/features/billing/server/billingService.ts` | upstream `web/src/ee/features/billing/server/stripe/stripeWebhookHandler.ts` (21 shared identifiers) | Langfuse Enterprise | `—` |
+| `web/src/features/public-api/server/scim*.ts`, `web/src/pages/api/public/scim/**` | no upstream counterpart found in `main` (upstream's SCIM work is not in the inspected revision); shared identifiers match unrelated features only | undetermined | `—` (developer process to confirm) |
+| remaining `evaluators/workspace` and `web/src/pages/api/**` rows of §4 | no upstream file of the same name; individual origin not established | undetermined | `—` |
+
+**How to read this table**: a `—` in the last column means the repository cannot
+yet state a basis for distributing that file; it does not mean the file is
+infringing or that no permission exists. The remedy for any row is one of
+§5.1/§5.2 — record an authorization, or replace the file with a recorded
+clean-room implementation (the path this repository is taking, tracked in
+`docs/ee-independence/`), or remove it.

@@ -110,9 +110,14 @@ applicable component.
 ANNEX A - LICENSED MATERIALS ("Enterprise Software")
 
 The following paths in this repository are the licensed materials governed by
-this Enterprise License. Everything outside them is MIT (see "/LICENSE"); ANNEX B
-records the paths that stay MIT on purpose, even where they implement or gate
-enterprise functionality.
+this Enterprise License. Everything else that Litefuse is in a position to
+license is MIT (see "/LICENSE"); ANNEX B records the paths that stay MIT on
+purpose, even where they implement or gate enterprise functionality. This
+Enterprise License does not relicense any third party component: components
+incorporated into the Software stay under the original license of their owner,
+exactly as "/LICENSE" records. Where a file mixes Litefuse material with such a
+component, the component keeps its own license and the file is not offered under
+this Enterprise License as if that component were Litefuse's to license.
 
 Enterprise feature modules:
 - web/src/features/enterprise/**            (apiKeys, auth, memberships, organizations, plan, projects, sso, http.ts)
