@@ -563,12 +563,18 @@ describe("keys-and-memberships API characterisation", () => {
 
     // C19
     it("C19 rejects an unauthenticated POST with 401 (auth runs before method dispatch)", async () => {
+      // `makeAPICall` without an auth argument falls back to `Basic
+      // pk-lf-1234567890:sk-lf-1234567890`, which the seed fixtures make a REAL key.
+      // With that key the request authenticates and is then rejected by the plan gate
+      // (403), which says nothing about "auth runs before method dispatch". Send an
+      // explicitly invalid key so the case pins the 401 it is named after.
       const res = await makeAPICall(
         "POST",
         "/api/public/organizations/apiKeys",
         {
           note: "x",
         },
+        "Basic cGstbGYtaW52YWxpZDpzay1sZi1pbnZhbGlk", // pk-lf-invalid:sk-lf-invalid
       );
       expect(res.status).toBe(401);
       expect(typeof (res.body as any).error).toBe("string");
