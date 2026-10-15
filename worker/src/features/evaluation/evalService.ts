@@ -61,6 +61,8 @@ import {
   // TRACE/DATASET rules live in the v2 tables; the projections below need the
   // evaluator type and the generated Kysely row type of `job_configurations`.
   EvalTemplateType,
+  PersistedEvalOutputDefinitionSchema,
+  resolvePersistedEvalOutputDefinition,
   type DB,
 } from "@langfuse/shared";
 import { kyselyPrisma, prisma } from "@langfuse/shared/src/db";
@@ -224,26 +226,59 @@ type V2TraceConfigRow = {
 };
 
 /** Legacy row shape produced by the Kysely query below (select-all). */
-type LegacyConfigRow = Awaited<
-  ReturnType<typeof selectLegacyConfigs>
->[number];
+type LegacyConfigRow = Awaited<ReturnType<typeof selectLegacyConfigs>>[number];
 
 async function selectLegacyConfigs(params: {
   projectId: string;
   configId?: string;
   enforcedJobTimeScope?: JobTimeScope;
 }) {
-  let query = kyselyPrisma.$kysely
-    .selectFrom("job_configurations")
-    .selectAll()
-    .where(sql.raw("job_type::text"), "=", "EVAL")
-    .where("project_id", "=", params.projectId)
-    .where(sql.raw("status::text"), "=", "ACTIVE")
-    .where(sql.raw("blocked_at"), "is", null)
-    .where("target_object", "in", [
-      EvalTargetObject.TRACE,
-      EvalTargetObject.DATASET,
-    ]);
+  let query =
+    // ── LITEFUSE ADDITION (evaluators v2 backfill) ─────────────────────────
+    // Once the legacy→v2 backfill has run, the v2 tables own the scheduling and
+    // `job_configurations` is a backup: the legacy pages exist to look things up,
+    // not to do the work. So anything that has a v2 rule is excluded here.
+    //
+    // This is required for correctness, not just tidiness: `createEvalJobs` below
+    // merges both sources. Without the anti-join, every migrated configuration
+    // that is still active would be scheduled twice — once from
+    // `job_configurations`, once from its `evaluation_rules` row — and both the
+    // job execution insert and the queue id are unconstrained, so it would
+    // surface as duplicate job executions and duplicate scores (double provider
+    // spend) rather than as an error. The batch-action path still reaches this
+    // function for legacy ids, so it is reachable, not theoretical.
+    //
+    // Two id shapes have to be matched:
+    //   * `er.id = jc.id`               — the backfill's original shape, and the
+    //                                     only one that exists while a rolling
+    //                                     deploy still runs this code against a
+    //                                     database that has not been converted;
+    //   * `er.id = 'evr_' || jc.id`     — the shape 20261015000000_convert_
+    //                                     legacy_evaluators_to_event_rules
+    //                                     re-keys converted rules to. Keeping the
+    //                                     prefix in sync with that migration is
+    //                                     what makes the exclusion hold after the
+    //                                     conversion ran.
+    //
+    // The status is deliberately not part of the condition: it already lives on
+    // the rule (the backfill writes `INACTIVE` for historic-only configurations
+    // whose `time_scope` has no `NEW`, exactly as upstream does), and the rule is
+    // what the new UI shows and edits.
+    kyselyPrisma.$kysely
+      .selectFrom("job_configurations")
+      .selectAll()
+      .where(sql.raw("job_type::text"), "=", "EVAL")
+      .where("project_id", "=", params.projectId)
+      .where(sql.raw("status::text"), "=", "ACTIVE")
+      .where(sql.raw("blocked_at"), "is", null)
+      .where("target_object", "in", [
+        EvalTargetObject.TRACE,
+        EvalTargetObject.DATASET,
+      ]).where(sql<boolean>`NOT EXISTS (
+        SELECT 1 FROM "evaluation_rules" er
+        WHERE er."id" = "job_configurations"."id"
+           OR er."id" = 'evr_' || "job_configurations"."id"
+      )`);
 
   if (params.configId) {
     query = query.where("id", "=", params.configId);
@@ -324,12 +359,41 @@ const V2_EXECUTABLE_OUTPUT_DATA_TYPES = new Set([
   "CATEGORICAL",
 ]);
 
+/**
+ * The score data type a persisted output definition resolves to, or null when it
+ * is unreadable.
+ *
+ * Rows carry one of two shapes:
+ *   * the dataType-discriminated v2 shape, and
+ *   * the legacy `{ score, reasoning }` shape — which is what the legacy template
+ *     form wrote and therefore what the evaluators v2 backfill copies out of
+ *     `eval_templates.output_schema` into `evaluator_versions.output_definition`.
+ *
+ * The legacy shape is resolved through the shared resolver, which normalises it to
+ * NUMERIC — the same function `executeLlmEvaluator` compiles with, so a migrated
+ * evaluator is not skipped for a type the executor could have scored. Reading the
+ * raw `dataType` field instead would silently skip every backfilled evaluator.
+ *
+ * A declared dataType is still honoured as declared, and a definition that is
+ * neither shape (e.g. `{}`) stays unreadable. Both keep the previous skip
+ * behaviour; the key gate mirrors `getTemplateResultType`, the legacy UI's own
+ * classification.
+ */
 function readOutputDefinitionDataType(
   outputDefinition: unknown,
 ): string | null {
   if (!outputDefinition || typeof outputDefinition !== "object") return null;
-  const dataType = (outputDefinition as { dataType?: unknown }).dataType;
-  return typeof dataType === "string" ? dataType : null;
+  const definition = outputDefinition as Record<string, unknown>;
+
+  if ("dataType" in definition) {
+    return typeof definition.dataType === "string" ? definition.dataType : null;
+  }
+
+  if (!("score" in definition) && !("reasoning" in definition)) return null;
+
+  const parsed = PersistedEvalOutputDefinitionSchema.safeParse(definition);
+  if (!parsed.success) return null;
+  return resolvePersistedEvalOutputDefinition(parsed.data).dataType;
 }
 
 /**
@@ -1445,7 +1509,8 @@ export const evaluate = async ({
   );
 
   const environment =
-    getEnvironmentFromVariables(extractedVariables) ?? DEFAULT_TRACE_ENVIRONMENT;
+    getEnvironmentFromVariables(extractedVariables) ??
+    DEFAULT_TRACE_ENVIRONMENT;
 
   // Final fail-closed loop safeguard: never execute an eval whose target lives in
   // an internal Langfuse environment, regardless of which scheduling path created
@@ -1453,12 +1518,15 @@ export const evaluate = async ({
   // the extracted trace variables, so a mapping without any tracing-data variable
   // falls back to the default environment and relies on the scheduling guards.
   if (!isEvalTargetEnvironmentAllowed(environment)) {
-    logger.warn("Cancelling eval job targeting an internal Langfuse environment", {
-      jobExecutionId: event.jobExecutionId,
-      projectId: event.projectId,
-      environment,
-      traceId: job.jobInputTraceId,
-    });
+    logger.warn(
+      "Cancelling eval job targeting an internal Langfuse environment",
+      {
+        jobExecutionId: event.jobExecutionId,
+        projectId: event.projectId,
+        environment,
+        traceId: job.jobInputTraceId,
+      },
+    );
 
     await prisma.jobExecution.update({
       where: { id: job.id, projectId: event.projectId },
