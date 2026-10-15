@@ -59,14 +59,19 @@ export async function deleteOrganization(
   // subscription behind. A Stripe failure aborts the deletion.
   await cancelSubscriptionImmediatelyForOrganization(organizationId);
 
-  const deleted = await prisma.organization.delete({
-    where: { id: organizationId },
-  });
-
-  // Cached API keys carry their org; drop them so deleted-org keys stop working.
+  // Drop the cached API keys BEFORE the delete, not after: the helper resolves the
+  // keys to evict by reading `api_keys`, and the organization delete cascades those
+  // rows away. Invalidating afterwards therefore found nothing to evict and left a
+  // stale Redis entry that kept authenticating a deleted organization's key for the
+  // remaining TTL (LITE_FUSE_CACHE_API_KEY_ENABLED defaults to true, 300s).
+  // `deleteProject` already invalidates first for the same reason.
   await new ApiAuthService(prisma, redis).invalidateCachedOrgApiKeys(
     organizationId,
   );
+
+  const deleted = await prisma.organization.delete({
+    where: { id: organizationId },
+  });
 
   await auditLog({
     apiKeyId: "admin-api",
