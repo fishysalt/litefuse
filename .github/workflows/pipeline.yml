@@ -122,7 +122,9 @@ jobs:
           fi
 
   test-docker-build:
-    timeout-minutes: 20
+    # Raised from 20: the job builds two images (pnpm install plus a full Next.js
+    # production build, twice) before it even starts the stack under test.
+    timeout-minutes: 35
     runs-on: ubuntu-latest
     needs:
       - pre-job
