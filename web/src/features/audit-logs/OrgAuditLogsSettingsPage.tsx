@@ -22,16 +22,16 @@ export function OrgAuditLogsSettingsPage({ orgId }: { orgId: string }) {
     </p>
   ) : !canReadAuditLogs ? (
     <Alert>
-      <AlertTitle>{t("Access Denied")}</AlertTitle>
+      <AlertTitle>{t("Access restricted")}</AlertTitle>
       <AlertDescription>
-        {t("Contact your organization administrator to request access.")}
+        {t("Ask an organization administrator to grant you access.")}
       </AlertDescription>
     </Alert>
   ) : null;
 
   return (
     <>
-      <Header title={t("Organization Audit Logs")} />
+      <Header title={t("Organization Audit Log")} />
       <p className="text-muted-foreground mb-2 text-sm">
         {t(
           "Track who changed what in your organization and when. Monitor organization settings, project creation/deletion, and membership changes over time.",

@@ -22,16 +22,16 @@ export function AuditLogsSettingsPage({ projectId }: { projectId: string }) {
     </p>
   ) : !canReadAuditLogs ? (
     <Alert>
-      <AlertTitle>{t("Access Denied")}</AlertTitle>
+      <AlertTitle>{t("Access restricted")}</AlertTitle>
       <AlertDescription>
-        {t("Contact your project administrator to request access.")}
+        {t("Ask a project administrator to grant you access.")}
       </AlertDescription>
     </Alert>
   ) : null;
 
   return (
     <>
-      <Header title={t("Audit Logs")} />
+      <Header title={t("Project Audit Log")} />
       <p className="text-muted-foreground mb-2 text-sm">
         {t(
           "Track who changed what in your project and when. Monitor settings, configurations, and data changes over time.",
