@@ -1204,3 +1204,22 @@ PATCH 分两阶段：**先把所有操作解析/校验完（不写库）**，再
   2. **保留**列唯一索引 `users_email_key`（Prisma schema 声明的是它，删了会产生 drift），**新增**函数唯一索引 `users_email_lower_key ON users (lower(email))`。
 - 实测：先插 `CaseCheck@Example.com`，再插 `casecheck@example.com` → `duplicate key value violates unique constraint "users_email_lower_key"` → **"同一人的第二个账号"从此不可能**；8 套件 257 用例全绿。
 - 部署注意：若某个安装的存量数据存在小写化碰撞（同一人两条大小写不同的记录），必须先人工合并再应用本迁移。
+
+### K.2c 与上游对比后的最终语义（方案 B，已实现）
+
+**上游 Langfuse（`langfuse-latest` @ `0ea9fde`，同文件）的做法**：分发前同样按全局 id 取用户（第 393-406 行），但有一个守卫 `requireOrgMembership`（第 461-478 行），调用点只有三处——`GET`（488）、`DELETE`（739）、以及 `PUT` **仅当不是 provisioning 时**（`if (!isProvisioning && !requireOrgMembership(...))`，674）。**`PATCH` 从不调用**。
+
+| 点 | 上游 | 我们（适配后、本次修复前） | 现状（方案 B） |
+| --- | --- | --- | --- |
+| GET | 要求成员 | 要求成员（写在 `handleGet`） | 要求成员 |
+| DELETE | 要求成员（非成员 404） | **无检查 → 204（存在性探测）** | **要求成员（恢复上游）** |
+| PUT | 非 provisioning 时要求成员 | **无任何检查** | 姓名写入要求成员；仅 `active`/`roles` 放行（= 上游语义） |
+| PATCH | **无检查（可改他组织账号的全局姓名）** | 无检查 | **写入 `name`/`displayName` 时要求成员 → 比上游更严** |
+
+**结论**：核心弱点（PATCH 可跨组织改账号）**上游同样存在**，属继承；"DELETE 无检查"是我们适配时相对上游的**退化**，本次已恢复。方案 B 之后我们在每个方法上**不弱于上游**，并在 PATCH 上比上游更严。
+
+**刻意的取舍（与上游一致）**：`active: true` / `roles` 属"成员关系级"写入，任何账号都放行——这正是上游 `isProvisioning` 豁免的语义，也是多组织部署（同一个人被多个组织的 IdP 各自 provision）与被 deprovision 账号"复活"所必需。因此**"把已有账号加进本组织"仍会成功，但再也改不了对方账号的任何全局数据**（姓名等），DELETE 探测也已消失。
+
+**实测**（org A 的 key 操作只属于 org B 的账号）：GET 404；PATCH 姓名 **404 且姓名未变**；PUT（带姓名）404；DELETE 404；`PATCH active:true` 200 并把该账号加入 org A（符合上游语义）。8 套件 257 用例全绿，日志 `~/SelectDB/litefuse-local/checks/20261016-101032-scim-guard-B2.log`。
+
+> 上游这条 PATCH 缺校验值得反馈：可整理成一段可直接贴进 issue 的说明（含复现步骤与上游行号）。
