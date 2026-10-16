@@ -184,6 +184,13 @@ enterprise functionality:
 - web/src/features/public-api/server/adminApiGuard.ts (the auth + entitlement
   guard for the organization admin API, kept outside ANNEX A so a community route
   can reject an unavailable operation without loading licensed code first)
+- web/src/server/adminApiAuth.ts (instance-admin API-key verification). It is
+  statically imported by community code — web/src/server/api/trpc.ts builds its
+  adminProcedure on it, and the community background-migrations router uses that
+  procedure — so it has to stay MIT for the community edition to run without an
+  Enterprise License. Its early history adapted upstream code; it was rewritten
+  independently in the enterprise-independence pass, and its behaviour is pinned
+  by the EE server tests.
 - web/src/pages/api/public/projects/index.ts (route wrapper plus the
   community-edition GET; only the enterprise POST implementation it calls,
   web/src/features/enterprise/projects/createProject.ts, is licensed under this
