@@ -810,3 +810,12 @@
 - 事实：它被 **MIT 文件静态导入**（`web/src/server/api/trpc.ts` 的 `adminProcedure`，并被 `features/background-migrations/server/background-migrations-router.ts` 使用）；`check-ee-boundary.mjs` 也把它当 MIT。
 - 按"**社区版是否需要它才能正常运行**"这一判据：社区功能（后台迁移的重试入口）需要它 → 应登记为 **ANNEX B（MIT）**；其"上游衍生"问题由本批次的净室重写解决。
 - 待办：把 `web/src/server/adminApiAuth.ts` 显式写入 `LICENSE-EE` 的 ANNEX B 清单（本批次提交时一并处理）。
+
+### K.1b 决策反转（2026-10-15，主控）：fail-closed 改为**保留 fail-open**
+
+- **新决策**：`loadSsoConfigs` 的 fail-closed 改造**已回退**（提交信息见下），SSO 配置读取失败/单行不合法时**保持原有 fail-open 行为**（吞掉读取错误、把空结果缓存 60s、跳过不合法行）。
+- **理由（主控）**：读不到配置时，系统**无法区分**"已登记域的用户"与"未登记域的自由用户"——两者都得不到"该域是否被强制"这一信息。fail-closed 会**误伤自由用户**（数据库抖动期间他们也登不上）。在"可能的策略失效"与"确定的功能误伤"之间，本项目选择**优先避免误伤**。
+- **被否掉的替代方案（记录备查）**：保留 last-known-good 快照（读失败时沿用上一次成功的集合）。技术上更精确——**因为"登记一个域"必须写数据库，所以读故障期间不可能出现新登记，上一次的集合在故障期间恰好是正确的**，从而能同时保住"已登记域仍强制"与"自由用户不受影响"；仅在"从未成功读过"的冷启动窗口才需要选择全拒。该方案需额外维护快照（可选放 Redis）并让 `createSsoConfig` 同步更新缓存，本轮不做。
+- **残留风险（明确接受，写入已知风险）**：数据库读失败或某行配置不合法期间，被强制 SSO 的域会退化为可用密码登录；该窗口内的强制失效不会被用户感知。运维侧建议对 `Unable to read the SSO configs from the database` 这条日志告警——它是"强制 SSO 静默失效"的唯一信号。
+- **对实现者的要求**：按**原有行为**实现（§16 的开放问题 1/2 恢复为"已知且有意保留"），不要自行 fail-closed。
+- 相应提交：`ed9d88b` 引入 fail-closed，其后一次提交按本节回退（仅回退 `ssoProviders.ts`；同批次的 SCIM `count` 上限保留）。

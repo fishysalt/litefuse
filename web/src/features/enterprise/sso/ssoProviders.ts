@@ -41,70 +41,66 @@ type ClientConfig =
   | { client: { token_endpoint_auth_method: TokenEndpointAuthMethod } }
   | Record<string, never>;
 
-// Local cache of SSO configs. Only a successful read is cached: a failed one is
-// never remembered, because "we could not read the configs" must not turn into
-// "there are no configs" (see loadSsoConfigs).
+// Local cache of SSO configs
 let ssoConfigCache: {
   data: SsoProviderConfig[];
+  failedToFetch: boolean;
   timestamp: number;
-} = { data: [], timestamp: 0 };
+} = { data: [], failedToFetch: false, timestamp: 0 };
 
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const FAILED_RETRY_AFTER = 60 * 1000; // 1 minute
 const DB_MAX_WAIT = 5 * 1000;
 const DB_TIMEOUT = 5 * 1000;
 
 /**
  * Read the SSO configs from the database and parse them into schema objects,
- * serving the local cache while it is still fresh.
- *
- * FAILS CLOSED. An organization can require that its domain authenticates through
- * SSO; the callers below answer "which provider serves this domain" and a `null`
- * answer means "no SSO here", which lets the password form through. So an
- * unreadable or untrustworthy config set must not be reported as an empty one:
- * the error is propagated instead of being swallowed, and nothing is cached, so
- * the login is refused rather than downgraded. The previous behaviour cached an
- * empty list for a minute after a failed read, which silently disabled SSO
- * enforcement for every enforced domain until the next successful read.
+ * serving the local cache while it is still fresh. Rows that no longer match
+ * the schema are skipped instead of failing the whole lookup.
  */
 async function loadSsoConfigs(): Promise<SsoProviderConfig[]> {
   if (!isMultiTenantSsoAvailable) return [];
 
-  const cacheIsStale = Date.now() - ssoConfigCache.timestamp > CACHE_TTL;
+  const retryAfter = ssoConfigCache.failedToFetch
+    ? FAILED_RETRY_AFTER
+    : CACHE_TTL;
+  const cacheIsStale = Date.now() - ssoConfigCache.timestamp > retryAfter;
 
   if (cacheIsStale) {
-    let dbConfigs: SsoConfig[];
+    let dbConfigs: SsoConfig[] = [];
+    let failedToFetch = false;
     try {
       dbConfigs = await prisma.$transaction(
         async (tx) => tx.ssoConfig.findMany(),
         { maxWait: DB_MAX_WAIT, timeout: DB_TIMEOUT },
       );
     } catch (e) {
-      logger.error(
-        "Unable to read the SSO configs from the database - refusing the login instead of assuming no SSO is configured",
-        e,
-      );
+      logger.error("Unable to read the SSO configs from the database", e);
       traceException(e);
-      throw e;
+      // The empty result is cached so an unreachable database is not retried
+      // on every request.
+      failedToFetch = true;
     }
 
-    const parsed = dbConfigs.map((row) => {
-      try {
-        return ssoProviderSchema.parse(row);
-      } catch (e) {
-        // Skipping the row would silently drop SSO enforcement for its domain,
-        // which is the same downgrade as reporting an empty config set.
-        logger.error(
-          `Refusing to serve the SSO config of domain ${row.domain}: it does not match the schema`,
-          e,
-        );
-        traceException(e);
-        throw e;
-      }
-    });
+    const parsed = dbConfigs
+      .map((row) => {
+        try {
+          return ssoProviderSchema.parse(row);
+        } catch (e) {
+          logger.error(
+            `Skipping SSO config of domain ${row.domain}: invalid schema`,
+            e,
+          );
+          traceException(e);
+          return null;
+        }
+      })
+      .filter((config): config is SsoProviderConfig => config !== null);
 
     ssoConfigCache = {
       data: parsed,
       timestamp: Date.now(),
+      failedToFetch,
     };
   }
 
