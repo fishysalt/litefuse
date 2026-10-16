@@ -1196,3 +1196,11 @@ PATCH 分两阶段：**先把所有操作解析/校验完（不写库）**，再
   1. **SCIM 是否也走同意**：若走，IdP 的 provision/复活只会产生"邀请"，用户在被接受前不是成员——IdP 侧会看到"用户未激活/GET 404"并可能重试；若不豁免，纯 provisioning 语义被改变。
   2. **公共 API 的契约破坏**：`PUT /api/public/organizations/memberships` 现在返回 200 + 成员关系；改为邀请后需返回"已发送邀请"，属破坏性变更（SDK/脚本会受影响）。
   3. **范围**：建议**只对"加入组织"要求同意**；项目成员关系（组织内部）保持直接写入（对方已在组织内，已同意过）。
+
+### K.4b 已修复：邮箱改为大小写不敏感唯一（提交见下）
+
+- 迁移 `packages/shared/prisma/migrations/20261016000000_case_insensitive_user_email/migration.sql`：
+  1. 把存量 `users.email` 小写化（应用前已核对：**0 行大小写不规范、0 组小写化碰撞**）；
+  2. **保留**列唯一索引 `users_email_key`（Prisma schema 声明的是它，删了会产生 drift），**新增**函数唯一索引 `users_email_lower_key ON users (lower(email))`。
+- 实测：先插 `CaseCheck@Example.com`，再插 `casecheck@example.com` → `duplicate key value violates unique constraint "users_email_lower_key"` → **"同一人的第二个账号"从此不可能**；8 套件 257 用例全绿。
+- 部署注意：若某个安装的存量数据存在小写化碰撞（同一人两条大小写不同的记录），必须先人工合并再应用本迁移。
