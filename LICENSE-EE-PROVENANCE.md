@@ -185,3 +185,22 @@ infringing or that no permission exists. The remedy for any row is one of
 §5.1/§5.2 — record an authorization, or replace the file with a recorded
 clean-room implementation (the path this repository is taking, tracked in
 `docs/ee-independence/`), or remove it.
+
+### 6.1 Recorded conclusion (wording per the reviewer's suggestion)
+
+**The license declarations and provenance inventory do not clearly identify the
+applicable license and distribution basis for each affected file.**
+
+That is the finding, stated precisely: not that any listed file infringes, and not that
+no authorization exists anywhere, but that the evidence needed to settle each file has
+not been recorded in this repository. Two consequences follow and are recorded rather
+than assumed away:
+
+- Changing the ANNEX A path list is **not** a remedy. ANNEX A applies Litefuse's
+  enterprise license; it does not grant rights in material governed by someone else's
+  license, and rights in newly added material do not replace rights in preexisting
+  material. A file that derives from upstream commercially licensed code needs a
+  distribution basis (authorization, an independent rewrite, or removal) regardless of
+  which list it appears in.
+- A maintainer's decision to merge does not supply that basis either; it settles what
+  this repository ships today, not what it is permitted to ship.
