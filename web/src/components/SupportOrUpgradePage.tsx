@@ -1,19 +1,25 @@
 import { AlertCircle } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/src/components/ui/alert";
+
 import { useTranslation } from "react-i18next";
-
-import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
-
-export const SupportOrUpgradePage = () => {
+/**
+ * Placeholder screen for pages whose RBAC scope the current user does not
+ * hold. It only explains the restriction; the caller decides whether to render
+ * it at all.
+ */
+export function SupportOrUpgradePage() {
   const { t } = useTranslation();
 
   return (
-    <div className="flex h-full w-full items-center justify-center p-6">
-      <div className="w-full max-w-md">
+    <div className="flex h-full w-full p-6">
+      <div className="m-auto w-full max-w-md">
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>{t("Access Restricted")}</AlertTitle>
-          <AlertDescription className="space-y-2">
-            <p>{t("This feature requires additional permissions")}</p>
+          <AlertDescription>
+            <p className="mb-2">
+              {t("This feature requires additional permissions")}
+            </p>
             <p>
               {t(
                 "Contact your system/project administrator for access. Need help? Reach out to support.",
@@ -24,4 +30,4 @@ export const SupportOrUpgradePage = () => {
       </div>
     </div>
   );
-};
+}

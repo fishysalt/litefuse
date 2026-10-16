@@ -1,40 +1,38 @@
-import { prisma } from "@langfuse/shared/src/db";
 import { type NextApiRequest, type NextApiResponse } from "next";
-import * as z from "zod/v4";
+import { prisma } from "@langfuse/shared/src/db";
+import { Role } from "@langfuse/shared";
+import { z } from "zod/v4";
 
 const DeleteOrgMembershipBody = z.object({
   userId: z.string(),
 });
 
+/**
+ * Delete an organization membership (DELETE /api/public/organizations/memberships).
+ * Uses deleteMany so a missing membership does not throw.
+ */
 export async function deleteOrgMembership(
   req: NextApiRequest,
   res: NextApiResponse,
   orgId: string,
 ) {
-  const parsedBody = DeleteOrgMembershipBody.safeParse(req.body);
-  if (!parsedBody.success) {
+  const parsed = DeleteOrgMembershipBody.safeParse(req.body);
+  if (!parsed.success) {
     return res.status(400).json({
       error: "Invalid request body",
-      details: parsedBody.error.issues,
+      details: parsed.error.issues,
     });
   }
 
-  const { userId } = parsedBody.data;
-
-  const membership = await prisma.organizationMembership.findUnique({
-    where: {
-      orgId_userId: { orgId, userId },
-    },
+  // Last-OWNER protection (matches the UI's membersRouter.deleteOrgMembership):
+  // do not allow deleting the only OWNER of the organization, so it never ends up ownerless.
+  const existing = await prisma.organizationMembership.findUnique({
+    where: { orgId_userId: { orgId, userId: parsed.data.userId } },
   });
-
-  if (membership?.role === "OWNER") {
+  if (existing?.role === Role.OWNER) {
     const owners = await prisma.organizationMembership.count({
-      where: {
-        orgId,
-        role: "OWNER",
-      },
+      where: { orgId, role: Role.OWNER },
     });
-
     if (owners === 1) {
       return res.status(403).json({
         error:
@@ -44,11 +42,11 @@ export async function deleteOrgMembership(
   }
 
   await prisma.organizationMembership.deleteMany({
-    where: { orgId, userId },
+    where: { orgId, userId: parsed.data.userId },
   });
 
   return res.status(200).json({
     message: "Organization membership removed",
-    userId,
+    userId: parsed.data.userId,
   });
 }

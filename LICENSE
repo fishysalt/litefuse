@@ -1,5 +1,10 @@
 Copyright (c) 2023-2025 Langfuse GmbH
 
+Litefuse is a fork of Langfuse (https://github.com/langfuse/langfuse), including the
+evaluator work in this repository. The community core is forked from the MIT-licensed
+Langfuse core and keeps the upstream copyright notice above; the paths listed in ANNEX A
+of "LICENSE-EE" are Litefuse's own work and are licensed under that file.
+
 Portions of this software are licensed as follows:
 
 - Content that resides in the paths listed in ANNEX A of "LICENSE-EE", other

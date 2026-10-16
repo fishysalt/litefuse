@@ -1,8 +1,12 @@
-import { prisma } from "@langfuse/shared/src/db";
 import { type NextApiRequest, type NextApiResponse } from "next";
+import { prisma } from "@langfuse/shared/src/db";
 
+/**
+ * List the projects of an organization (GET /api/public/organizations/projects).
+ * Only returns non-deleted projects (deletedAt is null).
+ */
 export async function listProjects(
-  _req: NextApiRequest,
+  req: NextApiRequest,
   res: NextApiResponse,
   orgId: string,
 ) {
@@ -17,5 +21,13 @@ export async function listProjects(
     },
   });
 
-  return res.status(200).json({ projects });
+  return res.status(200).json({
+    projects: projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      metadata: p.metadata,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    })),
+  });
 }

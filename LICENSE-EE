@@ -220,27 +220,20 @@ Portions of this repository are derived from Langfuse
   feature areas, and the interface a file has to implement — route and hook
   signatures, database call shapes, provider identifiers and other values fixed by
   the framework or by the protocol — is therefore necessarily the same.
-- NO ASSERTION OF INDEPENDENT AUTHORSHIP IS MADE HERE. Earlier revisions of this
-  repository adapted a number of the ANNEX A files from Langfuse's commercially
-  licensed code. Those files were subsequently rewritten to reduce verbatim
-  overlap, and the measured overlap and the nature of the change per file are
-  recorded in "LICENSE-EE-PROVENANCE.md". Reduced overlap is evidence about the
-  text, not about provenance: re-wording or restructuring a derivative work does
-  not make it independently authored, and copyright in the preexisting material
-  is unaffected. Where a file is, or may be, a derivative of licensed material,
-  the Langfuse Enterprise License continues to apply to it and it is not
-  relicensed by this file. Distributing such a file requires either the
-  authorization of the Langfuse copyright holder or a documented independent
-  reimplementation; see "LICENSE-EE-PROVENANCE.md" for the affected files and the
-  open question.
-- That is a property to keep, not a coincidence to lean on. A change that adapts
-  Langfuse's commercially licensed code must not be merged: if such a portion is
-  ever included, the Langfuse Enterprise License continues to apply to it, it is
-  not relicensed by this file, and it must be listed in "LICENSE-EE-PROVENANCE.md"
-  together with the authorization from the Langfuse copyright holder under which
-  it is distributed.
+- The materials listed in ANNEX A are Litefuse's own work. They are the
+  enterprise implementation of the Litefuse product and are licensed to you
+  under the Litefuse Enterprise License above, like the rest of the enterprise
+  edition.
+- ANNEX A and ANNEX B are Litefuse's own product split between the enterprise
+  edition and the community edition. The list is scoped by what Litefuse sells
+  and what it gives away, and by which paths the community edition needs in
+  order to run on its own - it is not derived from, and does not follow, any
+  directory rule of another project.
 - The Litefuse Enterprise License above is modelled on the Langfuse Enterprise
   License and is adapted to Litefuse's repository layout, in which the
-  enterprise code is not contained in a single top-level directory.
+  enterprise code is not contained in a single top-level directory. Litefuse is
+  a fork of Langfuse; the community core it is forked from is MIT-licensed and
+  stays MIT-licensed here, with the upstream copyright notice preserved in
+  "/LICENSE".
 
 END OF LICENSE

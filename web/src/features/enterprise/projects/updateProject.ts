@@ -1,74 +1,57 @@
+import { type NextApiRequest, type NextApiResponse } from "next";
+import { prisma, type Prisma } from "@langfuse/shared/src/db";
+import {
+  logger,
+  enqueueDorisSplitTableProvisioning,
+  type ApiAccessScope,
+} from "@langfuse/shared/src/server";
 import { projectNameSchema } from "@/src/features/auth/lib/projectNameSchema";
 import { projectRetentionSchema } from "@/src/features/auth/lib/projectRetentionSchema";
 import { hasEntitlementBasedOnPlan } from "@/src/features/entitlements/server/hasEntitlement";
-import { prisma, type Prisma } from "@langfuse/shared/src/db";
-import {
-  enqueueDorisSplitTableProvisioning,
-  logger,
-  type ApiAccessScope,
-} from "@langfuse/shared/src/server";
-import { type NextApiRequest, type NextApiResponse } from "next";
+import { RETENTION_FLOOR_DAYS } from "@langfuse/shared";
 
-type MetadataResult =
-  | { ok: true; value: Prisma.InputJsonValue | undefined }
-  | { ok: false; message: string };
+type MetadataUpdate =
+  | { state: "absent" }
+  | { state: "object"; value: Prisma.InputJsonValue }
+  | { state: "undecodable"; reason: string }
+  | { state: "wrong-type" };
 
-function decodeProjectMetadata(metadata: unknown): MetadataResult {
-  if (metadata === undefined) {
-    return { ok: true, value: undefined };
+/**
+ * `metadata` may be sent as a JSON object or as a JSON encoded string. Only the
+ * decoded object is kept; every other outcome is described so the handler can
+ * answer with the right 400.
+ */
+function normaliseMetadataUpdate(input: unknown): MetadataUpdate {
+  if (input === undefined) {
+    return { state: "absent" };
   }
 
-  let value = metadata;
-  if (typeof metadata === "string") {
+  let candidate: unknown = input;
+  if (typeof input === "string") {
     try {
-      value = JSON.parse(metadata);
+      candidate = JSON.parse(input);
     } catch (error) {
-      return {
-        ok: false,
-        message: `Metadata is not decodable JSON: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      };
+      return { state: "undecodable", reason: `${error}` };
     }
   }
 
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return { ok: false, message: "Metadata must be a JSON object." };
-  }
-
-  return { ok: true, value: value as Prisma.InputJsonValue };
-}
-
-function validateRetention(
-  retention: unknown,
-  scope: ApiAccessScope,
-): { ok: true } | { ok: false; status: number; message: string } {
-  if (!projectRetentionSchema.safeParse({ retention }).success) {
-    return {
-      ok: false,
-      status: 400,
-      message: "Invalid retention value. Must be 0 or at least 7 days.",
-    };
-  }
-
   if (
-    (retention as number) > 0 &&
-    !hasEntitlementBasedOnPlan({
-      plan: scope.plan,
-      entitlement: "data-retention",
-    })
+    typeof candidate !== "object" ||
+    candidate === null ||
+    Array.isArray(candidate)
   ) {
-    return {
-      ok: false,
-      status: 403,
-      message:
-        "A retention period above zero requires the data-retention entitlement.",
-    };
+    return { state: "wrong-type" };
   }
 
-  return { ok: true };
+  return { state: "object", value: candidate as Prisma.InputJsonValue };
 }
 
+/**
+ * Update a project (PUT /api/public/projects/{id}).
+ *
+ * The where clause pins both the project id and the organization id, so a key
+ * of one organization can never modify a project of another one.
+ */
 export async function updateProject(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -76,7 +59,11 @@ export async function updateProject(
   scope: ApiAccessScope,
 ) {
   try {
-    const { name, retention, metadata } = req.body;
+    const {
+      name,
+      retention: requestedRetention,
+      metadata: rawMetadata,
+    } = req.body;
 
     if (!projectNameSchema.safeParse({ name }).success) {
       return res.status(400).json({
@@ -84,57 +71,87 @@ export async function updateProject(
       });
     }
 
-    const decodedMetadata = decodeProjectMetadata(metadata);
-    if (!decodedMetadata.ok) {
-      return res.status(400).json({ message: decodedMetadata.message });
+    const metadata = normaliseMetadataUpdate(rawMetadata);
+    if (metadata.state === "undecodable") {
+      return res.status(400).json({
+        message: `Metadata is not decodable JSON: ${metadata.reason}`,
+      });
+    }
+    if (metadata.state === "wrong-type") {
+      return res.status(400).json({
+        message: "Metadata must be a JSON object.",
+      });
     }
 
-    if (retention !== undefined) {
-      const retentionValidation = validateRetention(retention, scope);
-      if (!retentionValidation.ok) {
-        return res.status(retentionValidation.status).json({
-          message: retentionValidation.message,
+    if (requestedRetention !== undefined) {
+      const retentionIsValid = projectRetentionSchema.safeParse({
+        retention: requestedRetention,
+      }).success;
+      if (!retentionIsValid) {
+        return res.status(400).json({
+          message: `Invalid retention value. Must be 0 or at least ${RETENTION_FLOOR_DAYS} days.`,
+        });
+      }
+
+      if (
+        requestedRetention > 0 &&
+        !hasEntitlementBasedOnPlan({
+          entitlement: "data-retention",
+          plan: scope.plan,
+        })
+      ) {
+        return res.status(403).json({
+          message:
+            "A retention period above zero requires the data-retention entitlement.",
         });
       }
     }
 
-    const patch: Prisma.ProjectUpdateInput = { name };
-    if (retention !== undefined) {
-      patch.retentionDays = retention;
+    // Only the fields the caller actually sent are patched; omitted ones keep
+    // their stored value.
+    const patch: {
+      name: string;
+      retentionDays?: number;
+      metadata?: Prisma.InputJsonValue;
+    } = { name };
+    if (requestedRetention !== undefined) {
+      patch.retentionDays = requestedRetention;
     }
-    if (decodedMetadata.value !== undefined) {
-      patch.metadata = decodedMetadata.value;
+    if (metadata.state === "object") {
+      patch.metadata = metadata.value;
     }
 
-    const project = await prisma.project.update({
+    const savedProject = await prisma.project.update({
       where: { id: projectId, orgId: scope.orgId },
       data: patch,
-      select: {
-        id: true,
-        name: true,
-        retentionDays: true,
-        metadata: true,
-      },
+      select: { id: true, name: true, retentionDays: true, metadata: true },
     });
 
-    if (retention !== undefined) {
-      try {
-        await enqueueDorisSplitTableProvisioning(projectId);
-      } catch (error) {
-        logger.error("Failed to enqueue Doris split table provisioning", error);
-      }
+    // Project.retentionDays is the single source of truth, so a changed value
+    // also has to reach the split tables' dynamic_partition TTL. The enqueue is
+    // idempotent and a no-op while no control row exists (compare setRetention
+    // in the UI's projectsRouter).
+    if (requestedRetention !== undefined) {
+      await enqueueDorisSplitTableProvisioning(projectId).catch((error) =>
+        logger.error(
+          `[table-split] could not enqueue TTL re-provisioning for ${projectId}`,
+          error,
+        ),
+      );
     }
 
-    return res.status(200).json({
-      id: project.id,
-      name: project.name,
-      metadata: project.metadata ?? {},
-      ...(project.retentionDays
-        ? { retentionDays: project.retentionDays }
-        : {}),
-    });
+    const payload: Record<string, unknown> = {
+      id: savedProject.id,
+      name: savedProject.name,
+      metadata: savedProject.metadata ?? {},
+    };
+    if (savedProject.retentionDays) {
+      payload.retentionDays = savedProject.retentionDays;
+    }
+
+    return res.status(200).json(payload);
   } catch (error) {
-    logger.error("Failed to update project", error);
+    logger.error("Could not update the project", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 }
