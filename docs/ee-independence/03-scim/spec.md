@@ -1165,3 +1165,34 @@ PATCH 分两阶段：**先把所有操作解析/校验完（不写库）**，再
   3. 保持 **403 的原文案**与响应结构不变（IdP 侧零感知），并发场景下最坏变成"重试/500"，而不是"组织没有 owner"；
   4. SCIM 侧与 tRPC 侧各自都有一份 last-OWNER 逻辑，应抽成同一个守卫，避免两边行为漂移；
   5. 配一条并发回归测试：同时发两个降级请求，断言**恰好一个成功**且该组织仍有 ≥1 个 OWNER。
+
+### K.2b 已修复（提交见下）：跨组织写已封堵；"复活"路径保留
+
+**实现**（`pages/api/public/scim/Users/[id].ts`，分发之前）：取到用户后要求存在 `organizationMembership(orgId, user.id)`；**若不存在，再看该账号是否在别的组织有成员关系**——
+- 有（属于别的组织）→ **404 `"User not found in organization"`**；
+- 没有（已不属于任何组织的孤儿账号）→ 放行，走原有逻辑（这正是 IdP 的"重新激活被 deprovision 用户"路径）。
+
+**为什么不能简单"无成员即 404"**：现有验收测试里的 `PUT … {active:true}`「reactivate a user」用例，其前置就是**先删掉该用户在本组织的成员关系**——"复活"与"跨组织拉人"在请求形状上完全相同，唯一区别是**该账号是否还属于别的组织**。第一版粗暴守卫把 2 条复活用例打红，因此改为上述判据。
+
+**实测（跨组织场景，受害者在 org B 有成员关系）**：
+| 请求（用 org A 的 key） | 修复前 | 修复后 |
+| --- | --- | --- |
+| GET | 404 | 404 |
+| PATCH displayName | **200，全局 `users.name` 被改** | **404，姓名未变** |
+| PATCH active:true | **200，账号被加入 org A** | **404，成员关系未新增** |
+| PUT | **200，全局姓名被改** | 404 |
+
+回归：8 套件 257 用例全绿（含 `scim-api` 的复活用例）。日志 `~/SelectDB/litefuse-local/checks/20261015-184756-scim-crossorg-guard-v3.log`。
+
+**残留（有意保留，待"同意"改造一并处理）**：孤儿账号（不属于任何组织）仍可被任一组织 provision 或改全局姓名——这是"复活"语义的必然结果；把它也纳入"需要对方同意"的范畴属于 §K.6 的改造范围。
+
+### K.6 待决策：把"拉已有用户进组"改为需要对方同意
+
+**结论：技术上可行，现有机制可直接复用。**
+- 现成机制：`MembershipInvitation` 模型（`email` + `orgId` + `orgRole` + 可选 project，`@@unique([email, orgId])`）；`membersRouter` 已有**创建邀请**（第 339 行）与**接受邀请**（第 476-514 行，接受后由第 288/303 行建成员关系）；新用户注册时由 `createProjectMembershipsOnSignup` 消费邀请（第 182-213 行）。
+- 改造点（把"直接建成员关系"改为"建邀请"）：`features/rbac/server/membersRouter.ts`（UI 加成员，第 253/288/303/697 行）、`features/enterprise/memberships/{upsertOrgMembership,upsertProjectMembership}.ts`（公共 API，ANNEX A）、SCIM `pages/api/public/scim/Users/index.ts:376`（POST 建号）与 `Users/[id].ts:208`（`active:true` provision）。
+- **不应改**的路径：`web/src/initialize.ts`（实例初始化建首个管理员）、`createProjectMembershipsOnSignup.ts`（它本身就是"接受邀请"的落地点）。
+- **需产品决策**（三条，决定后我再实现）：
+  1. **SCIM 是否也走同意**：若走，IdP 的 provision/复活只会产生"邀请"，用户在被接受前不是成员——IdP 侧会看到"用户未激活/GET 404"并可能重试；若不豁免，纯 provisioning 语义被改变。
+  2. **公共 API 的契约破坏**：`PUT /api/public/organizations/memberships` 现在返回 200 + 成员关系；改为邀请后需返回"已发送邀请"，属破坏性变更（SDK/脚本会受影响）。
+  3. **范围**：建议**只对"加入组织"要求同意**；项目成员关系（组织内部）保持直接写入（对方已在组织内，已同意过）。

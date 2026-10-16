@@ -376,6 +376,38 @@ export default async function handler(
     });
   }
 
+  // The lookup above is global (by user id), so it also finds accounts that belong to
+  // another organization, and every method below then acts on the *account*: PATCH/PUT
+  // write the global `users` row and can provision it into the caller's organization,
+  // and DELETE would reveal whether the id exists elsewhere.
+  //
+  // An account that belongs to another organization must not be addressable from here.
+  // An account that belongs to no organization at all is the deprovisioned case the IdP
+  // legitimately reactivates (`active: true`), so it stays addressable - there is no
+  // other tenant whose data could be touched.
+  const membership = await prisma.organizationMembership.findUnique({
+    where: {
+      orgId_userId: {
+        orgId: authCheck.scope.orgId,
+        userId: user.id,
+      },
+    },
+  });
+
+  if (!membership) {
+    const membershipsElsewhere = await prisma.organizationMembership.count({
+      where: { userId: user.id },
+    });
+
+    if (membershipsElsewhere > 0) {
+      return res.status(404).json({
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        detail: "User not found in organization",
+        status: 404,
+      });
+    }
+  }
+
   // Route to the appropriate handler based on HTTP method
   try {
     switch (req.method) {
