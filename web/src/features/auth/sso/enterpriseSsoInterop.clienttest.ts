@@ -200,3 +200,7 @@ describe("enterprise SSO gateway ↔ ssoProviders interoperability (X2/X4)", () 
     expect(enterpriseFactory).not.toHaveBeenCalled();
   });
 });
+
+// Marks this file as a module: without it, its top-level `type Gateway` is a global
+// declaration and collides with the identical one in enterpriseSso.clienttest.ts
+export {};
