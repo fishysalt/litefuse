@@ -204,3 +204,43 @@ than assumed away:
   which list it appears in.
 - A maintainer's decision to merge does not supply that basis either; it settles what
   this repository ships today, not what it is permitted to ship.
+
+## 7. Where the detailed process records live
+
+The per-batch evidence — the behaviour specification each implementer was given, the
+implementation record (the implementer's declaration and the exact search commands it
+ran), the similarity measurement, and the verification evidence — is **not** kept in this
+repository: those files are process and provenance evidence rather than product content,
+and they belong with the legal record rather than in every checkout of the application.
+
+They are published, versioned, at
+**https://github.com/fishysalt/litefuse-ee-independence-records** (this reference is
+pinned to tag `v1`). The batch index there maps each record to the commit in this
+repository that it documents, so a reader can move from a licence claim to the evidence
+behind it and back.
+
+Two notes about that repository:
+
+- The similarity reports there are **redacted**: the single upstream source lines they
+  originally quoted are replaced with a marker, because republishing those lines is a
+  distribution of third-party licensed material that this project does not need to make.
+  What is kept is the evidence that matters - file, line number, the number of shared
+  lines, whether they form a block of two or more consecutive lines, and the reason a
+  residual is acceptable. Unredacted reports are available to reviewers on request.
+- Records are corrected by **appending** a dated section, never by editing an earlier one;
+  where a decision was reversed (for example the SSO fail-closed change in batch 3a), both
+  the original decision and its reversal remain visible.
+
+Where a test file in this repository names a specification path under
+`docs/ee-independence/...`, that path is the history of the file: the specification was
+present in the tree when the tests were written and now lives in the records repository at
+the batch directory of the same name.
+
+## 8. Open loose ends (recorded, not resolved)
+
+- **Git history.** Rewriting the current tree does not remove the earlier adapted code from
+  this repository's history, nor from the published `license-ee` branch. Whether that
+  history is kept (with a recorded basis) or rewritten is an open decision.
+- **Per-file basis.** The `—` rows in section 6 are files whose applicable licence and
+  distribution basis have not been recorded yet; most correspond to material not yet
+  rewritten (batches 3a, 3b and 4) or to third-party components whose own licences apply.
