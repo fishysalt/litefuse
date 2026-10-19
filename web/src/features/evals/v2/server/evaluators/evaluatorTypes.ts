@@ -19,6 +19,7 @@ import {
 } from "@langfuse/shared";
 import { z } from "zod/v4";
 import { endOfDay, startOfDay, subMonths } from "date-fns";
+import { toleratesEmptyOptionSelections } from "../filterInputNormalization";
 
 const EvaluatorMetadataSchema = z.object({
   name: z.string().trim().min(1),
@@ -210,7 +211,9 @@ export const ActivationCostEstimatesSchema = EvaluatorIdsSchema.extend({
   { message: "Evaluator IDs must be unique", path: ["evaluatorIds"] },
 );
 
-const EvaluatorListFilterSchema = singleFilterList
+const EvaluatorListFilterSchema = toleratesEmptyOptionSelections(
+  singleFilterList,
+)
   .superRefine((filters, ctx) => {
     for (const [index, filter] of filters.entries()) {
       const valid =

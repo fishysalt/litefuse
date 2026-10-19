@@ -5,6 +5,7 @@ import {
   paginationLimitZod,
   singleFilterList,
 } from "@langfuse/shared";
+import { toleratesEmptyOptionSelections } from "../filterInputNormalization";
 import { z } from "zod/v4";
 
 export const RuleMetadataSchema = z.object({
@@ -76,7 +77,7 @@ export const ListRulesSchema = z.object({
     .min(1)
     .max(2)
     .optional(),
-  filter: singleFilterList
+  filter: toleratesEmptyOptionSelections(singleFilterList)
     .superRefine((filters, ctx) => {
       for (const [index, filter] of filters.entries()) {
         const valid =
