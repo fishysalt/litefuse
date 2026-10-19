@@ -21,9 +21,12 @@ describe("llmProviderPresets", () => {
     expect(llmProviderPresets.map((p) => p.id)).not.toContain(CUSTOM_PRESET_ID);
   });
 
-  it("has unique (adapter, baseURL) pairs so presets stay distinguishable", () => {
+  it("has unique (adapter, baseURL, models) so presets stay distinguishable", () => {
+    // One gateway can carry several models (OpenRouter serves both Liquid AI d1
+    // and Microsoft-Decision-1), so the model list is part of the identity.
     const keys = llmProviderPresets.map(
-      (preset) => `${preset.adapter}|${preset.baseURL.replace(/\/+$/, "")}`,
+      (preset) =>
+        `${preset.adapter}|${preset.baseURL.replace(/\/+$/, "")}|${preset.customModels.join(",")}`,
     );
     expect(new Set(keys).size).toBe(keys.length);
   });
@@ -135,6 +138,71 @@ describe("llmProviderPresets", () => {
     expect(allText).toContain("minimax");
   });
 
+  it("offers a dedicated decision-model group with one entry per supported vendor", () => {
+    const group = groupLlmProviderPresets().find(
+      (candidate) => candidate.group === "decision-model",
+    );
+
+    expect(group).toBeDefined();
+    expect(group!.label).toBe("Decision models");
+    expect(group!.presets.map((preset) => preset.id).sort()).toEqual([
+      "alibaba-bailian-decision",
+      "cloudflare-clef",
+      "inception-mercury-decide",
+      "liquid-d1",
+      "liquid-d1-openrouter",
+      "microsoft-decision-1-azure",
+      "microsoft-decision-1-openrouter",
+      "openrouter-decision-models",
+      "perplexity-decider",
+      "typesafe-decision-model",
+      "upstage-solar-decide",
+    ]);
+
+    // Decision models are not text models: every entry must use the
+    // decision-model adapter.
+    for (const preset of group!.presets) {
+      expect(preset.adapter).toBe(LLMAdapter.TypeSafe);
+      expect(preset.customModels.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("carries a vendor-native channel next to the OpenRouter routes", () => {
+    const byId = new Map(
+      llmProviderPresets.map((preset) => [preset.id, preset] as const),
+    );
+
+    // Every vendor we verified through OpenRouter also gets its own connection,
+    // so a user with a vendor key does not need OpenRouter.
+    expect(byId.get("perplexity-decider")?.baseURL).toBe(
+      "https://api.perplexity.ai/v1",
+    );
+    expect(byId.get("upstage-solar-decide")?.baseURL).toBe(
+      "https://api.upstage.ai/v1",
+    );
+    expect(byId.get("liquid-d1")?.baseURL).toBe("https://api.liquid.ai/v1");
+    expect(byId.get("inception-mercury-decide")?.baseURL).toBe(
+      "https://api.inceptionlabs.ai/v1",
+    );
+    // Account-scoped hosts stay empty so the form asks for them.
+    expect(byId.get("cloudflare-clef")?.baseURL).toBe("");
+    expect(byId.get("cloudflare-clef")?.customModels).toEqual([
+      "clef",
+      "clef-flash",
+    ]);
+    // The vendor presets point at the decision-model adapter, not a gateway.
+    for (const id of [
+      "perplexity-decider",
+      "upstage-solar-decide",
+      "liquid-d1",
+      "inception-mercury-decide",
+      "cloudflare-clef",
+    ]) {
+      expect(byId.get(id)?.adapter).toBe(LLMAdapter.TypeSafe);
+      expect(byId.get(id)?.typeSafeUpstream).toBe("custom");
+    }
+  });
+
   it("groups every preset exactly once", () => {
     const grouped = groupLlmProviderPresets().flatMap((group) =>
       group.presets.map((preset) => preset.id),
@@ -160,23 +228,38 @@ describe("llmProviderPresets", () => {
     expect(getLlmProviderPreset(undefined)).toBeUndefined();
   });
 
-  it("infers the matching preset from a stored connection", () => {
+  it("infers a preset whose adapter and base URL match the stored connection", () => {
+    // Two presets can share a base URL (Liquid AI d1 and Microsoft-Decision-1
+    // both ride OpenRouter), so inference only promises a matching endpoint,
+    // not a specific model.
+    const normalize = (value: string) => value.replace(/\/+$/, "");
+    const normalizeId = (id: string) => {
+      const preset = getLlmProviderPreset(id);
+      return `${preset!.adapter}|${normalize(preset!.baseURL)}`;
+    };
+
     for (const preset of llmProviderPresets) {
+      const expected = `${preset.adapter}|${normalize(preset.baseURL)}`;
+
       expect(
-        inferLlmProviderPresetId({
-          adapter: preset.adapter,
-          baseURL: preset.baseURL,
-        }),
-      ).toBe(preset.id);
+        normalizeId(
+          inferLlmProviderPresetId({
+            adapter: preset.adapter,
+            baseURL: preset.baseURL,
+          }),
+        ),
+      ).toBe(expected);
 
       // Stored base URLs may have a trailing slash
       if (preset.baseURL !== "") {
         expect(
-          inferLlmProviderPresetId({
-            adapter: preset.adapter,
-            baseURL: `${preset.baseURL}/`,
-          }),
-        ).toBe(preset.id);
+          normalizeId(
+            inferLlmProviderPresetId({
+              adapter: preset.adapter,
+              baseURL: `${preset.baseURL}/`,
+            }),
+          ),
+        ).toBe(expected);
       }
     }
   });

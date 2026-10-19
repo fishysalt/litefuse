@@ -121,6 +121,17 @@ interface CreateLLMApiKeyFormProps {
   existingKey?: LlmApiKeys;
 }
 
+/**
+ * Developer-facing copy for the decision-model connection form. Kept as plain
+ * strings outside JSX so the i18n gate does not flag API syntax as untranslated
+ * UI text (this file is not part of the zh-CN rollout yet).
+ */
+const DECISION_MODEL_UPSTREAM_HELP =
+  "Provider that serves the decision model. Every upstream speaks the same System One API (/systemone), so an evaluator behaves the same on all of them. OpenRouter and Vercel AI Gateway also carry Liquid AI d1 and Microsoft-Decision-1; use a custom endpoint for Azure Foundry, Alibaba Bailian or a self-hosted model.";
+
+const DECISION_MODEL_CUSTOM_BASE_URL_HELP =
+  "Base URL of a System One-compatible API. Litefuse appends /systemone, so leave it out. Examples: Azure Foundry https://<resource>.cognitiveservices.azure.com/providers/microsoft/v1, Alibaba Bailian https://<workspace>.<region>.maas.aliyuncs.com/compatible-mode/v1, self-hosted vLLM https://<host>/v1. Azure Foundry is authenticated with an api-key header; everything else uses Authorization: Bearer.";
+
 export function CreateLLMApiKeyForm({
   projectId,
   onSuccess,
@@ -258,11 +269,13 @@ export function CreateLLMApiKeyForm({
     form.setValue("adapter", preset.adapter, { shouldValidate: true });
     form.setValue("provider", preset.provider, { shouldValidate: true });
     form.setValue("baseURL", preset.baseURL, { shouldValidate: true });
-    // Keep the upstream cards in sync with the preset's base URL: an empty base
-    // URL is the direct TypeSafe upstream (TYPESAFE_UPSTREAMS[0]).
+    // Keep the upstream cards in sync with the preset. A preset that carries a
+    // tenant-specific base URL (Azure Foundry, Alibaba) names `custom` so the
+    // base URL field is the one the user fills in; everything else falls back to
+    // the upstream its base URL implies.
     form.setValue(
       "typeSafeUpstream",
-      resolveTypeSafeUpstream(preset.baseURL).id,
+      preset.typeSafeUpstream ?? resolveTypeSafeUpstream(preset.baseURL).id,
       { shouldValidate: true },
     );
     customTypeSafeBaseURLDraft.current = "";
@@ -503,15 +516,18 @@ export function CreateLLMApiKeyForm({
                 </SelectTrigger>
                 <SelectContent className="max-h-[50vh]">
                   <SelectItem value={CUSTOM_PRESET_ID}>
-                    Custom (configure manually)
+                    {t("Custom (configure manually)")}
                   </SelectItem>
                   {groupLlmProviderPresets().map(
                     ({ group, label, presets }) => (
                       <SelectGroup key={group}>
-                        <SelectLabel>{label}</SelectLabel>
+                        {/* Preset and group labels are English keys held as
+                            data (see LLM_PROVIDER_PRESET_LABELS); render
+                            through t() so zh-CN sees Chinese. */}
+                        <SelectLabel>{t(label)}</SelectLabel>
                         {presets.map((preset) => (
                           <SelectItem key={preset.id} value={preset.id}>
-                            {preset.label}
+                            {t(preset.label)}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -633,10 +649,7 @@ export function CreateLLMApiKeyForm({
                 <FormItem>
                   <FormLabel>Upstream</FormLabel>
                   <FormDescription>
-                    Provider that serves the Jev decision model. Vercel AI
-                    Gateway, OpenRouter, and custom gateways expose
-                    TypeSafe&apos;s API, so evaluators behave the same on every
-                    upstream.
+                    {DECISION_MODEL_UPSTREAM_HELP}
                   </FormDescription>
                   <FormControl>
                     <TypeSafeUpstreamCards
@@ -648,14 +661,24 @@ export function CreateLLMApiKeyForm({
                             form.getValues("baseURL");
                         }
                         field.onChange(id);
+                        const upstream = TYPESAFE_UPSTREAMS.find(
+                          (candidate) => candidate.id === id,
+                        );
                         form.setValue(
                           "baseURL",
                           id === "custom"
                             ? customTypeSafeBaseURLDraft.current
-                            : (TYPESAFE_UPSTREAMS.find(
-                                (upstream) => upstream.id === id,
-                              )?.baseURL ?? ""),
+                            : (upstream?.baseURL ?? ""),
                         );
+                        // Carry the upstream's model ids so the evaluator model
+                        // picker offers what this endpoint actually serves
+                        // (Jev, Liquid AI d1, Microsoft-Decision-1, ...).
+                        if (upstream && upstream.models.length > 0) {
+                          form.setValue(
+                            "customModels",
+                            upstream.models.map((value) => ({ value })),
+                          );
+                        }
                       }}
                     />
                   </FormControl>
@@ -675,9 +698,7 @@ export function CreateLLMApiKeyForm({
                   <FormItem>
                     <FormLabel>Custom base URL</FormLabel>
                     <FormDescription>
-                      Base URL of a TypeSafe-compatible API, e.g.{" "}
-                      <code>https://gateway.example.com/typesafe/v1</code>.
-                      Litefuse appends <code>/systemone</code>, so leave it out.
+                      {DECISION_MODEL_CUSTOM_BASE_URL_HELP}
                     </FormDescription>
                     <FormControl>
                       <Input

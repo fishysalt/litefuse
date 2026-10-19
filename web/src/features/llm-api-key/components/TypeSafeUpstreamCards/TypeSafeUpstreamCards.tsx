@@ -11,7 +11,8 @@ const UPSTREAM_DESCRIPTIONS: Record<TypeSafeUpstreamId, string> = {
   typesafe: "Direct connection, billed by TypeSafe.",
   "vercel-ai-gateway": "Routed and billed through your AI Gateway.",
   openrouter: "Routed and billed through OpenRouter.",
-  custom: "Your own TypeSafe-compatible gateway.",
+  custom:
+    "Your own System One endpoint: Azure Foundry, Alibaba Bailian, or a self-hosted model.",
 };
 
 type TypeSafeUpstreamCardsProps = {
@@ -38,7 +39,7 @@ export function TypeSafeUpstreamCards({
       onValueChange={(next) => onValueChange(next as TypeSafeUpstreamId)}
       className="grid gap-2 sm:grid-cols-4"
     >
-      {TYPESAFE_UPSTREAMS.map(({ id, label }) => {
+      {TYPESAFE_UPSTREAMS.map(({ id, label, models }) => {
         return (
           <RadioGroupPrimitive.Item
             key={id}
@@ -53,6 +54,11 @@ export function TypeSafeUpstreamCards({
             <span className="text-muted-foreground text-xs">
               {UPSTREAM_DESCRIPTIONS[id]}
             </span>
+            {models.length > 0 ? (
+              <span className="text-muted-foreground/80 text-[10px] break-words">
+                {models.join(" · ")}
+              </span>
+            ) : null}
           </RadioGroupPrimitive.Item>
         );
       })}

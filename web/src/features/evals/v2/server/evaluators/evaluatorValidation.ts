@@ -7,11 +7,13 @@ import {
 import { decrypt } from "@langfuse/shared/encryption";
 import {
   createTypeSafeDecisionModelClient,
+  decisionModelProfile,
   DefaultEvalModelService,
   getClientInitiatedNonStreamingLlmTimeoutMs,
   getLLMErrorInfo,
   isDecisionModelAdapter,
   logger,
+  unsupportedDecisionQuestionTypes,
 } from "@langfuse/shared/src/server";
 import { getEvaluatorDefinitionPreflightError } from "@/src/features/evals/server/evaluator-preflight";
 import { getPromptMessagesValidationError } from "@/src/features/evals/v2/fns/promptMessages/hasInvalidSystemPromptMessage";
@@ -314,6 +316,37 @@ async function assertDecisionModelDefinitionValid(params: {
     variableMapping: params.definition.variableMapping,
   });
 
+  // A provider can be narrower than our schema: Respan's span-01 family answers
+  // noul questions only (measured against OpenRouter). Reject unsupported types
+  // here so an evaluator is never saved into a state where every run is a
+  // provider 400.
+  // The domain calls a yes/no question `noul`; the capability helper speaks in
+  // wire-neutral names, so normalise before asking.
+  const unsupported = unsupportedDecisionQuestionTypes(
+    params.definition.model,
+    [
+      ...new Set(
+        params.definition.questions.map((question) =>
+          question.type === "noul" ? ("boolean" as const) : question.type,
+        ),
+      ),
+    ],
+  );
+  if (unsupported.length > 0) {
+    const label = (type: string) => (type === "boolean" ? "yes/no" : type);
+    throw new InvalidRequestError(
+      `Model "${params.definition.model}" cannot answer ${unsupported
+        .map(label)
+        .join(
+          ", ",
+        )} questions. Supported question types: ${decisionModelProfile(
+        params.definition.model,
+      )
+        .questionTypes.map(label)
+        .join(", ")}. Choose another model or remove those questions.`,
+    );
+  }
+
   const error = await getDecisionModelConfigurationError(params);
   if (error) throw new EvaluatorModelConfigurationError(error);
 
@@ -324,7 +357,8 @@ async function assertDecisionModelDefinitionValid(params: {
     model: params.definition.model,
     previousModel: params.previousModel,
   });
-  if (preflightError) throw new EvaluatorModelConfigurationError(preflightError);
+  if (preflightError)
+    throw new EvaluatorModelConfigurationError(preflightError);
 }
 
 /**

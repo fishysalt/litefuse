@@ -561,24 +561,39 @@ export const TYPESAFE_UPSTREAMS = [
     label: "TypeSafe",
     baseURL: null,
     apiKeyLabel: "TypeSafe API key",
+    /** Model ids this upstream serves by default. */
+    models: ["jev-latest"],
   },
   {
     id: "vercel-ai-gateway",
     label: "Vercel AI Gateway",
     baseURL: "https://ai-gateway.vercel.sh/typesafe/v1",
     apiKeyLabel: "Vercel AI Gateway API key",
+    models: ["jev-latest"],
   },
   {
     id: "openrouter",
     label: "OpenRouter",
+    // The gateway fans out to every System One provider it carries, so the
+    // model id selects the vendor: Jev, Liquid AI d1, Microsoft-Decision-1.
     baseURL: "https://openrouter.ai/api/v1",
     apiKeyLabel: "OpenRouter API key",
+    models: ["jev-latest", "liquid/d1-ultra", "microsoft/microsoft-decision-1"],
   },
   {
     id: "custom",
     label: "Custom",
     baseURL: null,
     apiKeyLabel: "API key",
+    /**
+     * No defaults: the base URL carries the tenant. Known System One hosts:
+     *   Azure Foundry  https://<resource>.cognitiveservices.azure.com/providers/microsoft/v1
+     *                  (authenticated with an `api-key` header, not Bearer)
+     *   Alibaba        https://<workspace>.<region>.maas.aliyuncs.com/compatible-mode/v1
+     *                  model `decision-model-preview`
+     *   liquid / vLLM  https://<host>/v1  (model `LiquidAI/d1-3B`)
+     */
+    models: [],
   },
 ] as const;
 
