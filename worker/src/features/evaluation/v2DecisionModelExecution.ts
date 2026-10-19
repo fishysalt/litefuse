@@ -29,7 +29,7 @@ import {
 import { decrypt } from "@langfuse/shared/encryption";
 import {
   EvaluatorBlockSource,
-  createTypeSafeDecisionModelClient,
+  createDecisionModelClient,
   executeDecisionModelEvaluator,
   instrumentAsync,
   logger,
@@ -310,11 +310,11 @@ async function executeV2DecisionModelEvaluation({
       let request: DecisionModelRequest | undefined;
       let execution: Awaited<ReturnType<typeof executeDecisionModelEvaluator>>;
       try {
-        const client = createTypeSafeDecisionModelClient({
+        const client = createDecisionModelClient({
+          adapter: modelConfig.config.apiKey.adapter,
           apiKey: decryptedSecretKey,
           model: modelConfig.config.model,
-          baseURL:
-            typeof apiKey.baseURL === "string" ? apiKey.baseURL : null,
+          baseURL: typeof apiKey.baseURL === "string" ? apiKey.baseURL : null,
         });
 
         execution = await executeDecisionModelEvaluator({

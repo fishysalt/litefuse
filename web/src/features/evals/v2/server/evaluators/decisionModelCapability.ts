@@ -1,6 +1,7 @@
 import {
   isAllowedDecisionModel,
   LLMAdapter,
+  OPENAI_DECISION_MODEL_IDS,
   supportedModels,
   supportsDecisionModels,
 } from "@langfuse/shared";
@@ -14,33 +15,17 @@ import {
  * adapter-only check (`isDecisionModelAdapter`) cannot answer, because it says
  * nothing about the model.
  *
- * LITEFUSE: decision-model support is narrowed to TypeSafe (see the LITEFUSE
- * NOTE in `packages/shared/src/server/llm/types.ts`). Upstream also reports
- * `LLMAdapter.OpenAI` as decision-model capable there, because upstream ships an
- * OpenAI decision-model client; we do not, so the OpenAI branch this module used
- * to carry is gone. Consequence here: `supportsDecisionModels(adapter)` and
- * `isDecisionModelAdapter(adapter)` are now the *same* predicate (TypeSafe only),
- * which is exactly the point — the save-time capability check can no longer pass
- * an adapter the worker execution gate will refuse on the first real run.
- *
- * Composition rule (do not loosen it): this helper only ever *adds* a rejection
- * reason. The execution path in litefuse is still restricted to the
- * `DECISION_MODEL_ADAPTERS` adapters, so callers keep their existing adapter
- * check after this one — a connection the runtime cannot execute is never
- * accepted just because the capability registry knows the adapter.
- */
-
-/**
- * Decision models `adapter` may answer with, for use in error messages.
- *
- * LITEFUSE: TypeSafe only. The OpenAI branch (`OPENAI_DECISION_MODEL_IDS`) was
- * removed with the narrowing — it is unreachable now, because
- * `getDecisionModelCapabilityError` rejects every non-TypeSafe adapter before it
- * would ask for this list.
+ * Decision-model support covers two adapters: TypeSafe (System One) and OpenAI
+ * (the hosted Decisions API, model allowlisted through
+ * `OPENAI_DECISION_MODEL_IDS`). Each has a client in this package's
+ * `server/llm` folder, dispatched by `createDecisionModelClient`.
  */
 export function getAllowedDecisionModelIds(adapter: string): string[] {
   if (adapter === LLMAdapter.TypeSafe) {
     return [...supportedModels[LLMAdapter.TypeSafe]];
+  }
+  if (adapter === LLMAdapter.OpenAI) {
+    return [...OPENAI_DECISION_MODEL_IDS];
   }
   return [];
 }
@@ -57,18 +42,17 @@ export function getDecisionModelCapabilityError(params: {
   const model = params.model ?? "";
 
   if (!supportsDecisionModels(params.adapter)) {
-    // Reached for every non-TypeSafe adapter, OpenAI included: decision models
-    // run on TypeSafe connections only in this deployment, and we cannot execute
-    // an OpenAI decision model at all (no client, no AI SDK dependency).
+    // Every adapter except TypeSafe and OpenAI: those two are the only ones with
+    // a decision-model client.
     return (
       `Connection "${params.provider}" uses adapter "${params.adapter}", which cannot answer ` +
-      `decision-model questions. Decision-model evaluators need a TypeSafe connection — add one ` +
-      `under Settings → Model Connections first.`
+      `decision-model questions. Decision-model evaluators need a TypeSafe or OpenAI ` +
+      `connection — add one under Settings → Model Connections first.`
     );
   }
 
   if (!isAllowedDecisionModel(params.adapter, model)) {
-    // TypeSafe only from here on, so this fires on an empty model name.
+    // An empty model name on TypeSafe, or a model outside OpenAI's allowlist.
     const allowed = getAllowedDecisionModelIds(params.adapter);
     return (
       `Model "${model}" cannot answer decision-model questions on connection ` +

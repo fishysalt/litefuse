@@ -153,16 +153,19 @@ describe("llmProviderPresets", () => {
       "liquid-d1-openrouter",
       "microsoft-decision-1-azure",
       "microsoft-decision-1-openrouter",
+      "openai-decision-model",
       "openrouter-decision-models",
       "perplexity-decider",
       "typesafe-decision-model",
       "upstage-solar-decide",
     ]);
 
-    // Decision models are not text models: every entry must use the
-    // decision-model adapter.
+    // Every entry must use a decision-model adapter. TypeSafe covers the
+    // System One gateways; OpenAI is the hosted Decisions API.
     for (const preset of group!.presets) {
-      expect(preset.adapter).toBe(LLMAdapter.TypeSafe);
+      expect([LLMAdapter.TypeSafe, LLMAdapter.OpenAI]).toContain(
+        preset.adapter,
+      );
       expect(preset.customModels.length).toBeGreaterThan(0);
     }
   });
@@ -192,14 +195,20 @@ describe("llmProviderPresets", () => {
     ]);
     // The vendor presets point at the decision-model adapter, not a gateway.
     for (const id of [
+      "openai-decision-model",
       "perplexity-decider",
       "upstage-solar-decide",
       "liquid-d1",
       "inception-mercury-decide",
       "cloudflare-clef",
     ]) {
-      expect(byId.get(id)?.adapter).toBe(LLMAdapter.TypeSafe);
-      expect(byId.get(id)?.typeSafeUpstream).toBe("custom");
+      const preset = byId.get(id);
+      expect([LLMAdapter.TypeSafe, LLMAdapter.OpenAI]).toContain(
+        preset?.adapter,
+      );
+      if (preset?.adapter === LLMAdapter.TypeSafe) {
+        expect(preset.typeSafeUpstream).toBe("custom");
+      }
     }
   });
 

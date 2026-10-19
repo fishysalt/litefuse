@@ -77,7 +77,7 @@ export function DecisionModelSelector({
     return (
       <>
         <Button type="button" variant="outline" onClick={onConfigureProviders}>
-          Add a TypeSafe connection
+          Add a decision-model connection
         </Button>
         {capabilityNotice}
       </>

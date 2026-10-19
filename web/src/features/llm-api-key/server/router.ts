@@ -16,16 +16,17 @@ import {
   ChatMessageRole,
   type Prisma,
   supportedModels,
+  isAllowedDecisionModel,
+  LLMAdapter,
   EvaluatorBlockReason,
   getEvaluatorBlockMetadata,
 } from "@langfuse/shared";
 import { encrypt, decrypt } from "@langfuse/shared/encryption";
 import {
   ChatMessageType,
-  createTypeSafeDecisionModelClient,
+  createDecisionModelClient,
   fetchLLMCompletion,
   isDecisionModelAdapter,
-  type LLMAdapter,
   logger,
   decryptAndParseExtraHeaders,
   blockEvaluatorConfigsInTx,
@@ -56,14 +57,14 @@ type TestLLMConnectionParams = {
 
 /**
  * LITEFUSE ADDITION (copied from upstream): a decision-model connection is an
- * ordinary `llm_api_keys` row that points at a TypeSafe-compatible gateway. The
- * provider appends `/systemone` to the raw base URL string, so the stored URL
- * must not already carry that path or a query string.
+ * ordinary `llm_api_keys` row. For TypeSafe-style gateways the client appends
+ * `/systemone`, for OpenAI it appends `/decisions`, so the stored base URL must
+ * not already carry either path or a query string.
  *
  * Any gateway URL is accepted — the `custom` upstream stores one of the user's
- * choosing — and extra headers are still rejected because
- * `createTypeSafeDecisionModelClient` authenticates with the connection's API
- * key only.
+ * choosing. Extra headers stay rejected for TypeSafe connections because that
+ * client authenticates with the connection's API key only; the rule is not
+ * applied to OpenAI connections, which are ordinary text connections too.
  */
 function assertDecisionModelConnectionInput(input: {
   adapter: LLMAdapter;
@@ -83,11 +84,11 @@ function assertDecisionModelConnectionInput(input: {
       });
     }
 
-    if (/\/systemone\/?$/.test(url.pathname)) {
+    if (/\/(systemone|decisions)\/?$/.test(url.pathname)) {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message:
-          "Remove /systemone from the end of the base URL. Litefuse appends it.",
+          "Remove /systemone or /decisions from the end of the base URL. Litefuse appends it.",
       });
     }
 
@@ -100,7 +101,11 @@ function assertDecisionModelConnectionInput(input: {
     }
   }
 
-  if (input.extraHeaders && Object.keys(input.extraHeaders).length > 0) {
+  if (
+    input.adapter === LLMAdapter.TypeSafe &&
+    input.extraHeaders &&
+    Object.keys(input.extraHeaders).length > 0
+  ) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Decision-model connections do not support extra headers.",
@@ -115,12 +120,14 @@ function assertDecisionModelConnectionInput(input: {
  * choice question instead.
  */
 async function testDecisionModelConnection(params: {
+  adapter: string;
   secretKey: string;
   model: string;
   baseURL?: string | null;
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const client = createTypeSafeDecisionModelClient({
+    const client = createDecisionModelClient({
+      adapter: params.adapter,
       apiKey: params.secretKey,
       model: params.model,
       baseURL: params.baseURL,
@@ -157,8 +164,15 @@ async function testLLMConnection(
 
     // LITEFUSE ADDITION (copied from upstream): route decision models to their
     // own probe before the text-model path.
-    if (isDecisionModelAdapter(params.adapter)) {
+    // Only a model that actually is a decision model takes the decision probe.
+    // The OpenAI adapter serves both text models and `gpt-6-luna`, so checking
+    // the adapter alone would send a text model to `/v1/decisions`.
+    if (
+      isDecisionModelAdapter(params.adapter) &&
+      isAllowedDecisionModel(params.adapter, model)
+    ) {
       return await testDecisionModelConnection({
+        adapter: params.adapter,
         secretKey: params.secretKey,
         model,
         baseURL: params.baseURL,

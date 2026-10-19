@@ -6,7 +6,7 @@ import {
 } from "@langfuse/shared";
 import { decrypt } from "@langfuse/shared/encryption";
 import {
-  createTypeSafeDecisionModelClient,
+  createDecisionModelClient,
   decisionModelProfile,
   DefaultEvalModelService,
   getClientInitiatedNonStreamingLlmTimeoutMs,
@@ -272,7 +272,7 @@ export async function getDecisionModelConfigurationError(params: {
     params.definition.model,
   );
   if (!modelConfig.valid) {
-    return `No decision-model connection found for evaluator "${params.name}". ${modelConfig.error}. Add a TypeSafe connection under Settings → Model Connections (/project/${params.projectId}/settings/llm-connections) first.`;
+    return `No decision-model connection found for evaluator "${params.name}". ${modelConfig.error}. Add a TypeSafe or OpenAI connection under Settings → Model Connections (/project/${params.projectId}/settings/llm-connections) first.`;
   }
   // LITEFUSE ADDITION (gap D4): `supportsDecisionModels` / `isAllowedDecisionModel`
   // answer the adapter *and* the model half of the question, so an unsupported
@@ -295,7 +295,7 @@ export async function getDecisionModelConfigurationError(params: {
     return capabilityError;
   }
   if (!isDecisionModelAdapter(modelConfig.config.apiKey.adapter)) {
-    return `Connection "${params.definition.provider}" is not a decision-model connection. Decision-model evaluators need a TypeSafe connection.`;
+    return `Connection "${params.definition.provider}" is not a decision-model connection. Decision-model evaluators need a TypeSafe or OpenAI connection.`;
   }
   return null;
 }
@@ -442,7 +442,8 @@ async function getDecisionModelPreflightError(params: {
     // Built lazily: when the probe is skipped, no client (and no proxy agent) is
     // constructed and no request leaves the process.
     createClient: () =>
-      createTypeSafeDecisionModelClient({
+      createDecisionModelClient({
+        adapter: modelConfig.config.apiKey.adapter,
         apiKey: decrypt(modelConfig.config.apiKey.secretKey),
         model: modelConfig.config.model,
         baseURL: modelConfig.config.apiKey.baseURL,

@@ -6,7 +6,7 @@ import { decrypt } from "@langfuse/shared/encryption";
 import {
   buildEvalExecutionData,
   compileLangfuseMediaMessages,
-  createTypeSafeDecisionModelClient,
+  createDecisionModelClient,
   createW3CTraceId,
   DefaultEvalModelService,
   createLLMOutput,
@@ -156,7 +156,8 @@ async function testDecisionModelEvaluator(params: {
   const executionTraceId = createW3CTraceId();
   let request: DecisionModelRequest | undefined;
   try {
-    const client = createTypeSafeDecisionModelClient({
+    const client = createDecisionModelClient({
+      adapter: modelConfig.config.apiKey.adapter,
       apiKey: decrypt(modelConfig.config.apiKey.secretKey),
       model: modelConfig.config.model,
       baseURL: modelConfig.config.apiKey.baseURL,

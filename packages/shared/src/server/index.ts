@@ -134,6 +134,8 @@ export * from "./evals/llmEvaluatorExecution";
 export * from "./evals/codeEvalCompat";
 export * from "./evals/decisionModelEvaluatorExecution";
 export * from "./llm/typesafe/typeSafeDecisionModelClient";
+export * from "./llm/openai/openAiDecisionModelClient";
+export * from "./llm/createDecisionModelClient";
 export * from "./prismaFilter";
 export * from "./redis/evalExecutionQueue";
 export * from "./redis/llmAsJudgeExecutionQueue";

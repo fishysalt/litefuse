@@ -255,77 +255,69 @@ export enum LLMAdapter {
   TypeSafe = "typesafe",
 }
 
-/** Adapters that can only be used by decision-model (Jev) evaluators. */
+/** Adapters that can answer decision-model evaluators. */
 export const DECISION_MODEL_ADAPTERS: readonly LLMAdapter[] = [
   LLMAdapter.TypeSafe,
+  LLMAdapter.OpenAI,
 ];
 
 export function isDecisionModelAdapterType(adapter: string): boolean {
   return DECISION_MODEL_ADAPTERS.includes(adapter as LLMAdapter);
 }
 
-// ── LITEFUSE NOTE: decision-model support is deliberately narrowed to TypeSafe ──
-// This is an intentional, reversible deviation from upstream — not a missed port.
+// ── LITEFUSE NOTE: two decision-model providers, two wire formats ────────────
+// Upstream 4.56 exposes two decision-model adapters: TypeSafe (System One, Jev)
+// and OpenAI (the hosted Decisions API, `gpt-6-luna`). This fork matches that
+// surface, but implements both clients by hand instead of through the AI SDK:
 //
-// Upstream 4.56 (`packages/shared/src/server/llm/types.ts:272-284`) treats OpenAI
-// as a second decision-model adapter: `supportsDecisionModels` returns true for
-// `LLMAdapter.OpenAI`, and `isAllowedDecisionModel` accepts the model ids of the
-// hosted OpenAI Decisions API (`OPENAI_DECISION_MODEL_IDS`). Upstream can honour
-// that claim because it ships the whole execution chain for it — an OpenAI
-// decision-model client (`.../llm/openai/openAIDecisionModelClient.ts`), a
-// dispatcher that selects it (`.../llm/createDecisionModelClient.ts`) and the
-// `ai@7` / `@ai-sdk/openai` dependencies those two need.
+//   * `.../llm/typesafe/typeSafeDecisionModelClient.ts` — POST /systemone
+//   * `.../llm/openai/openAiDecisionModelClient.ts`     — POST /decisions
+//   * `.../llm/createDecisionModelClient.ts`            — picks one by adapter
 //
-// Litefuse ships none of that. Our only decision-model client is the hand-written
-// TypeSafe/Jev one (`.../llm/typesafe/typeSafeDecisionModelClient.ts`), the worker
-// execution path builds exactly that client
-// (`worker/src/features/evaluation/v2DecisionModelExecution.ts`) and the execute
-// gate there is `isDecisionModelAdapter` / `DECISION_MODEL_ADAPTERS`, which lists
-// TypeSafe only.
+// All four call sites (worker execution, save-time preflight, manual test run,
+// connection test) go through that factory, so the adapter gate
+// (`isDecisionModelAdapter` / `DECISION_MODEL_ADAPTERS`), the selector filter and
+// the execution path always agree.
 //
-// Keeping OpenAI "capable" here while nothing could execute it created a trap:
-// the save-time capability check waved OpenAI through, so an OpenAI decision-model
-// evaluator *saved successfully* and was only refused by the adapter gate on its
-// first real run — "saves fine, blocked later", worse than a plain rejection.
-// Narrowing both predicates to TypeSafe removes the claim and the trap together:
-// the selector filter, the save validation and the worker execution gate now all
-// answer the same question, because all three are TypeSafe-only.
+// The OpenAI endpoint is NOT System One: `input` instead of `state`, `predicate`
+// instead of `noul`, ordered `questions`/`answers` arrays instead of keyed
+// objects, `choices`/`levels` arrays instead of criteria, and probabilities as
+// `[{ value, probability }]`. The OpenAI client absorbs all of that; the rest of
+// the pipeline keeps seeing the same domain types.
 //
-// To re-enable OpenAI decision models: add the OpenAI decision-model client plus
-// the AI SDK dependencies and dispatch to it from the worker, then widen the two
-// predicates below back to their upstream form.
+// Difference that remains: a TypeSafe connection accepts any model name (the
+// model version is free text, `jev-latest` by default), while an OpenAI
+// connection is restricted to `OPENAI_DECISION_MODEL_IDS` — a typo there would
+// only surface as a provider 404 on the first real run.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Kept verbatim from upstream 4.56 for contract parity: the model ids the hosted
-// OpenAI Decisions API accepts. LITEFUSE: NOT ENABLED — nothing in this repo can
-// create or dispatch an OpenAI decision-model client, so these ids are
-// descriptive only and are deliberately *not* accepted by
-// `isAllowedDecisionModel` below. See the LITEFUSE NOTE above.
 export const OPENAI_DECISION_MODEL_IDS: readonly string[] = ["gpt-6-luna"];
 
 /**
- * Adapters that can answer a decision-model evaluator.
- *
- * LITEFUSE: TypeSafe only — upstream also returns true for `LLMAdapter.OpenAI`
- * (see the LITEFUSE NOTE above). OpenAI is a text adapter here, nothing more.
+ * Adapters that can answer a decision-model evaluator: TypeSafe (System One) and
+ * OpenAI (Decisions API).
  */
 export function supportsDecisionModels(adapter: string): boolean {
-  return adapter === LLMAdapter.TypeSafe;
+  return isDecisionModelAdapterType(adapter);
 }
 
 /**
- * LITEFUSE: TypeSafe only — any non-empty model name is allowed, because a
- * TypeSafe/Jev connection stores a free-text model version (`jev-latest` by
- * default). Upstream's OpenAI branch — the `isOpenAIDecisionModel(model)` call —
- * is intentionally absent: that upstream helper was DELETED from this package
- * (it had no call sites outside that branch). The name survives only in this
- * comment as traceability; see the LITEFUSE NOTE above.
+ * Whether a model may be used for decision models on that adapter.
+ *
+ * TypeSafe allows any non-empty name (the Jev model version is free text);
+ * OpenAI allows only `OPENAI_DECISION_MODEL_IDS`.
  */
 export function isAllowedDecisionModel(
   adapter: string,
   model: string,
 ): boolean {
+  // TypeSafe stores a free-text model version (`jev-latest` by default), so any
+  // non-empty name is allowed there. OpenAI's decision models are an allowlist:
+  // only the hosted ids this client knows how to call.
   if (adapter === LLMAdapter.TypeSafe) return model.length > 0;
+  if (adapter === LLMAdapter.OpenAI) {
+    return OPENAI_DECISION_MODEL_IDS.includes(model);
+  }
   return false;
 }
 

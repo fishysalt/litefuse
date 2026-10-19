@@ -35,6 +35,7 @@ export const LLM_PROVIDER_PRESET_LABELS = [
   i18nKey("Liquid AI d1 (official)"),
   i18nKey("Liquid AI d1 (OpenRouter)"),
   i18nKey("Perplexity Decider (official)"),
+  i18nKey("OpenAI Decisions (gpt-6-luna)"),
   i18nKey("Upstage Solar Decide (official)"),
   i18nKey("Inception Mercury Decide (official)"),
   i18nKey("Cloudflare Clef (official)"),

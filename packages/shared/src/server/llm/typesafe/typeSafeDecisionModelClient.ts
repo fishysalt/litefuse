@@ -33,10 +33,10 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { z } from "zod/v4";
-import { ProxyAgent, type Dispatcher } from "undici";
+import type { Dispatcher } from "undici";
 import { LLMCompletionError } from "../../llm/errors";
 
-import { env } from "../../../env";
+import { decisionModelProxyDispatcher } from "../proxyDispatcher";
 import type {
   DecisionModelAnswer,
   DecisionModelClient,
@@ -285,10 +285,9 @@ export function createTypeSafeDecisionModelClient(params: {
   // HTTPS_PROXY is the same variable the LLM-judge path honours, so one setting
   // covers every outbound LLM call in the worker. Read per client (not at module
   // load) so a test or a one-off script can set it before constructing the client.
-  const proxyUrl = env.HTTPS_PROXY;
-  const proxyDispatcher: Dispatcher | undefined = proxyUrl
-    ? new ProxyAgent(proxyUrl)
-    : undefined;
+  // Loopback targets (self-hosted vLLM, test doubles) bypass the proxy.
+  const proxyDispatcher: Dispatcher | undefined =
+    decisionModelProxyDispatcher(baseURL);
 
   return {
     evaluate: async (
@@ -327,22 +326,17 @@ export function createTypeSafeDecisionModelClient(params: {
 
       if (!response.ok) {
         const detail = await response.text().catch(() => "");
-        // 429/5xx are operational: throw the shared LLM error so the eval queue
-        // applies its backoff retry instead of recording a permanent ERROR.
-        // Measured on OpenRouter: a busy decision model answers 429 transiently
-        // (nace-ai/drex-v1.5) and succeeds on retry.
-        if (response.status === 429 || response.status >= 500) {
-          throw new LLMCompletionError({
-            message: `Decision model request failed (${response.status})${detail ? `: ${detail.slice(0, 500)}` : ""}`,
-            responseStatusCode: response.status,
-            isRetryable: true,
-          });
-        }
-        throw new Error(
-          `Decision model request failed (${response.status})${
-            detail ? `: ${detail.slice(0, 500)}` : ""
-          }`,
-        );
+        // Every non-2xx becomes an LLMCompletionError: the eval queue records its
+        // message verbatim, so a user sees the provider's own reason (region
+        // block, unknown model, ToS refusal) instead of "An internal error
+        // occurred". 429/5xx stay retryable — measured on OpenRouter, a busy
+        // decision model answers 429 transiently (nace-ai/drex-v1.5) and succeeds
+        // on retry.
+        throw new LLMCompletionError({
+          message: `Decision model request failed (${response.status})${detail ? `: ${detail.slice(0, 500)}` : ""}`,
+          responseStatusCode: response.status,
+          isRetryable: response.status === 429 || response.status >= 500,
+        });
       }
 
       const parsed = decisionResponseSchema.safeParse(await response.json());

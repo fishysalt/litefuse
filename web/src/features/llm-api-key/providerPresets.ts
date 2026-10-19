@@ -264,6 +264,21 @@ export const llmProviderPresets: LlmProviderPreset[] = [
     note: "Pick any model in the list. ScaleDown needs a text state and Respan span-01 a chat state; both are adapted automatically. Respan span-01 answers yes/no questions only, and the evaluator form enforces that.",
   },
   {
+    id: "openai-decision-model",
+    label: "OpenAI Decisions (gpt-6-luna)",
+    group: "decision-model",
+    adapter: LLMAdapter.OpenAI,
+    provider: "OpenAI",
+    // OpenAI serves its decision model at /v1/decisions on the regular API host;
+    // the client appends /decisions to this base URL.
+    baseURL: "https://api.openai.com/v1",
+    withDefaultModels: false,
+    customModels: ["gpt-6-luna"],
+    docsUrl: "https://developers.openai.com/api/docs/guides/decisions",
+    apiKeyUrl: "https://platform.openai.com/api-keys",
+    note: "OpenAI's own Decisions API (public beta). It is not the System One protocol: the evaluator form is the same, but this connection can only answer decision-model evaluators. You can also reuse an existing OpenAI connection if it lists gpt-6-luna.",
+  },
+  {
     id: "perplexity-decider",
     label: "Perplexity Decider (official)",
     group: "decision-model",

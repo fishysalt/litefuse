@@ -53,7 +53,7 @@ export function getDecisionModelConnectionExclusionReason(
   // fired for OpenAI, which no longer reports as decision-model capable — and was
   // removed rather than left as dead text.
   if (!supportsDecisionModels(connection.adapter)) {
-    return `${label} cannot answer decision-model questions; decision-model evaluators need a TypeSafe connection.`;
+    return `${label} cannot answer decision-model questions; decision-model evaluators need a TypeSafe or OpenAI connection.`;
   }
 
   const hasAllowedModel = getConnectionModels(connection).some((model) =>
