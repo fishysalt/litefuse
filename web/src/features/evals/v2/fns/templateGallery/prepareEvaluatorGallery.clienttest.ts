@@ -96,6 +96,19 @@ describe("prepareEvaluatorGallery", () => {
     expect(customNames).not.toContain(codeTemplate.name);
   });
 
+  it("hides the project-template entry when nothing would be listed under it", () => {
+    const gallery = prepareEvaluatorGallery({
+      customTemplates: [],
+      customTemplateCount: 0,
+      search: "",
+    });
+
+    expect(gallery.navigationItems.map(({ key }) => key)).not.toContain(
+      "custom",
+    );
+    expect(gallery.sections.map(({ key }) => key)).not.toContain("custom");
+  });
+
   it("searches custom and managed template descriptions", () => {
     const gallery = prepareEvaluatorGallery({
       customTemplates: [judgeTemplate, codeTemplate],
@@ -106,7 +119,6 @@ describe("prepareEvaluatorGallery", () => {
     expect(
       gallery.navigationItems.map(({ key, count }) => ({ key, count })),
     ).toEqual([
-      { key: "custom", count: 0 },
       { key: "recommended", count: 0 },
       { key: "conversation", count: 0 },
       { key: "quality", count: 0 },

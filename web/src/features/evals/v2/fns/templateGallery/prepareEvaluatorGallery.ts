@@ -81,15 +81,23 @@ export function prepareEvaluatorGallery({
       ];
     }),
   );
+  // "Your templates" is only a selectable sidebar entry when there is something
+  // to select: an empty project section used to render as a clickable entry that
+  // fell back to "All" as soon as it was clicked, which read as a broken link.
+  const hasProjectTemplates = filteredCustom.length > 0;
   const navigationItems: GalleryNavigationItem[] = [
-    {
-      key: EVALUATOR_GALLERY_PROJECT_SECTION_KEY,
-      label: "Your templates",
-      icon: getGalleryCategoryPresentation(
-        EVALUATOR_GALLERY_PROJECT_SECTION_KEY,
-      ).icon,
-      count: customTemplateCount,
-    },
+    ...(hasProjectTemplates
+      ? [
+          {
+            key: EVALUATOR_GALLERY_PROJECT_SECTION_KEY,
+            label: "Your templates",
+            icon: getGalleryCategoryPresentation(
+              EVALUATOR_GALLERY_PROJECT_SECTION_KEY,
+            ).icon,
+            count: customTemplateCount,
+          },
+        ]
+      : []),
     ...managedCatalog.categories.map((category) => ({
       key: category.key,
       label: category.label,
@@ -98,7 +106,7 @@ export function prepareEvaluatorGallery({
     })),
   ];
   const sections: GallerySection[] = [
-    ...(filteredCustom.length
+    ...(hasProjectTemplates
       ? [
           {
             key: EVALUATOR_GALLERY_PROJECT_SECTION_KEY,
