@@ -61,7 +61,7 @@ function LevelDescriptionTooltip({
     <Tooltip>
       <TooltipTrigger
         type="button"
-        className="text-muted-foreground focus-visible:ring-ring cursor-help rounded-sm focus-visible:ring-2 focus-visible:outline-none"
+        className="text-muted-foreground focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
         aria-label={`Level ${index} description`}
       >
         <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
