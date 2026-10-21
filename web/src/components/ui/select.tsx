@@ -108,6 +108,15 @@ const SelectContent = React.forwardRef<
           position === "popper" &&
             "h-(--radix-select-trigger-height) w-full min-w-(--radix-select-trigger-width)",
         )}
+        // Inside a modal Dialog the scroll lock calls preventDefault() on wheel
+        // events that target portaled content (this list among them), which left
+        // the options scrollable only through the hover scroll buttons. When that
+        // happened, scroll the list ourselves; when it did not, the browser
+        // already scrolled it and this does nothing.
+        onWheel={(event) => {
+          if (!event.defaultPrevented) return;
+          event.currentTarget.scrollTop += event.deltaY;
+        }}
       >
         {children}
       </SelectPrimitive.Viewport>
