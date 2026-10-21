@@ -16,6 +16,7 @@ import {
 import { usePostHogClientCapture } from "@/src/features/posthog-analytics";
 
 export function EvaluatorActionsCell({
+  canEdit,
   canViewExecutions,
   canViewScores,
   ruleTracesLinks,
@@ -25,6 +26,8 @@ export function EvaluatorActionsCell({
   onEdit,
   onDelete,
 }: {
+  /** `evaluator:CUD`. Without it the menu keeps only the read-only entries. */
+  canEdit: boolean;
   canViewExecutions: boolean;
   /** False until the evaluator's own score names are known (or if it has none). */
   canViewScores: boolean;
@@ -120,27 +123,31 @@ export function EvaluatorActionsCell({
                 },
               ]
             : []),
-          {
-            type: "item",
-            id: "edit",
-            title: "Edit",
-            icon: Pencil,
-            onClick: onEdit,
-          },
-          {
-            type: "item",
-            id: "clone",
-            title: "Clone",
-            icon: Copy,
-            onClick: onClone,
-          },
-          {
-            type: "item",
-            id: "delete",
-            title: "Delete",
-            icon: Trash2,
-            onClick: onDelete,
-          },
+          ...(canEdit
+            ? [
+                {
+                  type: "item" as const,
+                  id: "edit",
+                  title: "Edit",
+                  icon: Pencil,
+                  onClick: onEdit,
+                },
+                {
+                  type: "item" as const,
+                  id: "clone",
+                  title: "Clone",
+                  icon: Copy,
+                  onClick: onClone,
+                },
+                {
+                  type: "item" as const,
+                  id: "delete",
+                  title: "Delete",
+                  icon: Trash2,
+                  onClick: onDelete,
+                },
+              ]
+            : []),
         ]}
       >
         {({ getTriggerProps }) => (

@@ -838,6 +838,7 @@ export function EvaluatorSetupPage(
           store={evaluatorSetupStore}
           initialSnapshot={initialSnapshot.current}
           isEditing={Boolean(initialEvaluator)}
+          canWrite={canReactivate}
           isSaving={
             saveInFlight ||
             create.isPending ||

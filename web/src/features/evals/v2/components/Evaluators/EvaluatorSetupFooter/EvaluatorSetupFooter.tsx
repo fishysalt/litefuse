@@ -12,6 +12,7 @@ export function EvaluatorSetupFooter({
   initialSnapshot,
   isEditing,
   isSaving,
+  canWrite,
   nameAIAssistanceAvailable,
   codeValidation,
   onClose,
@@ -21,6 +22,8 @@ export function EvaluatorSetupFooter({
   initialSnapshot: string;
   isEditing: boolean;
   isSaving: boolean;
+  /** `evaluator:CUD`. Read-only viewers can look at the editor, never save it. */
+  canWrite: boolean;
   nameAIAssistanceAvailable: boolean;
   codeValidation: { isValid: boolean; isPending: boolean } | null;
   onClose: () => void;
@@ -62,19 +65,21 @@ export function EvaluatorSetupFooter({
     }),
   );
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot;
-  const disabledReason =
-    nameMissing && !nameAIAssistanceAvailable
+  const disabledReason = !canWrite
+    ? "You do not have permission to create or change evaluators in this project."
+    : nameMissing && !nameAIAssistanceAvailable
       ? "Add an evaluator name before saving."
       : promptMessagesReason
         ? promptMessagesReason
         : scoreOutputReason
           ? scoreOutputReason
           : codeValidation &&
-              !codeValidation.isPending &&
-              !codeValidation.isValid
-            ? "Fix the code validation errors before saving."
-            : null;
+                !codeValidation.isPending &&
+                !codeValidation.isValid
+              ? "Fix the code validation errors before saving."
+              : null;
   const saveDisabled =
+    !canWrite ||
     !canSubmit ||
     Boolean(
       codeValidation && (codeValidation.isPending || !codeValidation.isValid),

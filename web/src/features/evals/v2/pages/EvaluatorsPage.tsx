@@ -96,10 +96,13 @@ function RelativeDate({ date }: { date: Date }) {
 function EvaluatorsOverviewSelectionBar({
   selectionStore,
   totalCount,
+  canDelete,
   onDeleteSelection,
 }: {
   selectionStore: EvaluatorsTableStore;
   totalCount: number | null;
+  /** `evaluator:CUD`. Viewers may select rows but never see the delete action. */
+  canDelete: boolean;
   onDeleteSelection: (selection: {
     selectAll: boolean;
     selectedIds: string[];
@@ -118,16 +121,18 @@ function EvaluatorsOverviewSelectionBar({
       }
       onClear={selectionStore.getState().actions.clearSelection}
     >
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-8"
-        onClick={() => onDeleteSelection({ selectAll, selectedIds })}
-      >
-        <Trash2 className="h-4 w-4 sm:mr-2" />
-        <span className="hidden sm:inline">Delete</span>
-      </Button>
+      {canDelete ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={() => onDeleteSelection({ selectAll, selectedIds })}
+        >
+          <Trash2 className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Delete</span>
+        </Button>
+      ) : null}
     </OverviewSelectionBar>
   );
 }
@@ -289,6 +294,12 @@ export default function EvaluatorsPage() {
   const hasExecutionReadAccess = useHasProjectAccess({
     projectId,
     scope: "evalJobExecution:read",
+  });
+  // Create / edit / clone / delete all need `evaluator:CUD`. Hiding the entries
+  // is better than letting a viewer click them into a FORBIDDEN toast.
+  const hasEvaluatorWriteAccess = useHasProjectAccess({
+    projectId,
+    scope: "evaluator:CUD",
   });
   const defaultModelConnection = projectDefaultModel.connections.find(
     ({ provider }) => provider === projectDefaultModel.defaultModel?.provider,
@@ -509,6 +520,7 @@ export default function EvaluatorsPage() {
           return (
             <div className="w-full" onClick={(event) => event.stopPropagation()}>
               <EvaluatorActionsCell
+                canEdit={hasEvaluatorWriteAccess}
                 canViewExecutions={hasExecutionReadAccess}
                 canViewScores={scoresUrl !== null}
                 ruleTracesLinks={ruleTracesLinks}
@@ -541,6 +553,7 @@ export default function EvaluatorsPage() {
       },
     ],
     [
+      hasEvaluatorWriteAccess,
       hasExecutionReadAccess,
       projectId,
       recentExecutions.data,
@@ -674,10 +687,12 @@ export default function EvaluatorsPage() {
                 hideCreateEntryWhenEmpty
               />
             )}
-            <Button onClick={() => setGalleryOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New evaluator
-            </Button>
+            {hasEvaluatorWriteAccess ? (
+              <Button onClick={() => setGalleryOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                New evaluator
+              </Button>
+            ) : null}
           </div>
         ),
         tabsProps: {
@@ -801,6 +816,7 @@ export default function EvaluatorsPage() {
       <EvaluatorsOverviewSelectionBar
         selectionStore={selectionStore}
         totalCount={evaluators.data?.totalItems ?? null}
+        canDelete={hasEvaluatorWriteAccess}
         onDeleteSelection={({ selectAll, selectedIds }) => {
           if (selectAll) setDeleteAll(true);
           else setDeleteIds(selectedIds);
