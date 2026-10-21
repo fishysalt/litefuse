@@ -1,4 +1,4 @@
-﻿import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -12,7 +12,6 @@ import {
 import { ChevronDown, PlusIcon, TrashIcon } from "lucide-react";
 import { z } from "zod/v4";
 import { Button } from "@/src/components/ui/button";
-import { DropdownMenu } from "@/src/components/design-system/DropdownMenu/DropdownMenu";
 import {
   Form,
   FormControl,
@@ -257,6 +256,15 @@ export function CreateLLMApiKeyForm({
 
   const selectedPreset: LlmProviderPreset | undefined =
     getLlmProviderPreset(presetId);
+
+  // The preset list is an inline panel rather than a portalled dropdown: inside
+  // this dialog the wheel does not reach portalled content, an inline panel
+  // scrolls natively like any other part of the dialog.
+  const [presetPickerOpen, setPresetPickerOpen] = useState(false);
+  const selectPreset = (nextPresetId: string) => {
+    applyPreset(nextPresetId);
+    setPresetPickerOpen(false);
+  };
 
   const applyPreset = (nextPresetId: string) => {
     setPresetId(nextPresetId);
@@ -507,53 +515,74 @@ export function CreateLLMApiKeyForm({
               <Label>Provider preset</Label>
               <p className="text-muted-foreground text-sm">
                 Prefills the adapter, base URL and model names for a provider.
-                Choose 鈥淐ustom鈥?to configure the connection entirely by hand.
+                Choose “Custom” to configure the connection entirely by hand.
               </p>
-              {/* A dropdown like the app's other menus (row actions, table
-                  filters): the same DropdownMenu primitive, so the list scrolls
-                  with the wheel inside this dialog instead of only through the
-                  hover scroll buttons a Radix Select gives you. */}
-              <DropdownMenu
-                maxHeight="40vh"
-                items={[
-                  {
-                    type: "item",
-                    id: CUSTOM_PRESET_ID,
-                    title: t("Custom (configure manually)"),
-                    onClick: () => applyPreset(CUSTOM_PRESET_ID),
-                  },
-                  ...groupLlmProviderPresets().flatMap(
-                    ({ group, label, presets }) => [
-                      // Preset and group labels are English keys held as data
-                      // (see LLM_PROVIDER_PRESET_LABELS); render through t() so
-                      // zh-CN sees Chinese.
-                      { type: "label" as const, id: `group-${group}`, title: t(label) },
-                      ...presets.map((preset) => ({
-                        type: "item" as const,
-                        id: preset.id,
-                        title: t(preset.label),
-                        onClick: () => applyPreset(preset.id),
-                      })),
-                    ],
-                  ),
-                ]}
-              >
-                {({ getTriggerProps }) => (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-between font-normal"
-                    {...getTriggerProps()}
+              {/* A dropdown panel rendered inside the dialog: it looks like the
+                  app's other menus, and because it is not portalled the browser
+                  scrolls it with the wheel. */}
+              <div className="relative">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between font-normal"
+                  aria-haspopup="listbox"
+                  aria-expanded={presetPickerOpen}
+                  onClick={() => setPresetPickerOpen((open) => !open)}
+                >
+                  <span className="truncate">
+                    {selectedPreset
+                      ? t(selectedPreset.label)
+                      : t("Custom (configure manually)")}
+                  </span>
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                </Button>
+                {presetPickerOpen ? (
+                  <div
+                    role="listbox"
+                    className="bg-popover absolute z-50 mt-1 max-h-[40vh] w-full overflow-y-auto rounded-md border shadow-md"
                   >
-                    <span className="truncate">
-                      {selectedPreset
-                        ? t(selectedPreset.label)
-                        : t("Custom (configure manually)")}
-                    </span>
-                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
-                  </Button>
-                )}
-              </DropdownMenu>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={presetId === CUSTOM_PRESET_ID}
+                      onClick={() => selectPreset(CUSTOM_PRESET_ID)}
+                      className={cn(
+                        "hover:bg-accent w-full px-3 py-2 text-left text-sm",
+                        presetId === CUSTOM_PRESET_ID && "bg-accent font-medium",
+                      )}
+                    >
+                      {t("Custom (configure manually)")}
+                    </button>
+                    {groupLlmProviderPresets().map(
+                      ({ group, label, presets }) => (
+                        <div key={group}>
+                          {/* Preset and group labels are English keys held as
+                              data (see LLM_PROVIDER_PRESET_LABELS); render
+                              through t() so zh-CN sees Chinese. */}
+                          <div className="text-muted-foreground px-3 pt-2 pb-1 text-xs font-semibold">
+                            {t(label)}
+                          </div>
+                          {presets.map((preset) => (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              role="option"
+                              aria-selected={presetId === preset.id}
+                              onClick={() => selectPreset(preset.id)}
+                              className={cn(
+                                "hover:bg-accent w-full px-3 py-2 text-left text-sm",
+                                presetId === preset.id && "bg-accent font-medium",
+                              )}
+                            >
+                              {t(preset.label)}
+                            </button>
+                          ))}
+                        </div>
+                      ),
+                    )}
+                  </div>
+                ) : null}
+              </div>
               {selectedPreset && (
                 <p className="text-muted-foreground text-sm">
                   {selectedPreset.note ? `${selectedPreset.note} ` : ""}
