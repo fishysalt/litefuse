@@ -771,14 +771,16 @@ export function EvaluatorSetupPage(
               <History className="mr-2 h-4 w-4" />
               Version history
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              title="Delete evaluator"
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 className="text-destructive h-4 w-4" />
-            </Button>
+            {canReactivate ? (
+              <Button
+                type="button"
+                variant="outline"
+                title="Delete evaluator"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="text-destructive h-4 w-4" />
+              </Button>
+            ) : null}
           </div>
         ) : undefined,
       }}
