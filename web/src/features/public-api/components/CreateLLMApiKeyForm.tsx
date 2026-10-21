@@ -26,9 +26,7 @@ import { Label } from "@/src/components/ui/label";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/src/components/ui/select";
@@ -510,31 +508,46 @@ export function CreateLLMApiKeyForm({
                 Prefills the adapter, base URL and model names for a provider.
                 Choose “Custom” to configure the connection entirely by hand.
               </p>
-              <Select value={presetId} onValueChange={applyPreset}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a provider" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[50vh]">
-                  <SelectItem value={CUSTOM_PRESET_ID}>
-                    {t("Custom (configure manually)")}
-                  </SelectItem>
-                  {groupLlmProviderPresets().map(
-                    ({ group, label, presets }) => (
-                      <SelectGroup key={group}>
-                        {/* Preset and group labels are English keys held as
-                            data (see LLM_PROVIDER_PRESET_LABELS); render
-                            through t() so zh-CN sees Chinese. */}
-                        <SelectLabel>{t(label)}</SelectLabel>
-                        {presets.map((preset) => (
-                          <SelectItem key={preset.id} value={preset.id}>
-                            {t(preset.label)}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    ),
+              {/* A grouped list rendered inline instead of a Select: a Radix
+                  Select portals its options to <body>, where the dialog's
+                  scroll lock swallows the wheel and the list only moves through
+                  the hover scroll buttons. Inside the dialog the browser
+                  scrolls this list with the wheel like any other panel. */}
+              <div className="max-h-[40vh] overflow-y-auto rounded-md border">
+                <button
+                  type="button"
+                  onClick={() => applyPreset(CUSTOM_PRESET_ID)}
+                  className={cn(
+                    "hover:bg-accent flex w-full items-center px-3 py-2 text-left text-sm",
+                    presetId === CUSTOM_PRESET_ID && "bg-accent font-medium",
                   )}
-                </SelectContent>
-              </Select>
+                >
+                  {t("Custom (configure manually)")}
+                </button>
+                {groupLlmProviderPresets().map(({ group, label, presets }) => (
+                  <div key={group}>
+                    {/* Preset and group labels are English keys held as data
+                        (see LLM_PROVIDER_PRESET_LABELS); render through t() so
+                        zh-CN sees Chinese. */}
+                    <div className="bg-muted/50 text-muted-foreground sticky top-0 px-3 py-1.5 text-xs font-semibold">
+                      {t(label)}
+                    </div>
+                    {presets.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => applyPreset(preset.id)}
+                        className={cn(
+                          "hover:bg-accent flex w-full items-center px-3 py-2 text-left text-sm",
+                          presetId === preset.id && "bg-accent font-medium",
+                        )}
+                      >
+                        {t(preset.label)}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
               {selectedPreset && (
                 <p className="text-muted-foreground text-sm">
                   {selectedPreset.note ? `${selectedPreset.note} ` : ""}
