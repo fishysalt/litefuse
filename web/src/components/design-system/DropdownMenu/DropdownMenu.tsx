@@ -154,10 +154,18 @@ type DropdownMenuSubmenu = {
   type: "submenu";
 };
 
+/** A non-interactive group heading rendered inline between items. */
+export type DropdownMenuLabelItem = {
+  id: string;
+  title: string;
+  type: "label";
+};
+
 export type DropdownMenuItemDefinition =
   | DropdownMenuItem
   | DropdownMenuCheckboxItem
   | DropdownMenuSubmenu
+  | DropdownMenuLabelItem
   | { id: string; type: "loading" }
   | { id: string; type: "separator" };
 
@@ -264,7 +272,12 @@ function DropdownMenuNode({
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
     if (!search || !normalizedQuery) return items;
     const hasDefaultMatch = items.some((item) => {
-      if (item.type === "separator" || item.type === "loading") return false;
+      if (
+        item.type === "separator" ||
+        item.type === "loading" ||
+        item.type === "label"
+      )
+        return false;
       if (item.searchBehavior && item.searchBehavior !== "default")
         return false;
       return item.title.toLocaleLowerCase().includes(normalizedQuery);
@@ -272,6 +285,7 @@ function DropdownMenuNode({
 
     return items.filter((item) => {
       if (item.type === "separator") return false;
+      if (item.type === "label") return true;
       if (item.type === "loading") return true;
       if (item.searchBehavior === "hide") return false;
       if (item.searchBehavior === "always-show") return true;
@@ -395,6 +409,20 @@ function DropdownMenuNode({
                         role="separator"
                         className="bg-border -mx-1 my-1 h-px"
                       />
+                    );
+                  }
+
+                  if (item.type === "label") {
+                    labelsRef.current[index] = null;
+                    listRef.current[index] = null;
+                    return (
+                      <div
+                        key={item.id}
+                        role="presentation"
+                        className="text-muted-foreground px-2 pt-2 pb-1 text-xs font-semibold"
+                      >
+                        {item.title}
+                      </div>
                     );
                   }
 

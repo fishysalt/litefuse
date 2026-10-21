@@ -1,4 +1,4 @@
-import { useFieldArray, useForm } from "react-hook-form";
+﻿import { useFieldArray, useForm } from "react-hook-form";
 import { useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -12,6 +12,7 @@ import {
 import { ChevronDown, PlusIcon, TrashIcon } from "lucide-react";
 import { z } from "zod/v4";
 import { Button } from "@/src/components/ui/button";
+import { DropdownMenu } from "@/src/components/design-system/DropdownMenu/DropdownMenu";
 import {
   Form,
   FormControl,
@@ -506,48 +507,53 @@ export function CreateLLMApiKeyForm({
               <Label>Provider preset</Label>
               <p className="text-muted-foreground text-sm">
                 Prefills the adapter, base URL and model names for a provider.
-                Choose “Custom” to configure the connection entirely by hand.
+                Choose 鈥淐ustom鈥?to configure the connection entirely by hand.
               </p>
-              {/* A grouped list rendered inline instead of a Select: a Radix
-                  Select portals its options to <body>, where the dialog's
-                  scroll lock swallows the wheel and the list only moves through
-                  the hover scroll buttons. Inside the dialog the browser
-                  scrolls this list with the wheel like any other panel. */}
-              <div className="max-h-[40vh] overflow-y-auto rounded-md border">
-                <button
-                  type="button"
-                  onClick={() => applyPreset(CUSTOM_PRESET_ID)}
-                  className={cn(
-                    "hover:bg-accent flex w-full items-center px-3 py-2 text-left text-sm",
-                    presetId === CUSTOM_PRESET_ID && "bg-accent font-medium",
-                  )}
-                >
-                  {t("Custom (configure manually)")}
-                </button>
-                {groupLlmProviderPresets().map(({ group, label, presets }) => (
-                  <div key={group}>
-                    {/* Preset and group labels are English keys held as data
-                        (see LLM_PROVIDER_PRESET_LABELS); render through t() so
-                        zh-CN sees Chinese. */}
-                    <div className="bg-muted/50 text-muted-foreground sticky top-0 px-3 py-1.5 text-xs font-semibold">
-                      {t(label)}
-                    </div>
-                    {presets.map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => applyPreset(preset.id)}
-                        className={cn(
-                          "hover:bg-accent flex w-full items-center px-3 py-2 text-left text-sm",
-                          presetId === preset.id && "bg-accent font-medium",
-                        )}
-                      >
-                        {t(preset.label)}
-                      </button>
-                    ))}
-                  </div>
-                ))}
-              </div>
+              {/* A dropdown like the app's other menus (row actions, table
+                  filters): the same DropdownMenu primitive, so the list scrolls
+                  with the wheel inside this dialog instead of only through the
+                  hover scroll buttons a Radix Select gives you. */}
+              <DropdownMenu
+                maxHeight="40vh"
+                items={[
+                  {
+                    type: "item",
+                    id: CUSTOM_PRESET_ID,
+                    title: t("Custom (configure manually)"),
+                    onClick: () => applyPreset(CUSTOM_PRESET_ID),
+                  },
+                  ...groupLlmProviderPresets().flatMap(
+                    ({ group, label, presets }) => [
+                      // Preset and group labels are English keys held as data
+                      // (see LLM_PROVIDER_PRESET_LABELS); render through t() so
+                      // zh-CN sees Chinese.
+                      { type: "label" as const, id: `group-${group}`, title: t(label) },
+                      ...presets.map((preset) => ({
+                        type: "item" as const,
+                        id: preset.id,
+                        title: t(preset.label),
+                        onClick: () => applyPreset(preset.id),
+                      })),
+                    ],
+                  ),
+                ]}
+              >
+                {({ getTriggerProps }) => (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between font-normal"
+                    {...getTriggerProps()}
+                  >
+                    <span className="truncate">
+                      {selectedPreset
+                        ? t(selectedPreset.label)
+                        : t("Custom (configure manually)")}
+                    </span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                  </Button>
+                )}
+              </DropdownMenu>
               {selectedPreset && (
                 <p className="text-muted-foreground text-sm">
                   {selectedPreset.note ? `${selectedPreset.note} ` : ""}
@@ -559,7 +565,7 @@ export function CreateLLMApiKeyForm({
                   >
                     Docs
                   </a>
-                  {" · "}
+                  {" 路 "}
                   <a
                     href={selectedPreset.apiKeyUrl}
                     target="_blank"
@@ -875,3 +881,4 @@ export function CreateLLMApiKeyForm({
     </Form>
   );
 }
+
