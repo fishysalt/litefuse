@@ -2,8 +2,10 @@
 import { useRouter } from "next/router";
 import { EvalTemplateTypeEnum } from "@langfuse/shared";
 
+import { SupportOrUpgradePage } from "@/src/components/SupportOrUpgradePage";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { useEvalTemplate } from "@/src/features/evals/v2/hooks/useEvalTemplate";
+import { useHasProjectAccess } from "@/src/features/rbac";
 import { EvaluatorSetupPage } from "./EvaluatorSetupPage";
 
 function requestedEvaluatorType(value: string | string[] | undefined) {
@@ -17,6 +19,13 @@ function requestedEvaluatorType(value: string | string[] | undefined) {
 export default function NewEvaluatorPage() {
   const router = useRouter();
   const projectId = router.query.projectId as string;
+  // Creating an evaluator needs `evaluator:CUD`. The list page already hides
+  // its entry point for read-only roles; this keeps a typed URL from rendering
+  // an editor whose every save would be rejected server-side.
+  const canCreate = useHasProjectAccess({
+    projectId,
+    scope: "evaluator:CUD",
+  });
   const templateKey =
     typeof router.query.template === "string" ? router.query.template : null;
   const evaluatorId =
@@ -27,10 +36,18 @@ export default function NewEvaluatorPage() {
     projectId,
     templateKey,
     evaluatorId,
-    enabled: router.isReady,
+    enabled: router.isReady && canCreate,
   });
 
-  if (!router.isReady || template.isPending) {
+  if (!router.isReady) {
+    return <Skeleton className="m-6 h-96 w-[calc(100%-3rem)]" />;
+  }
+
+  if (!canCreate) {
+    return <SupportOrUpgradePage />;
+  }
+
+  if (template.isPending) {
     return <Skeleton className="m-6 h-96 w-[calc(100%-3rem)]" />;
   }
 
