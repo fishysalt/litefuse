@@ -6,12 +6,14 @@ export function TestRerunAction({
   projectId,
   store,
   hasValidModel,
+  canRunTest,
   isPending,
   onRerun,
 }: {
   projectId: string;
   store: EvaluatorSetupStore;
   hasValidModel: boolean;
+  canRunTest: boolean;
   isPending: boolean;
   onRerun: () => void;
 }) {
@@ -19,6 +21,7 @@ export function TestRerunAction({
     projectId,
     store,
     hasValidModel,
+    canRunTest,
   });
 
   return (

@@ -14,6 +14,7 @@ export function EvaluatorTestPanelContainer({
   sampleSelector,
   testResult,
   testPending,
+  canRunTest,
   rawResultOpen,
   onRawResultOpenChange,
   onRunTest,
@@ -24,6 +25,8 @@ export function EvaluatorTestPanelContainer({
   sampleSelector: ReactNode;
   testResult: unknown;
   testPending: boolean;
+  /** `evaluator:CUD` — test runs bill the configured model. */
+  canRunTest: boolean;
   rawResultOpen: boolean;
   onRawResultOpenChange: (open: boolean) => void;
   onRunTest: () => void;
@@ -43,6 +46,7 @@ export function EvaluatorTestPanelContainer({
           projectId={projectId}
           store={store}
           hasValidModel={hasValidModel}
+          canRunTest={canRunTest}
           testResult={testResult}
           testPending={testPending}
           rawResultOpen={rawResultOpen}

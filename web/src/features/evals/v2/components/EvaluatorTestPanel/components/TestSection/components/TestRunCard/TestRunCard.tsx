@@ -8,11 +8,13 @@ export function TestRunCard({
   projectId,
   store,
   hasValidModel,
+  canRunTest,
   onRunTest,
 }: {
   projectId: string;
   store: EvaluatorSetupStore;
   hasValidModel: boolean;
+  canRunTest: boolean;
   onRunTest: () => void;
 }) {
   const selectedSampleLabel = useStore(store, (state) => {
@@ -25,6 +27,7 @@ export function TestRunCard({
     projectId,
     store,
     hasValidModel,
+    canRunTest,
   });
 
   return (

@@ -22,6 +22,7 @@ export function TestSectionContainer({
   projectId,
   store,
   hasValidModel,
+  canRunTest,
   testResult,
   testPending,
   rawResultOpen,
@@ -32,6 +33,7 @@ export function TestSectionContainer({
   projectId: string;
   store: EvaluatorSetupStore;
   hasValidModel: boolean;
+  canRunTest: boolean;
   testResult: unknown;
   testPending: boolean;
   rawResultOpen: boolean;
@@ -57,6 +59,7 @@ export function TestSectionContainer({
             projectId={projectId}
             store={store}
             hasValidModel={hasValidModel}
+            canRunTest={canRunTest}
             onRunTest={onRunTest}
           />
         ) : (
@@ -84,6 +87,7 @@ export function TestSectionContainer({
                 projectId={projectId}
                 store={store}
                 hasValidModel={hasValidModel}
+                canRunTest={canRunTest}
                 isPending={testPending}
                 onRerun={onRunTest}
               />

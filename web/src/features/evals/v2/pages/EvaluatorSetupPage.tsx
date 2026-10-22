@@ -643,6 +643,7 @@ export function EvaluatorSetupPage(
   };
 
   const runTest = () => {
+    if (!canReactivate) return;
     const state = evaluatorSetupStore.getState();
     const { definition } = prepareEvaluatorDraft(state);
     const selectedObservation = state.selectedObservation;
@@ -721,6 +722,7 @@ export function EvaluatorSetupPage(
       }
       testResult={testResult}
       testPending={testEvaluator.isPending}
+      canRunTest={canReactivate}
       rawResultOpen={rawResultOpen}
       onRawResultOpenChange={setRawResultOpen}
       onRunTest={runTest}

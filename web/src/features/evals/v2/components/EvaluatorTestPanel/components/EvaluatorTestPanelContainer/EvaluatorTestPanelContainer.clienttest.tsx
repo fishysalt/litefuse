@@ -37,6 +37,7 @@ describe("EvaluatorTestPanelContainer", () => {
         sampleSelector={null}
         testResult={null}
         testPending={false}
+        canRunTest
         rawResultOpen={false}
         onRawResultOpenChange={jest.fn()}
         onRunTest={jest.fn()}

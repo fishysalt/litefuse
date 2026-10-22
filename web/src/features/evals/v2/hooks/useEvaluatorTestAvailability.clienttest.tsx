@@ -34,6 +34,7 @@ describe("useEvaluatorTestAvailability", () => {
           projectId: "project-1",
           store,
           hasValidModel,
+          canRunTest: true,
         }),
       { initialProps: { hasValidModel: false } },
     );
@@ -46,5 +47,22 @@ describe("useEvaluatorTestAvailability", () => {
     act(() => store.getState().actions.setType("CODE"));
     rerender({ hasValidModel: false });
     expect(result.current).toBeNull();
+  });
+
+  // Test runs bill the configured model, so a read-only role must be stopped
+  // before any "select a model"/"pick a sample" hint is offered.
+  it("blocks every test run for roles without evaluator:CUD", () => {
+    const { result } = renderHook(() =>
+      useEvaluatorTestAvailability({
+        projectId: "project-1",
+        store,
+        hasValidModel: true,
+        canRunTest: false,
+      }),
+    );
+
+    expect(result.current).toBe(
+      "You do not have permission to run evaluator tests in this project.",
+    );
   });
 });
