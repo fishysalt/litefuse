@@ -34,14 +34,11 @@ export function RulesPage() {
           description:
             "Rules define which incoming observations reusable evaluators run on.",
         },
-        actionButtonsRight: (
-          <Button
-            disabled={!hasWriteAccess}
-            onClick={() => setCreateOpen(true)}
-          >
+        actionButtonsRight: hasWriteAccess ? (
+          <Button onClick={() => setCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> New rule
           </Button>
-        ),
+        ) : undefined,
         tabsProps: {
           tabs: getEvalsV2Tabs(projectId),
           activeTab: EVALS_V2_TABS.RULES,

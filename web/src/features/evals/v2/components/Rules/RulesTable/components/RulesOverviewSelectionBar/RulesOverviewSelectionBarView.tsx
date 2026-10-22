@@ -31,33 +31,39 @@ export function RulesOverviewSelectionBarView({
   return (
     <>
       <OverviewSelectionBar selectedCount={selectedCount} onClear={onClear}>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={!hasWriteAccess || statusChangePending}
-          onClick={onEnable}
-        >
-          <Play className="mr-2 h-4 w-4" /> Enable
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={!hasWriteAccess || statusChangePending}
-          onClick={onDisable}
-        >
-          <Pause className="mr-2 h-4 w-4" /> Disable
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={!hasWriteAccess}
-          onClick={onDelete}
-        >
-          <Trash2 className="mr-2 h-4 w-4" /> Delete
-        </Button>
+        {/* Bulk enable/disable/delete all need `evaluationRule:CUD`. Read-only
+            roles keep the selection (so they can see what they picked) but are
+            not offered an action that the server would reject. */}
+        {hasWriteAccess ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={statusChangePending}
+              onClick={onEnable}
+            >
+              <Play className="mr-2 h-4 w-4" /> Enable
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={statusChangePending}
+              onClick={onDisable}
+            >
+              <Pause className="mr-2 h-4 w-4" /> Disable
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onDelete}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Delete
+            </Button>
+          </>
+        ) : null}
       </OverviewSelectionBar>
       <ConfirmDialog
         open={deleteDialogOpen}

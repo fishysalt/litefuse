@@ -37,6 +37,7 @@ export function CreateRuleDialogContent({
   targetObject,
   evaluatorSearch,
   successNotification,
+  canEdit,
   onEvaluatorSearchChange,
 }: {
   projectId: string;
@@ -49,6 +50,7 @@ export function CreateRuleDialogContent({
   targetObject?: Extract<EvalTargetObject, "event" | "experiment">;
   evaluatorSearch: string;
   successNotification: "toast" | "none";
+  canEdit: boolean;
   onEvaluatorSearchChange: (search: string) => void;
 }) {
   const capture = usePostHogClientCapture();
@@ -160,42 +162,44 @@ export function CreateRuleDialogContent({
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
-          <RuleSetup
-            projectId={projectId}
-            evaluatorOptions={evaluatorOptions}
-            evaluatorSearch={evaluatorSearch}
-            onEvaluatorSearchChange={onEvaluatorSearchChange}
-            store={ruleSetupStore}
-            nameAIAssistance={
-              !nameAIAssistanceAvailable
-                ? { state: "unavailable" }
-                : suggestName.isPending
-                  ? { state: "generating" }
-                  : {
-                      state: "idle",
-                      onGenerate: () =>
-                        requestNameSuggestion().catch(() => undefined),
-                    }
-            }
-            onNameStepOpenChange={(stepOpen) => {
-              const state = ruleSetupStore.getState();
-              if (
-                nameAIAssistanceAvailable &&
-                stepOpen &&
-                !state.name &&
-                !hasRequestedName.current
-              ) {
-                requestNameSuggestion().catch(() => undefined);
+          <fieldset disabled={!canEdit} className="contents">
+            <RuleSetup
+              projectId={projectId}
+              evaluatorOptions={evaluatorOptions}
+              evaluatorSearch={evaluatorSearch}
+              onEvaluatorSearchChange={onEvaluatorSearchChange}
+              store={ruleSetupStore}
+              nameAIAssistance={
+                !nameAIAssistanceAvailable
+                  ? { state: "unavailable" }
+                  : suggestName.isPending
+                    ? { state: "generating" }
+                    : {
+                        state: "idle",
+                        onGenerate: () =>
+                          requestNameSuggestion().catch(() => undefined),
+                      }
               }
-            }}
-          />
+              onNameStepOpenChange={(stepOpen) => {
+                const state = ruleSetupStore.getState();
+                if (
+                  nameAIAssistanceAvailable &&
+                  stepOpen &&
+                  !state.name &&
+                  !hasRequestedName.current
+                ) {
+                  requestNameSuggestion().catch(() => undefined);
+                }
+              }}
+            />
+          </fieldset>
         </DialogBody>
         <RuleDialogFooter
           ruleSetupStore={ruleSetupStore}
           mutationPending={createRule.isPending}
           nameGenerationPending={suggestName.isPending}
           isEditing={false}
-          canEdit
+          canEdit={canEdit}
           nameAIAssistanceAvailable={nameAIAssistanceAvailable}
           onCancel={() => onOpenChange(false)}
           onSave={() => requestCreate().catch(() => undefined)}

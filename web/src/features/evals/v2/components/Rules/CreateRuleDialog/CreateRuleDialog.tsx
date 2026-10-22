@@ -20,6 +20,7 @@ export function CreateRuleDialog({
   initialFilter,
   targetObject,
   successNotification,
+  canEdit = true,
 }: {
   projectId: string;
   open: boolean;
@@ -29,6 +30,9 @@ export function CreateRuleDialog({
   initialFilter?: FilterState;
   targetObject?: Extract<EvalTargetObject, "event" | "experiment">;
   successNotification: "toast" | "none";
+  /** `evaluationRule:CUD`. Callers that can be reached by a read-only role
+   * pass it through so the dialog cannot post a save it is not allowed to. */
+  canEdit?: boolean;
 }) {
   const [evaluatorSearch, setEvaluatorSearch] = useState("");
   const [evaluatorSearchQuery, setEvaluatorSearchQuery] = useState("");
@@ -98,6 +102,7 @@ export function CreateRuleDialog({
       targetObject={targetObject}
       evaluatorSearch={evaluatorSearch}
       successNotification={successNotification}
+      canEdit={canEdit}
       onEvaluatorSearchChange={(value) => {
         setEvaluatorSearch(value);
         debouncedEvaluatorSearch(value);

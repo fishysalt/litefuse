@@ -378,6 +378,7 @@ function EvaluatorRuleRelationshipsSheet({
           }}
           onOpenChange={setCreateOpen}
           successNotification="toast"
+          canEdit={hasWriteAccess}
         />
       ) : null}
       <ActivationConfirmationDialog

@@ -460,7 +460,7 @@ export function RulesTable({
                         },
                         onClick: () => undefined,
                       },
-                  ...(navigationAction === "edit"
+                  ...(navigationAction === "edit" && hasWriteAccess
                     ? [
                         {
                           type: "item" as const,
@@ -471,17 +471,21 @@ export function RulesTable({
                         },
                       ]
                     : []),
-                  {
-                    type: "item",
-                    id: "clone",
-                    title: "Clone",
-                    icon: Copy,
-                    disabled:
-                      hasWriteAccess && navigationAction === "edit"
-                        ? undefined
-                        : { reason: "This rule cannot be cloned" },
-                    onClick: () => setCloneRule(row.original),
-                  },
+                  ...(hasWriteAccess
+                    ? [
+                        {
+                          type: "item" as const,
+                          id: "clone",
+                          title: "Clone",
+                          icon: Copy,
+                          disabled:
+                            navigationAction === "edit"
+                              ? undefined
+                              : { reason: "This rule cannot be cloned" },
+                          onClick: () => setCloneRule(row.original),
+                        },
+                      ]
+                    : []),
                   {
                     type: "item",
                     id: "delete",
@@ -699,7 +703,9 @@ export function RulesTable({
                   return;
                 }
 
-                if (navigationAction === "peek") {
+                if (navigationAction === "peek" || !hasWriteAccess) {
+                  // Read-only roles open the same rule, just in the read-only
+                  // peek instead of an editor whose save would be rejected.
                   setEditRuleId(null);
                   legacyPeekNavigation.openPeek(rule.id, rule);
                   return;
@@ -757,6 +763,7 @@ export function RulesTable({
             initialRule={cloneRule}
             onOpenChange={(open) => !open && setCloneRule(null)}
             successNotification="toast"
+            canEdit={hasWriteAccess}
           />
         ) : null}
       </div>
