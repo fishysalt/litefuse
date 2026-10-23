@@ -11,11 +11,29 @@ export type PrismaFilterColumnHandlers<TWhere> = {
   ) => TWhere;
 };
 
+/**
+ * A filter whose value was cleared (or an option list with nothing selected)
+ * expresses no constraint, so it must not reach the query: `does not contain ""`
+ * matched no rows at all and an empty `in: []` filtered everything out. Only a
+ * truly empty value is dropped — a single space is a legitimate filter ("does
+ * not contain ' '"), which is why this does not trim.
+ */
+function isEmptyValue(filter: PrismaFilter): boolean {
+  switch (filter.type) {
+    case "string":
+    case "stringOptions":
+      return filter.value.length === 0;
+    default:
+      return false;
+  }
+}
+
 export function compilePrismaFilters<TWhere>(
   filters: FilterState,
   handlers: Record<string, PrismaFilterColumnHandlers<TWhere>>,
 ): TWhere[] {
-  return filters.map((filter) => {
+  return filters.flatMap((filter) => {
+    if (isEmptyValue(filter)) return [];
     const handler = handlers[filter.column]?.[filter.type] as
       | ((filter: PrismaFilter) => TWhere)
       | undefined;
@@ -24,7 +42,7 @@ export function compilePrismaFilters<TWhere>(
         `Unsupported Prisma filter: ${filter.column} (${filter.type})`,
       );
     }
-    return handler(filter);
+    return [handler(filter)];
   });
 }
 
@@ -41,7 +59,13 @@ export function stringFilterToPrisma(
     case "contains":
       return { contains: filter.value, ...insensitive };
     case "does not contain":
-      return { not: { contains: filter.value, ...insensitive } };
+      // `mode` belongs on the top-level StringFilter only: Prisma's
+      // NestedStringFilter (what `not` accepts) has no `mode` member, so
+      // nesting it makes Prisma reject the whole query with
+      // "Unknown argument `mode`". The `not` object below is written out
+      // literally (no spread) so an accidental `mode` inside it fails
+      // excess-property checking at compile time.
+      return { not: { contains: filter.value }, ...insensitive };
     case "starts with":
       return { startsWith: filter.value, ...insensitive };
     case "ends with":
