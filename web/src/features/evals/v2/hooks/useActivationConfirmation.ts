@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   requestRuleActivation,
   type ActivationEstimate,
@@ -29,15 +30,17 @@ export function useActivationConfirmation({
 }: {
   projectId: string;
 }) {
+  const { t } = useTranslation();
   const utils = api.useUtils();
   const [confirmation, setConfirmation] = useState<ActivationConfirmationState>(
     {
       open: false,
       isConfirming: false,
-      title: "Activate evaluation rule?",
-      description:
+      title: t("Activate evaluation rule?"),
+      description: t(
         "Review the estimated cost before activating this evaluation rule.",
-      confirmLabel: "Activate rule",
+      ),
+      confirmLabel: t("Activate rule"),
       pendingAction: null,
     },
   );

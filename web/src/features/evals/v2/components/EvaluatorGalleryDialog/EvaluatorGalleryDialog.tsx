@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { EvalTemplateType } from "@langfuse/shared";
 
 import {
@@ -31,6 +32,7 @@ export function EvaluatorGalleryDialog({
   onCreateFromScratch: (type: EvalTemplateType) => void;
 }) {
   const capture = usePostHogClientCapture();
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [activeSection, setActiveSection] = useState<string>(
     EVALUATOR_GALLERY_ALL_SECTION_KEY,
@@ -131,10 +133,11 @@ export function EvaluatorGalleryDialog({
         }}
       >
         <DialogHeader className="[&>div]:items-start [&>div>button]:-mt-1 [&>div>button]:-mr-2 [&>div>button]:flex [&>div>button]:size-8 [&>div>button]:items-center [&>div>button]:justify-center">
-          <DialogTitle>Add an evaluator</DialogTitle>
+          <DialogTitle>{t("Add an evaluator")}</DialogTitle>
           <DialogDescription>
-            Pick a template to start from or create a new evaluator from
-            scratch.
+            {t(
+              "Pick a template to start from or create a new evaluator from scratch.",
+            )}
           </DialogDescription>
         </DialogHeader>
         <EvaluatorGalleryView

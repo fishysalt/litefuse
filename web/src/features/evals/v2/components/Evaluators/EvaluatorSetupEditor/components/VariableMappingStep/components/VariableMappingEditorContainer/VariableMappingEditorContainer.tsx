@@ -1,6 +1,7 @@
 import { memo, useMemo, useRef } from "react";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import { useTranslation } from "react-i18next";
 
 import { DecisionModelStateEditor } from "@/src/features/evals/v2/components/Evaluators/DecisionModel/DecisionModelStateEditor/DecisionModelStateEditor";
 import { VariableMapping } from "@/src/features/evals/v2/components/VariableMapping/VariableMapping";
@@ -8,11 +9,13 @@ import { buildDecisionModelStateFields } from "@/src/features/evals/v2/fns/varia
 import { buildEvaluatorVariableMappings } from "@/src/features/evals/v2/fns/variableMapping/buildEvaluatorVariableMappings";
 import { useEvaluatorSetupSample } from "@/src/features/evals/v2/hooks/useEvaluatorSetupSample";
 import type { EvaluatorSetupStore } from "@/src/features/evals/v2/store/evaluatorSetupStore/evaluatorSetupStore";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 
 const StableVariableMapping = memo(VariableMapping);
 
-const SOURCE_UNAVAILABLE_MESSAGE =
-  "Select a sample observation in the test panel to preview mapped values.";
+const SOURCE_UNAVAILABLE_MESSAGE = i18nKey(
+  "Select a sample observation in the test panel to preview mapped values.",
+);
 
 export function VariableMappingEditorContainer({
   projectId,
@@ -21,6 +24,7 @@ export function VariableMappingEditorContainer({
   projectId: string;
   store: EvaluatorSetupStore;
 }) {
+  const { t } = useTranslation();
   const resolvedSample = useEvaluatorSetupSample({ projectId, store });
   const state = useStore(
     store,
@@ -69,7 +73,7 @@ export function VariableMappingEditorContainer({
         onRemoveField={state.actions.removeStateKey}
         sourceObject={displayedSample}
         hasMatchingObservations={Boolean(displayedSample)}
-        sourceUnavailableMessage={SOURCE_UNAVAILABLE_MESSAGE}
+        sourceUnavailableMessage={t(SOURCE_UNAVAILABLE_MESSAGE)}
       />
     );
   }
@@ -83,7 +87,7 @@ export function VariableMappingEditorContainer({
       onChangeField={state.actions.setVariableField}
       sourceObject={displayedSample}
       hasMatchingObservations={Boolean(displayedSample)}
-      sourceUnavailableMessage={SOURCE_UNAVAILABLE_MESSAGE}
+      sourceUnavailableMessage={t(SOURCE_UNAVAILABLE_MESSAGE)}
     />
   );
 }

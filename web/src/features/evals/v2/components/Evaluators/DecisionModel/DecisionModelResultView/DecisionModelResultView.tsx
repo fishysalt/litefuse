@@ -1,5 +1,6 @@
 import { DECISION_MODEL_LIMITS } from "@langfuse/shared";
 import { InfoIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/src/components/ui/badge";
 import {
@@ -40,12 +41,15 @@ function confidenceTone(confidence: number) {
 }
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
+  const { t } = useTranslation();
   return (
     <span
       className={cn("font-mono text-xs", confidenceTone(confidence))}
-      title="How concentrated the distribution is (0–1). Not the winner's probability."
+      title={t(
+        "How concentrated the distribution is (0–1). Not the winner's probability.",
+      )}
     >
-      confidence {confidence.toFixed(2)}
+      {t("confidence {{value}}", { value: confidence.toFixed(2) })}
     </span>
   );
 }
@@ -57,12 +61,13 @@ function LevelDescriptionTooltip({
   index: number;
   description: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Tooltip>
       <TooltipTrigger
         type="button"
         className="text-muted-foreground focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
-        aria-label={`Level ${index} description`}
+        aria-label={t("Level {{index}} description", { index })}
       >
         <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
       </TooltipTrigger>
@@ -189,15 +194,19 @@ function ScoreDistribution({
 }
 
 function NoulGauge({ probability }: { probability: number }) {
-  const leaning = probability >= 0.5 ? "yes" : "no";
+  const { t } = useTranslation();
+  const leaning = probability >= 0.5 ? t("yes") : t("no");
   return (
     <div className="flex flex-col gap-1 text-xs">
       <div className="flex items-center justify-between font-mono">
-        <span className="text-muted-foreground">no</span>
+        <span className="text-muted-foreground">{t("no")}</span>
         <span className="font-bold">
-          P(yes) = {probability.toFixed(2)} → leaning {leaning}
+          {t("P(yes) = {{probability}} → leaning {{leaning}}", {
+            probability: probability.toFixed(2),
+            leaning,
+          })}
         </span>
-        <span className="text-muted-foreground">yes</span>
+        <span className="text-muted-foreground">{t("yes")}</span>
       </div>
       <div className="bg-muted relative h-2 rounded-full">
         <span
@@ -249,12 +258,16 @@ function ResultVisual({ result }: { result: DecisionModelQuestionResult }) {
 }
 
 function ResultRow({ result }: { result: DecisionModelQuestionResult }) {
+  const { t } = useTranslation();
   const copy = QUESTION_TYPE_COPY[result.type];
   return (
     <li className="flex flex-col gap-2 rounded-md border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-2 text-sm">
-          <copy.icon className="h-4 w-4 shrink-0" aria-label={copy.label} />
+          <copy.icon
+            className="h-4 w-4 shrink-0"
+            aria-label={t(copy.label)}
+          />
           <Badge variant="secondary" className="font-mono">
             {result.scoreName}
           </Badge>

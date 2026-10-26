@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { EvalTemplateType } from "@langfuse/shared";
+import { useTranslation } from "react-i18next";
 
 import { EvaluatorGalleryMethodBadge } from "@/src/features/evals/v2/components/EvaluatorGalleryView/components/EvaluatorGalleryMethodBadge/EvaluatorGalleryMethodBadge";
 import { EVALUATOR_GALLERY_RECOMMENDED_SECTION_KEY } from "@/src/features/evals/v2/constants/evaluatorGallery";
@@ -34,6 +35,8 @@ export function EvaluatorRecommendedCardContent({
   title: string;
   description: string | undefined;
 }) {
+  const { t } = useTranslation();
+
   return (
     <>
       <div className="flex items-start justify-between gap-2">
@@ -45,9 +48,9 @@ export function EvaluatorRecommendedCardContent({
       </span>
       <p
         className="text-muted-foreground mt-1 line-clamp-2 text-sm leading-relaxed"
-        title={description}
+        title={description ? t(description) : undefined}
       >
-        {description}
+        {description ? t(description) : null}
       </p>
     </>
   );

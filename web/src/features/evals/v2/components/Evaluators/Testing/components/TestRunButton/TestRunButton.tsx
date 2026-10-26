@@ -1,4 +1,5 @@
 import { Play } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/src/components/ui/button";
 import {
@@ -17,6 +18,7 @@ export function TestRunButton({
   onRun: () => void;
   disabledReason: string | null;
 }) {
+  const { t } = useTranslation();
   const button = (
     <Button
       type="button"
@@ -25,13 +27,15 @@ export function TestRunButton({
       loading={isPending}
       disabled={Boolean(disabledReason)}
       title={
-        disabledReason ? undefined : "Run the evaluator on the selected sample"
+        disabledReason
+          ? undefined
+          : t("Run the evaluator on the selected sample")
       }
       className={disabledReason ? "pointer-events-none" : undefined}
       onClick={onRun}
     >
       <Play className="mr-1.5 h-3.5 w-3.5" />
-      Run test on this sample
+      {t("Run test on this sample")}
     </Button>
   );
 
@@ -42,7 +46,7 @@ export function TestRunButton({
           {button}
         </span>
       </TooltipTrigger>
-      <TooltipContent>{disabledReason}</TooltipContent>
+      <TooltipContent>{t(disabledReason)}</TooltipContent>
     </Tooltip>
   ) : (
     button

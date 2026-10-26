@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { Switch } from "@/src/components/design-system/Switch/Switch";
 import { Tooltip } from "@/src/components/design-system/Tooltip/Tooltip";
 import { usePostHogClientCapture } from "@/src/features/posthog-analytics";
@@ -16,6 +18,7 @@ export function RuleActiveSwitchCell({
   projectId: string;
   hasWriteAccess: boolean;
 }) {
+  const { t } = useTranslation();
   const capture = usePostHogClientCapture();
   const utils = api.useUtils();
   const setEnabled = api.evalsV2.rules.setEnabled.useMutation({
@@ -38,7 +41,9 @@ export function RuleActiveSwitchCell({
   const isLegacy = isLegacyEvalTarget(rule.targetObject);
   const legacyDisabledReason =
     isLegacy && !rule.enabled
-      ? "Legacy rules cannot be re-enabled because trace- and dataset-level evaluations are deprecated. Create an observation-based rule instead."
+      ? t(
+          "Legacy rules cannot be re-enabled because trace- and dataset-level evaluations are deprecated. Create an observation-based rule instead.",
+        )
       : null;
 
   const switchControl = (
@@ -48,7 +53,11 @@ export function RuleActiveSwitchCell({
       disabled={
         !hasWriteAccess || Boolean(legacyDisabledReason) || setEnabled.isPending
       }
-      aria-label={`${rule.enabled ? "Disable" : "Enable"} ${rule.name}`}
+      aria-label={
+        rule.enabled
+          ? t("Disable {{name}}", { name: rule.name })
+          : t("Enable {{name}}", { name: rule.name })
+      }
       onCheckedChange={(enabled) => {
         if (!hasWriteAccess) return;
         onStatusChange(enabled).catch(() => undefined);

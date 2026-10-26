@@ -4,6 +4,8 @@ import {
   deepParseJsonIterative,
 } from "@langfuse/shared";
 import { ChevronDown, Plus, TriangleAlert } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { type TFunction } from "i18next";
 
 import { Button } from "@/src/components/ui/button";
 import { PrettyJsonView } from "@/src/components/ui/PrettyJsonView";
@@ -51,12 +53,13 @@ function buildStatePreview(
 function validateStateKey(
   next: string,
   fields: DecisionModelStateField[],
+  t: TFunction,
 ): string | null {
   if (!DecisionModelStateKeySchema.safeParse(next).success) {
-    return "Use letters, digits, and underscores; start with a letter.";
+    return t("Use letters, digits, and underscores; start with a letter.");
   }
   if (fields.some((field) => field.key === next)) {
-    return "A field with this name already exists.";
+    return t("A field with this name already exists.");
   }
   return null;
 }
@@ -92,6 +95,7 @@ export function DecisionModelStateEditor({
   hasMatchingObservations: boolean;
   sourceUnavailableMessage?: string;
 }) {
+  const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
   const statePreview = useMemo(
     () => buildStatePreview(fields, sourceObject),
@@ -114,7 +118,7 @@ export function DecisionModelStateEditor({
         onDeleteVariable={fields.length > 1 ? onRemoveField : undefined}
         onRenameVariable={onRenameField}
         validateVariableName={(_variable, next) =>
-          validateStateKey(next, fields)
+          validateStateKey(next, fields, t)
         }
         sourceObject={sourceObject}
         hasMatchingObservations={hasMatchingObservations}
@@ -124,7 +128,7 @@ export function DecisionModelStateEditor({
       <div>
         <Button type="button" variant="outline" size="sm" onClick={onAddField}>
           <Plus className="mr-1 h-3.5 w-3.5" />
-          Add field
+          {t("Add field")}
         </Button>
       </div>
 
@@ -136,7 +140,7 @@ export function DecisionModelStateEditor({
           onClick={() => setPreviewOpen((open) => !open)}
         >
           <span className="flex items-center gap-2">
-            <span className="font-bold">State sent to the model</span>
+            <span className="font-bold">{t("State sent to the model")}</span>
             {statePreview ? (
               <span
                 className={cn(
@@ -145,14 +149,25 @@ export function DecisionModelStateEditor({
                 )}
               >
                 {tooLarge ? <TriangleAlert className="h-3.5 w-3.5" /> : null}
-                {Object.keys(statePreview).length} field
-                {Object.keys(statePreview).length === 1 ? "" : "s"} ·{" "}
-                {stateSize.toLocaleString()} chars
-                {tooLarge ? " · trim fields, ~32k limit" : ""}
+                {Object.keys(statePreview).length === 1
+                  ? t("{{total}} field · {{size}} chars", {
+                      total: Object.keys(statePreview).length,
+                      size: stateSize.toLocaleString(),
+                    })
+                  : t("{{total}} fields · {{size}} chars", {
+                      total: Object.keys(statePreview).length,
+                      size: stateSize.toLocaleString(),
+                    })}
+                {tooLarge ? (
+                  <>
+                    {" · "}
+                    {t("trim fields, ~32k limit")}
+                  </>
+                ) : null}
               </span>
             ) : (
               <span className="text-muted-foreground text-xs">
-                select a sample observation to preview
+                {t("select a sample observation to preview")}
               </span>
             )}
           </span>

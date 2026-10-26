@@ -1,5 +1,7 @@
 import { useRouter } from "next/router";
 import type { EvalTemplateType } from "@langfuse/shared";
+import { useTranslation } from "react-i18next";
+
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { api, type RouterOutputs } from "@/src/utils/api";
 import type { NormalizedEvaluatorDefinition } from "../server/evaluators/evaluatorTypes";
@@ -43,6 +45,7 @@ function toSetupDefinition(
 }
 
 export default function EvaluatorDetailPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const projectId = router.query.projectId as string;
   const evaluatorId = router.query.evaluatorId as string;
@@ -55,7 +58,7 @@ export default function EvaluatorDetailPage() {
     return <Skeleton className="m-6 h-96 w-[calc(100%-3rem)]" />;
   }
   if (!evaluator.data?.versions[0]) {
-    return <div className="p-6">Evaluator not found</div>;
+    return <div className="p-6">{t("Evaluator not found")}</div>;
   }
 
   const latest = evaluator.data.versions[0];

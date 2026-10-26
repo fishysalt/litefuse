@@ -12,7 +12,8 @@ import { EVALUATOR_GALLERY_RECOMMENDED_SECTION_KEY } from "@/src/features/evals/
 export type GalleryTemplatePresentation = {
   description: string | undefined;
   type: EvalTemplateType;
-  attribution: string | null;
+  /** Rendered by the caller, so the copy around the parts can be translated. */
+  attribution: { author: string | null; updated: string } | null;
 };
 
 function managedPresentation(
@@ -45,7 +46,7 @@ function customPresentation(
       ? template.description
       : codeFallback,
     type: template.type,
-    attribution: author ? `${author} · ${updated}` : `Updated ${updated}`,
+    attribution: { author, updated },
   };
 }
 

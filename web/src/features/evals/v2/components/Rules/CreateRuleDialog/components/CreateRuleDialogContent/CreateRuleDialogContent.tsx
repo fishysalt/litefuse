@@ -2,6 +2,7 @@
 import { showSuccessToast } from "@/src/features/notifications";
 import type { EvalTargetObject, FilterState } from "@langfuse/shared";
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogBody,
@@ -53,6 +54,7 @@ export function CreateRuleDialogContent({
   canEdit: boolean;
   onEvaluatorSearchChange: (search: string) => void;
 }) {
+  const { t } = useTranslation();
   const capture = usePostHogClientCapture();
   const utils = api.useUtils();
   const { isLangfuseCloud } = useLangfuseCloudRegion();
@@ -123,8 +125,8 @@ export function CreateRuleDialogContent({
     });
     if (successNotification === "toast") {
       showSuccessToast({
-        title: "Rule created",
-        description: `${rule.name} is active.`,
+        title: t("Rule created"),
+        description: t("{{ruleName}} is active.", { ruleName: rule.name }),
       });
     }
     await Promise.all([
@@ -156,9 +158,11 @@ export function CreateRuleDialogContent({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="xl" className="max-w-6xl" closeOnInteractionOutside>
         <DialogHeader>
-          <DialogTitle>New rule</DialogTitle>
+          <DialogTitle>{t("New rule")}</DialogTitle>
           <DialogDescription>
-            Select which incoming observations should trigger evaluators.
+            {t(
+              "Select which incoming observations should trigger evaluators.",
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>

@@ -3,6 +3,7 @@ import {
   type DecisionModelEntry,
   type DecisionModelQuestion,
 } from "@langfuse/shared";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/src/components/ui/badge";
 import { QUESTION_TYPE_COPY } from "@/src/features/evals/v2/components/Evaluators/DecisionModel/QuestionTypeSelector/QuestionTypeSelector";
@@ -13,6 +14,7 @@ function entryText(entry: DecisionModelEntry | null | undefined) {
 }
 
 function Criteria({ question }: { question: DecisionModelQuestion }) {
+  const { t } = useTranslation();
   switch (question.type) {
     case DecisionModelQuestionType.CHOICE:
       return (
@@ -47,19 +49,21 @@ function Criteria({ question }: { question: DecisionModelQuestion }) {
         <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
           {question.criteria.true ? (
             <>
-              <dt className="text-muted-foreground">Yes</dt>
+              <dt className="text-muted-foreground">{t("Yes")}</dt>
               <dd>{entryText(question.criteria.true)}</dd>
             </>
           ) : null}
           {question.criteria.false ? (
             <>
-              <dt className="text-muted-foreground">No</dt>
+              <dt className="text-muted-foreground">{t("No")}</dt>
               <dd>{entryText(question.criteria.false)}</dd>
             </>
           ) : null}
         </dl>
       ) : (
-        <p className="text-muted-foreground">Returns the probability of yes.</p>
+        <p className="text-muted-foreground">
+          {t("Returns the probability of yes.")}
+        </p>
       );
   }
 }
@@ -72,6 +76,7 @@ export function DecisionModelQuestionSummary({
   question: DecisionModelQuestion;
   index: number;
 }) {
+  const { t } = useTranslation();
   const copy = QUESTION_TYPE_COPY[question.type];
   return (
     <div className="bg-card text-card-foreground flex flex-col gap-2 rounded-md border p-3 text-sm">
@@ -79,7 +84,10 @@ export function DecisionModelQuestionSummary({
         <span className="text-muted-foreground shrink-0 font-mono text-xs">
           {index + 1}
         </span>
-        <copy.icon className="h-4 w-4 shrink-0" aria-label={copy.label} />
+        <copy.icon
+          className="h-4 w-4 shrink-0"
+          aria-label={t(copy.label)}
+        />
         <Badge variant="secondary" className="shrink-0 font-mono">
           {question.scoreName}
         </Badge>

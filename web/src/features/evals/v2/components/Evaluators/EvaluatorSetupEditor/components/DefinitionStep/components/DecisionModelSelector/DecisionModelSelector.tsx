@@ -4,6 +4,7 @@ import {
   supportedModels,
 } from "@langfuse/shared";
 import { useStore } from "zustand";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/src/components/ui/button";
 import { SelectInput } from "@/src/components/design-system/SelectInput/SelectInput";
@@ -27,6 +28,7 @@ export function DecisionModelSelector({
   store: EvaluatorSetupStore;
   onConfigureProviders: () => void;
 }) {
+  const { t } = useTranslation();
   const selectedModel = useStore(store, (state) => state.selectedModel);
   const selectModel = store.getState().actions.selectModel;
   const connections = api.llmApiKey.all.useQuery({
@@ -68,7 +70,10 @@ export function DecisionModelSelector({
     });
 
   // LITEFUSE ADDITION (gap D4): name the connections the gate above kept out of
-  // the picker instead of letting them disappear silently.
+  // the picker instead of letting them disappear silently. It is only rendered
+  // when the picker would otherwise be empty: once a decision-model connection is
+  // selectable, listing the excluded ones next to a working picker reads like an
+  // error state.
   const capabilityNotice = (
     <DecisionModelCapabilityNotice connections={connections.data?.data ?? []} />
   );
@@ -77,7 +82,7 @@ export function DecisionModelSelector({
     return (
       <>
         <Button type="button" variant="outline" onClick={onConfigureProviders}>
-          Add a decision-model connection
+          {t("Add a decision-model connection")}
         </Button>
         {capabilityNotice}
       </>
@@ -87,8 +92,8 @@ export function DecisionModelSelector({
   return (
     <div className="max-w-xs min-w-56">
       <SelectInput
-        aria-label="Decision model"
-        placeholder="Select a decision model"
+        aria-label={t("Decision model")}
+        placeholder={t("Select a decision model")}
         value={
           selectedModel
             ? `${selectedModel.provider}${SEPARATOR}${selectedModel.model}`
@@ -104,7 +109,6 @@ export function DecisionModelSelector({
           });
         }}
       />
-      {capabilityNotice}
     </div>
   );
 }

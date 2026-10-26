@@ -5,6 +5,7 @@ import {
   type ObservationVariableMapping,
 } from "@langfuse/shared";
 import { memo, type ReactNode, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useStore } from "zustand";
 
 import { Button } from "@/src/components/ui/button";
@@ -27,7 +28,7 @@ export const EvaluatorMappingRow = memo(function EvaluatorMappingRow({
   store,
   sampleObject,
   unvalidatedSourceColumnIds = [],
-  sourceUnavailableMessage = "No matching observation is available to validate JSON paths.",
+  sourceUnavailableMessage,
   disabled = false,
   costEstimate,
 }: {
@@ -42,6 +43,10 @@ export const EvaluatorMappingRow = memo(function EvaluatorMappingRow({
   disabled?: boolean;
   costEstimate: ReactNode;
 }) {
+  const { t } = useTranslation();
+  const resolvedSourceUnavailableMessage =
+    sourceUnavailableMessage ??
+    t("No matching observation is available to validate JSON paths.");
   const [open, setOpen] = useState(false);
   const variableMappingOverride = useStore(
     store,
@@ -122,16 +127,24 @@ export const EvaluatorMappingRow = memo(function EvaluatorMappingRow({
                   </span>
                   {!isCodeEvaluator ? (
                     <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1 text-xs">
-                      {mappedVariableCount}/{mapping.length} variables mapped
+                      {t(
+                        "{{mappedCount}}/{{totalCount}} variables mapped",
+                        {
+                          mappedCount: mappedVariableCount,
+                          totalCount: mapping.length,
+                        },
+                      )}
                       {allVariablesMapped ? (
                         <Check
-                          aria-label="All variables mapped"
+                          aria-label={t("All variables mapped")}
                           className="text-dark-green h-3.5 w-3.5"
                         />
                       ) : hasInvalidMappings ? (
                         <span
-                          aria-label="Some variables are not mapped correctly"
-                          title="Some variables are not mapped correctly"
+                          aria-label={t(
+                            "Some variables are not mapped correctly",
+                          )}
+                          title={t("Some variables are not mapped correctly")}
                           className="text-dark-yellow h-3.5 w-3.5"
                         >
                           <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
@@ -153,19 +166,21 @@ export const EvaluatorMappingRow = memo(function EvaluatorMappingRow({
             onClick={() => detachEvaluator(evaluatorId)}
           >
             <Unlink className="h-3.5 w-3.5" />
-            Disconnect
+            {t("Disconnect")}
           </Button>
         </div>
         <CollapsibleContent className="border-t p-3">
           {isCodeEvaluator ? (
             <p className="text-muted-foreground text-sm">
-              Observation data is available directly in code evaluators, so no
-              variable mapping is required.
+              {t(
+                "Observation data is available directly in code evaluators, so no variable mapping is required.",
+              )}
             </p>
           ) : mapping.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              No variable mapping is required because this evaluator does not
-              define prompt variables.
+              {t(
+                "No variable mapping is required because this evaluator does not define prompt variables.",
+              )}
             </p>
           ) : (
             <VariableMapping
@@ -176,7 +191,7 @@ export const EvaluatorMappingRow = memo(function EvaluatorMappingRow({
               sourceObject={sampleObject}
               hasMatchingObservations={Boolean(sampleObject)}
               unvalidatedSourceColumnIds={unvalidatedSourceColumnIds}
-              sourceUnavailableMessage={sourceUnavailableMessage}
+              sourceUnavailableMessage={resolvedSourceUnavailableMessage}
             />
           )}
         </CollapsibleContent>

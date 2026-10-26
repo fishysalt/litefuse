@@ -1,4 +1,5 @@
 import type { ManagedTemplate } from "@/src/features/evals/v2/types/templateGallery";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 
 type ManagedTemplatesCatalog = {
   schemaVersion: 1;
@@ -16,51 +17,58 @@ export const MANAGED_TEMPLATES_CATALOG = {
   categories: [
     {
       key: "recommended",
-      label: "Recommended starting points",
-      description:
+      label: i18nKey("Recommended starting points"),
+      description: i18nKey(
         "A curated starter set of templates that works well for most teams.",
+      ),
       icon: "sparkles",
     },
     {
       key: "conversation",
-      label: "Conversational / Chatbots",
-      description:
+      label: i18nKey("Conversational / Chatbots"),
+      description: i18nKey(
         "Signals and monitors for chatbot-style interactions between human and agent.",
+      ),
       icon: "messages-square",
     },
     {
       key: "quality",
-      label: "Quality",
-      description:
+      label: i18nKey("Quality"),
+      description: i18nKey(
         "Checks response quality, correctness, and deterministic quality constraints.",
+      ),
       icon: "gauge",
     },
     {
       key: "classifier",
-      label: "Classifier",
-      description:
+      label: i18nKey("Classifier"),
+      description: i18nKey(
         "Help categorize the requests going through your system to understand respective volumes",
+      ),
       icon: "list-filter",
     },
     {
       key: "retrieval",
-      label: "Retrieval",
-      description:
+      label: i18nKey("Retrieval"),
+      description: i18nKey(
         "Measures grounding and retrieval quality for context-backed responses.",
+      ),
       icon: "file-search",
     },
     {
       key: "safety",
-      label: "Safety / Security",
-      description:
+      label: i18nKey("Safety / Security"),
+      description: i18nKey(
         "Monitors policy adherence, privacy leakage, and adversarial prompts.",
+      ),
       icon: "shield",
     },
     {
       key: "coding-agents",
-      label: "Coding agents",
-      description:
+      label: i18nKey("Coding agents"),
+      description: i18nKey(
         "Classifies coding-agent usage across task and department dimensions.",
+      ),
       icon: "code-2",
     },
   ],
@@ -70,8 +78,9 @@ export const MANAGED_TEMPLATES_CATALOG = {
       name: "Detect Chat Intent",
       categories: ["conversation"],
       icon: "message-square",
-      description:
+      description: i18nKey(
         "Classifies the user's primary request into one predefined intent category.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -138,8 +147,9 @@ User message: {{input}}`,
       name: "Detect Out-of-Scope Request",
       categories: ["conversation", "recommended"],
       icon: "shield",
-      description:
+      description: i18nKey(
         "Checks whether the user's request is clearly outside the assistant's defined role or supported scope.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -215,8 +225,9 @@ Think step by step and return the structured result.`,
       name: "Detect User Disagreement",
       categories: ["conversation"],
       icon: "messages-square",
-      description:
+      description: i18nKey(
         "Detects whether the user perceives the assistant as making an error or heading in the wrong direction.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -285,8 +296,9 @@ Last user message: {{last_user_message}}`,
       name: "Detect User Frustration (ALL CAPS)",
       categories: ["conversation"],
       icon: "type",
-      description:
+      description: i18nKey(
         "Detects whether user uses all capital letters, potentially indicating frustration.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "CODE",
@@ -376,8 +388,9 @@ Last user message: {{last_user_message}}`,
       name: "Detect User Distress",
       categories: ["conversation"],
       icon: "frown",
-      description:
+      description: i18nKey(
         "Detects whether the latest user message expresses clear, meaningful emotional distress.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -445,8 +458,9 @@ Last user message: {{last_user_message}}`,
       name: "Check Correctness",
       categories: ["quality"],
       icon: "circle-check",
-      description:
+      description: i18nKey(
         "Checks whether the actual output matches the expected output in material meaning.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -513,8 +527,9 @@ Expected output: {{expected_output}}`,
       name: "Check if Output Is an Exact Match",
       categories: ["quality"],
       icon: "equal",
-      description:
+      description: i18nKey(
         "Checks whether the output exactly matches the expected output.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "CODE",
@@ -609,8 +624,9 @@ Expected output: {{expected_output}}`,
       name: "Validate Keyword Overlap",
       categories: ["quality"],
       icon: "list-checks",
-      description:
+      description: i18nKey(
         "Scores what fraction of expected keywords from keyword_overlap appear in the output.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "CODE",
@@ -710,8 +726,9 @@ Expected output: {{expected_output}}`,
       name: "Check Answer Relevance",
       categories: ["quality"],
       icon: "target",
-      description:
+      description: i18nKey(
         "Checks whether the response actually addresses the user's question or task.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -773,7 +790,9 @@ Assistant output: {{assistant_output}}`,
       name: "Judge on One Quality Criterion",
       categories: ["quality", "recommended"],
       icon: "scale",
-      description: "Checks whether output follows a defined quality criterion.",
+      description: i18nKey(
+        "Checks whether output follows a defined quality criterion.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -824,8 +843,9 @@ Assistant output: {{assistant_output}}`,
       name: "Classify Input Topic",
       categories: ["classifier", "recommended"],
       icon: "tags",
-      description:
+      description: i18nKey(
         "Assigns the input, output, or conversation to one of a predefined set of topics.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -891,8 +911,9 @@ Input: {{input}}`,
       name: "Classify Input Language",
       categories: ["classifier"],
       icon: "languages",
-      description:
+      description: i18nKey(
         "Classifies input into one of the pre-defined language categories.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -948,8 +969,9 @@ Input: {{input}}`,
       name: "Check Answer Groundedness",
       categories: ["retrieval"],
       icon: "book-open-check",
-      description:
+      description: i18nKey(
         "Checks whether the output is supported by the provided context and avoids unsupported claims.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -1008,8 +1030,9 @@ Context: {{context}}`,
       name: "Check Context Precision",
       categories: ["retrieval"],
       icon: "scan-search",
-      description:
+      description: i18nKey(
         "Checks whether the provided context is actually useful and relevant for producing the answer.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -1069,8 +1092,9 @@ Context: {{context}}`,
       name: "Check Context Recall",
       categories: ["retrieval"],
       icon: "list-checks",
-      description:
+      description: i18nKey(
         "Checks whether the provided context covers the information needed to support the answer.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -1132,8 +1156,9 @@ Context: {{context}}`,
       name: "Detect PII Leakage",
       categories: ["safety"],
       icon: "shield-alert",
-      description:
+      description: i18nKey(
         "Checks whether assistant output contains sensitive personal information that could identify or harm a private individual.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -1195,8 +1220,9 @@ Assistant output: {{output}}`,
       name: "Check Rule Adherence",
       categories: ["safety"],
       icon: "shield-check",
-      description:
+      description: i18nKey(
         "Checks whether the output follows a defined policy, instruction set, rubric, or formatting rule.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -1244,8 +1270,9 @@ Assistant output: {{assistant_output}}`,
       name: "Detect Prompt Injection",
       categories: ["safety"],
       icon: "shield-x",
-      description:
+      description: i18nKey(
         "Checks whether the input contains attempts of prompt injection.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -1301,7 +1328,9 @@ Input text: {{input_text}}`,
       name: "Classify Engineering Task Type",
       categories: ["coding-agents"],
       icon: "code-2",
-      description: "Categorizes the type of task the coding agent is used for.",
+      description: i18nKey(
+        "Categorizes the type of task the coding agent is used for.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -1376,7 +1405,9 @@ Task text: {{task_text}}`,
       name: "Classify Coding Agent Usage per Department",
       categories: ["coding-agents"],
       icon: "building-2",
-      description: "Classifies coding-agent usage into department buckets.",
+      description: i18nKey(
+        "Classifies coding-agent usage into department buckets.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "LLM_AS_JUDGE",
@@ -1439,8 +1470,9 @@ Task text: {{task_text}}`,
       name: "Assign Input Topic",
       categories: ["classifier", "recommended"],
       icon: "tags",
-      description:
+      description: i18nKey(
         "Assigns the input to one of your topics with a calibrated probability for each option, in one fast decision-model call.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "DECISION_MODEL",
@@ -1489,8 +1521,9 @@ Task text: {{task_text}}`,
       name: "Flag Out-of-Scope Request",
       categories: ["conversation"],
       icon: "shield",
-      description:
+      description: i18nKey(
         "Returns the probability that the user's request falls outside what the assistant is meant to handle.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "DECISION_MODEL",
@@ -1519,8 +1552,9 @@ Task text: {{task_text}}`,
       name: "Rate Customer Frustration",
       categories: ["conversation"],
       icon: "frown",
-      description:
+      description: i18nKey(
         "Rates how frustrated the user sounds along levels you describe, from calm to ready to leave.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "DECISION_MODEL",
@@ -1552,8 +1586,9 @@ Task text: {{task_text}}`,
       name: "Detect Conversation Signals",
       categories: ["conversation"],
       icon: "messages-square",
-      description:
+      description: i18nKey(
         "Flags seven user-side conversation signals—rephrases, corrections, human handoff, retries, quoted errors, frustration, and success—in one decision-model call.",
+      ),
       maintainer: "langfuse",
       evaluator: {
         type: "DECISION_MODEL",

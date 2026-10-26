@@ -1,5 +1,6 @@
 /* eslint-disable no-nested-ternary */
 import { useRouter } from "next/router";
+import { useTranslation } from "react-i18next";
 import {
   ArrowUpRight,
   Bell,
@@ -95,11 +96,12 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
     hideCreateEntryWhenEmpty = false,
   } = props;
   const router = useRouter();
+  const { t } = useTranslation();
   const capture = usePostHogClientCapture();
   const createDisabled = !canCreate || limitReached;
   const disabledReason = limitReached
-    ? "Alert limit reached"
-    : "You do not have permission to create alerts";
+    ? t("Alert limit reached")
+    : t("You do not have permission to create alerts");
   const alertCount = connectedAlerts.length;
   const isAggregateCost = props.scope === "allEvaluators";
   const supportsCostAlert =
@@ -158,7 +160,7 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
             {canRead && connectedAlerts.length > 0 ? (
               <div className="p-2">
                 <p className="text-muted-foreground px-2 py-1.5 text-[10px] font-bold tracking-wider uppercase">
-                  Connected · {connectedAlerts.length}
+                  {t("Connected")} · {connectedAlerts.length}
                   {hasMore ? "+" : ""}
                 </p>
                 <div className="space-y-1">
@@ -210,7 +212,7 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
                       )
                     }
                   >
-                    <span>See all alerts</span>
+                    <span>{t("See all alerts")}</span>
                     <ArrowUpRight className="text-muted-foreground ml-auto h-4 w-4 shrink-0" />
                   </CommandItem>
                 ) : null}
@@ -219,15 +221,19 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
               <div className="px-4 py-3">
                 <p className="text-sm font-bold">
                   {isAggregateCost
-                    ? "No alerts on evaluator cost"
-                    : "No alerts on this evaluator"}
+                    ? t("No alerts on evaluator cost")
+                    : t("No alerts on this evaluator")}
                 </p>
                 <p className="text-muted-foreground mt-0.5 text-xs">
                   {isAggregateCost
-                    ? "Get notified when evaluator cost crosses a threshold."
+                    ? t("Get notified when evaluator cost crosses a threshold.")
                     : supportsCostAlert
-                      ? "Get notified when this evaluator's scores or cost cross a threshold."
-                      : "Get notified when this evaluator's score crosses a threshold."}
+                      ? t(
+                          "Get notified when this evaluator's scores or cost cross a threshold.",
+                        )
+                      : t(
+                          "Get notified when this evaluator's score crosses a threshold.",
+                        )}
                 </p>
               </div>
             )}
@@ -235,7 +241,7 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
             {connectedAlerts.length > 0 ? (
               <div className="flex items-center justify-between gap-3 p-2">
                 <span className="text-muted-foreground flex h-8 items-center px-1 text-sm leading-none">
-                  Add alert
+                  {t("Add alert")}
                 </span>
                 <div className="flex flex-wrap items-center justify-end gap-1.5">
                   {selectedScoreDataType ? (
@@ -255,7 +261,7 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
                       }
                     >
                       <Gauge className="text-muted-foreground h-4 w-4" />
-                      Score
+                      {t("Score")}
                     </Button>
                   ) : null}
                   {supportsCostAlert ? (
@@ -274,7 +280,7 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
                       }
                     >
                       <DollarSign className="text-muted-foreground h-4 w-4" />
-                      Cost
+                      {t("Cost")}
                     </Button>
                   ) : null}
                 </div>
@@ -295,10 +301,11 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
                   >
                     <Gauge className="text-muted-foreground" />
                     <div>
-                      <p>Score threshold</p>
+                      <p>{t("Score threshold")}</p>
                       <p className="text-muted-foreground text-xs">
-                        Alert when this evaluator&apos;s score crosses a
-                        threshold
+                        {t(
+                          "Alert when this evaluator's score crosses a threshold",
+                        )}
                       </p>
                     </div>
                     <ArrowUpRight className="text-muted-foreground ml-auto h-4 w-4 shrink-0" />
@@ -317,11 +324,11 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
                   >
                     <DollarSign className="text-muted-foreground" />
                     <div>
-                      <p>Cost threshold</p>
+                      <p>{t("Cost threshold")}</p>
                       <p className="text-muted-foreground text-xs">
                         {isAggregateCost
-                          ? "Alert when evaluator cost crosses a threshold"
-                          : "Alert on spend from running this evaluator"}
+                          ? t("Alert when evaluator cost crosses a threshold")
+                          : t("Alert on spend from running this evaluator")}
                       </p>
                     </div>
                     <ArrowUpRight className="text-muted-foreground ml-auto h-4 w-4 shrink-0" />
@@ -345,10 +352,16 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
             variant="outline"
             aria-label={
               isLoading
-                ? "Loading evaluator alerts"
+                ? t("Loading evaluator alerts")
                 : alertCount > 0
-                  ? `${alertCount} connected evaluator alert${alertCount === 1 ? "" : "s"}`
-                  : "Add evaluator alert"
+                  ? alertCount === 1
+                    ? t("{{count}} connected evaluator alert", {
+                        count: alertCount,
+                      })
+                    : t("{{count}} connected evaluator alerts", {
+                        count: alertCount,
+                      })
+                  : t("Add evaluator alert")
             }
             className="w-auto max-w-full justify-start"
           >
@@ -363,7 +376,7 @@ export function EvaluatorAlertButton(props: EvaluatorAlertButtonProps) {
               <Plus className="mr-1 h-4 w-4 shrink-0" aria-hidden="true" />
             )}
             <span className="flex-1 text-left">
-              {alertCount > 0 ? "Alerts" : "Add alert"}
+              {alertCount > 0 ? t("Alerts") : t("Add alert")}
             </span>
             {!isLoading && alertCount > 0 ? (
               <Badge variant="secondary" className="ml-1 shrink-0">

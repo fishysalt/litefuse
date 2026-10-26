@@ -5,9 +5,11 @@ import { prepareEvaluatorDraft } from "@/src/features/evals/v2/fns/evaluators/pr
 import { getScoreOutputValidation } from "@/src/features/evals/v2/fns/scoreOutput/getScoreOutputValidation";
 import { useEvaluatorSetupSample } from "@/src/features/evals/v2/hooks/useEvaluatorSetupSample";
 import type { EvaluatorSetupStore } from "@/src/features/evals/v2/store/evaluatorSetupStore/evaluatorSetupStore";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 
-export const EVALUATOR_TEST_PERMISSION_REASON =
-  "You do not have permission to run evaluator tests in this project.";
+export const EVALUATOR_TEST_PERMISSION_REASON = i18nKey(
+  "You do not have permission to run evaluator tests in this project.",
+);
 
 export function useEvaluatorTestAvailability({
   projectId,
@@ -37,7 +39,7 @@ export function useEvaluatorTestAvailability({
   );
   const modelReason = useStore(store, (state) =>
     state.type === "LLM_AS_JUDGE" && !hasValidModel
-      ? "Select a model before running a test."
+      ? i18nKey("Select a model before running a test.")
       : null,
   );
 
@@ -48,10 +50,10 @@ export function useEvaluatorTestAvailability({
       : modelReason
         ? modelReason
         : !definitionAvailable
-          ? "Complete the evaluator before running a test."
+          ? i18nKey("Complete the evaluator before running a test.")
           : !selectedObservation
-            ? "Select a sample observation first."
+            ? i18nKey("Select a sample observation first.")
             : !sampleObject
-              ? "Loading the selected sample."
+              ? i18nKey("Loading the selected sample.")
               : null;
 }

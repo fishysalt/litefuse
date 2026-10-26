@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Badge } from "@/src/components/ui/badge";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/src/utils/tailwind";
 
 export function V4MigrationBadgeContent({
@@ -33,6 +34,7 @@ export function V4MigrationBadgeContent({
   compact?: boolean;
   className?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Badge
       variant="warning"
@@ -52,7 +54,7 @@ export function V4MigrationBadgeContent({
           }
         : {})}
     >
-      Legacy
+      {t("Legacy")}
     </Badge>
   );
 }

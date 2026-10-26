@@ -3,7 +3,6 @@ import { useStore } from "zustand";
 
 import {
   TestResultPanelView,
-  type TestResultPanelTitle,
 } from "@/src/features/evals/v2/components/Evaluators/Testing/components/TestResultPanelView/TestResultPanelView";
 import { TestSection } from "@/src/features/evals/v2/components/EvaluatorTestPanel/components/TestSection/TestSection";
 import { TestRerunAction } from "@/src/features/evals/v2/components/EvaluatorTestPanel/components/TestSection/components/TestRerunAction/TestRerunAction";
@@ -11,11 +10,12 @@ import { TestResultActions } from "@/src/features/evals/v2/components/EvaluatorT
 import { TestRunCard } from "@/src/features/evals/v2/components/EvaluatorTestPanel/components/TestSection/components/TestRunCard/TestRunCard";
 import { toTestResultPanelState } from "@/src/features/evals/v2/fns/evaluatorTesting/toTestResultPanelState";
 import type { EvaluatorSetupStore } from "@/src/features/evals/v2/store/evaluatorSetupStore/evaluatorSetupStore";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 
-const RESULT_TITLES: Record<EvalTemplateType, TestResultPanelTitle> = {
-  LLM_AS_JUDGE: "LLM Output",
-  CODE: "Code Output",
-  DECISION_MODEL: "Decision Model Output",
+const RESULT_TITLES: Record<EvalTemplateType, string> = {
+  LLM_AS_JUDGE: i18nKey("LLM Output"),
+  CODE: i18nKey("Code Output"),
+  DECISION_MODEL: i18nKey("Decision Model Output"),
 };
 
 export function TestSectionContainer({

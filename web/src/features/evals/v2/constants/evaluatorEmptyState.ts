@@ -1,3 +1,5 @@
+import { i18nKey } from "@/src/features/i18n/i18nKey";
+
 export const EVALUATOR_EMPTY_STATE_DOCS_HREF =
   "https://langfuse.com/docs/evaluation/overview";
 
@@ -11,9 +13,10 @@ export const EVALUATOR_EMPTY_STATE_STARTING_POINTS = [
   {
     action: "detect-topics",
     templateKey: "topic-classifier",
-    title: "Detect Topics",
-    description:
+    title: i18nKey("Detect Topics"),
+    description: i18nKey(
       "Classify the requests going through your system to better understand volumes of different categories.",
+    ),
   },
   {
     action: "select-template",

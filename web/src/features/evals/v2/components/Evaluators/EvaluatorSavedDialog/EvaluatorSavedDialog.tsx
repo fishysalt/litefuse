@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+
 import { Button } from "@/src/components/ui/button";
 import {
   Collapsible,
@@ -19,6 +21,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/src/components/ui/tooltip";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 import { cn } from "@/src/utils/tailwind";
 import styles from "./EvaluatorSavedDialog.module.css";
 
@@ -27,13 +30,17 @@ export type EvaluatorSavedMode = "test-filters" | "different-scope";
 const modeOptions = [
   {
     value: "test-filters",
-    title: "Reuse the configured filters",
-    description: "Creates a rule from the sample observation filters.",
+    title: i18nKey("Reuse the configured filters"),
+    description: i18nKey(
+      "Creates a rule from the sample observation filters.",
+    ),
   },
   {
     value: "different-scope",
-    title: "Run on a different scope",
-    description: "Attach to a rule you already have, or create a new one.",
+    title: i18nKey("Run on a different scope"),
+    description: i18nKey(
+      "Attach to a rule you already have, or create a new one.",
+    ),
   },
 ] as const;
 
@@ -68,6 +75,8 @@ export function EvaluatorSavedDialog({
   onOpenAutoFocus?: () => void;
   onCloseAnimationEnd?: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Dialog
       open={open}
@@ -82,16 +91,16 @@ export function EvaluatorSavedDialog({
         onCloseAutoFocus={onCloseAnimationEnd}
       >
         <DialogHeader className="[&>div]:items-start [&>div>button]:-mt-1">
-          <DialogTitle>Evaluator saved</DialogTitle>
+          <DialogTitle>{t("Evaluator saved")}</DialogTitle>
           <DialogDescription>
-            Choose which observations this evaluator should score.
+            {t("Choose which observations this evaluator should score.")}
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="gap-0 p-0">
           <div className="grid h-[30rem] grid-cols-[minmax(0,1fr)_15rem] overflow-hidden">
             <div className="min-w-0 overflow-y-auto px-6 py-5 [scrollbar-gutter:stable]">
               <h3 className="mb-2 text-sm font-bold">
-                Set up rule to run on incoming observations
+                {t("Set up rule to run on incoming observations")}
               </h3>
               <RadioGroup
                 value={mode}
@@ -139,10 +148,10 @@ export function EvaluatorSavedDialog({
                               htmlFor={id}
                               className="block cursor-pointer text-sm leading-none font-bold"
                             >
-                              {option.title}
+                              {t(option.title)}
                             </label>
                             <p className="text-muted-foreground mt-1.5 text-xs">
-                              {option.description}
+                              {t(option.description)}
                             </p>
                           </div>
                         </div>
@@ -180,18 +189,19 @@ export function EvaluatorSavedDialog({
                 disabled={isSubmitting}
                 onClick={onSecondaryAction}
               >
-                Skip execution
+                {t("Skip execution")}
               </Button>
             </TooltipTrigger>
             <TooltipContent className="max-w-72">
-              It remains available for batch evaluations and prompt experiments.
-              Set up incoming observations later.
+              {t(
+                "It remains available for batch evaluations and prompt experiments. Set up incoming observations later.",
+              )}
             </TooltipContent>
           </Tooltip>
           <Button
             disabled={!canSubmit}
             loading={isSubmitting}
-            loadingText="Starting evaluator..."
+            loadingText={t("Starting evaluator...")}
             onClick={onPrimaryAction}
           >
             {primaryActionLabel}

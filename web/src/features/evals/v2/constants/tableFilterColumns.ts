@@ -1,5 +1,6 @@
 import { EvalTemplateType, type ColumnDefinition } from "@langfuse/shared";
 import type { FilterConfig } from "@/src/features/filters";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 
 const evaluatorStatusOptions = [
   { value: "ACTIVE", displayValue: "Active" },
@@ -21,35 +22,35 @@ const evaluatorTypeOptions = [
 
 export const evaluatorTableFilterColumns: ColumnDefinition[] = [
   {
-    name: "Name",
+    name: i18nKey("Name"),
     id: "name",
     type: "stringOptions",
     internal: "name",
     options: [],
   },
   {
-    name: "Status",
+    name: i18nKey("Status"),
     id: "status",
     type: "stringOptions",
     internal: "status",
     options: evaluatorStatusOptions,
   },
   {
-    name: "Type",
+    name: i18nKey("Type"),
     id: "type",
     type: "stringOptions",
     internal: "type",
     options: evaluatorTypeOptions,
   },
   {
-    name: "Model",
+    name: i18nKey("Model"),
     id: "model",
     type: "stringOptions",
     internal: "model",
     options: [],
   },
   {
-    name: "Creator",
+    name: i18nKey("Creator"),
     id: "creator",
     type: "stringOptions",
     internal: "creator",
@@ -59,27 +60,27 @@ export const evaluatorTableFilterColumns: ColumnDefinition[] = [
 
 export const evaluationRuleTableFilterColumns: ColumnDefinition[] = [
   {
-    name: "Name",
+    name: i18nKey("Name"),
     id: "name",
     type: "stringOptions",
     internal: "name",
     options: [],
   },
   {
-    name: "Creator",
+    name: i18nKey("Creator"),
     id: "creator",
     type: "stringOptions",
     internal: "creator",
     options: [],
   },
   {
-    name: "Enabled",
+    name: i18nKey("Enabled"),
     id: "enabled",
     type: "boolean",
     internal: "enabled",
   },
   {
-    name: "Upgrade required",
+    name: i18nKey("Upgrade required"),
     id: "upgradeRequired",
     type: "boolean",
     internal: "upgradeRequired",
@@ -91,11 +92,11 @@ export const evaluatorTableFilterConfig: FilterConfig = {
   columnDefinitions: evaluatorTableFilterColumns,
   defaultExpanded: ["status", "type"],
   facets: [
-    { type: "categorical", column: "name", label: "Name" },
-    { type: "categorical", column: "status", label: "Status" },
-    { type: "categorical", column: "type", label: "Type" },
-    { type: "categorical", column: "model", label: "Model" },
-    { type: "categorical", column: "creator", label: "Creator" },
+    { type: "categorical", column: "name", label: i18nKey("Name") },
+    { type: "categorical", column: "status", label: i18nKey("Status") },
+    { type: "categorical", column: "type", label: i18nKey("Type") },
+    { type: "categorical", column: "model", label: i18nKey("Model") },
+    { type: "categorical", column: "creator", label: i18nKey("Creator") },
   ],
 };
 
@@ -104,19 +105,19 @@ export const evaluationRuleTableFilterConfig: FilterConfig = {
   columnDefinitions: evaluationRuleTableFilterColumns,
   defaultExpanded: ["enabled"],
   facets: [
-    { type: "categorical", column: "name", label: "Name" },
-    { type: "categorical", column: "creator", label: "Creator" },
+    { type: "categorical", column: "name", label: i18nKey("Name") },
+    { type: "categorical", column: "creator", label: i18nKey("Creator") },
     {
       type: "boolean",
       column: "enabled",
-      label: "Enabled",
+      label: i18nKey("Enabled"),
       trueLabel: "Enabled",
       falseLabel: "Disabled",
     },
     {
       type: "boolean",
       column: "upgradeRequired",
-      label: "Upgrade required",
+      label: i18nKey("Upgrade required"),
       trueLabel: "Required",
       falseLabel: "Not required",
     },

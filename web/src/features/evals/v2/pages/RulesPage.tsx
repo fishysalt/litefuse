@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/router";
+import { useTranslation } from "react-i18next";
 import Page from "@/src/components/layouts/page";
 import { Button } from "@/src/components/ui/button";
 import { SupportOrUpgradePage } from "@/src/ee/features/billing";
@@ -11,6 +12,7 @@ import { EVALS_V2_TABS, getEvalsV2Tabs } from "@/src/features/navigation";
 import { V4MigrationUpdateRequiredBadge } from "@/src/features/v4-migration/V4MigrationDelayBadge";
 
 export function RulesPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const projectId = router.query.projectId as string;
   const [createOpen, setCreateOpen] = useState(false);
@@ -28,15 +30,16 @@ export function RulesPage() {
   return (
     <Page
       headerProps={{
-        title: "Rules",
+        title: t("Rules"),
         titleBadges: <V4MigrationUpdateRequiredBadge />,
         help: {
-          description:
+          description: t(
             "Rules define which incoming observations reusable evaluators run on.",
+          ),
         },
         actionButtonsRight: hasWriteAccess ? (
           <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> New rule
+            <Plus className="mr-2 h-4 w-4" /> {t("New rule")}
           </Button>
         ) : undefined,
         tabsProps: {

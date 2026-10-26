@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { useTranslation } from "react-i18next";
 import {
   type EvalTemplateSourceCodeLanguage,
   EvalTemplateTypeEnum,
@@ -62,6 +63,7 @@ function CodeEvaluatorDefinitionView({
 }: {
   definition: Extract<EvaluatorDefinition, { type: "CODE" }>;
 }) {
+  const { t } = useTranslation();
   const { sourceCode, sourceCodeLanguage } = definition;
 
   return (
@@ -78,11 +80,11 @@ function CodeEvaluatorDefinitionView({
             disabled
           />
         ) : (
-          <Badge variant="outline">Language unavailable</Badge>
+          <Badge variant="outline">{t("Language unavailable")}</Badge>
         )}
       </EvaluationTypeConfiguration>
       <section className="flex flex-col gap-2">
-        <Label>Code</Label>
+        <Label>{t("Code")}</Label>
         {/* The execution row above already names the language. */}
         <CodeBlock
           language={
@@ -104,6 +106,7 @@ function LlmEvaluatorDefinitionView({
 }: {
   definition: Extract<EvaluatorDefinition, { type: "LLM_AS_JUDGE" }>;
 }) {
+  const { t } = useTranslation();
   const { variableMappings, promptMessages } = definition;
   const mappings =
     variableMappings.state === "visible" ? variableMappings.mappings : [];
@@ -151,7 +154,7 @@ function LlmEvaluatorDefinitionView({
         </JudgeModelPicker>
       </EvaluationTypeConfiguration>
       <section className="flex min-w-0 flex-col gap-2">
-        <Label>Prompt</Label>
+        <Label>{t("Prompt")}</Label>
         {promptMessages.map((message, index) => (
           <PromptVariableEditor
             key={index}
@@ -177,7 +180,7 @@ function LlmEvaluatorDefinitionView({
       </section>
       {variableMappings.state === "visible" ? (
         <section className="flex flex-col gap-2">
-          <Label>Prompt variables</Label>
+          <Label>{t("Prompt variables")}</Label>
           <VariableMapping
             mode="read-only"
             mappings={mappings.map((mapping) => ({
@@ -203,6 +206,7 @@ function DecisionModelDefinitionView({
 }: {
   definition: Extract<EvaluatorDefinition, { type: "DECISION_MODEL" }>;
 }) {
+  const { t } = useTranslation();
   const questions = parseDecisionModelQuestions(definition.questions);
 
   return (
@@ -215,11 +219,11 @@ function DecisionModelDefinitionView({
         <Badge variant="outline" className="font-mono">
           {definition.selectedModel
             ? `${definition.selectedModel.provider}: ${definition.selectedModel.model}`
-            : "No model"}
+            : t("No model")}
         </Badge>
       </EvaluationTypeConfiguration>
       <section className="flex min-w-0 flex-col gap-2">
-        <Label>Questions</Label>
+        <Label>{t("Questions")}</Label>
         {questions.success ? (
           questions.data.map((question, index) => (
             <DecisionModelQuestionSummary
@@ -233,7 +237,7 @@ function DecisionModelDefinitionView({
         )}
       </section>
       <section className="flex flex-col gap-2">
-        <Label>State</Label>
+        <Label>{t("State")}</Label>
         <VariableMapping
           mode="read-only"
           variableDisplay="stateKey"

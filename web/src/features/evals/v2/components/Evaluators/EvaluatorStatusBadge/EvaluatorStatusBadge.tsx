@@ -1,5 +1,6 @@
 /* eslint-disable no-nested-ternary */
 import { Circle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   getEvaluatorBlockMetadata,
@@ -28,6 +29,7 @@ export function EvaluatorStatusBadge({
   blockReason?: EvaluatorBlockReason | null;
   blockMessage?: string | null;
 }) {
+  const { t } = useTranslation();
   const badge = (
     <Badge
       variant={blocked ? "warning" : active ? "default" : "secondary"}
@@ -39,7 +41,8 @@ export function EvaluatorStatusBadge({
       )}
     >
       <Circle className="h-2 w-2 fill-current" />
-      {blocked ? "Blocked" : active ? "Active" : "Inactive"} · {ruleCount}
+      {blocked ? t("Blocked") : active ? t("Active") : t("Inactive")} ·{" "}
+      {ruleCount}
     </Badge>
   );
 

@@ -1,4 +1,5 @@
 /* eslint-disable no-nested-ternary */
+import { useTranslation } from "react-i18next";
 import { useStore } from "zustand";
 
 import { Stepper } from "@/src/features/evals/v2/components/Stepper/Stepper";
@@ -23,6 +24,7 @@ export function RuleEvaluatorsStep({
   search: string;
   onSearchChange: (search: string) => void;
 }) {
+  const { t } = useTranslation();
   const selectedObservation = useStore(
     store,
     (state) => state.selectedObservation,
@@ -67,8 +69,10 @@ export function RuleEvaluatorsStep({
   return (
     <Stepper
       number={2}
-      title="Attach evaluators"
-      description="Choose which evaluators should run on matching observations."
+      title={t("Attach evaluators")}
+      description={t(
+        "Choose which evaluators should run on matching observations.",
+      )}
     >
       <EvaluatorAssignmentsEditor
         evaluatorOptions={evaluatorOptions}

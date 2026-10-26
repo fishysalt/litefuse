@@ -1,4 +1,5 @@
 import type { GetServerSideProps } from "next";
+import { useTranslation } from "react-i18next";
 
 // LITEFUSE: /evals/default-model was the legacy (v1) project default evaluation
 // model page before the evaluators UI moved to the canonical /evals paths and
@@ -19,5 +20,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 };
 
 export default function EvaluatorDefaultModelRedirectPage() {
-  return <div className="p-3">Redirecting...</div>;
+  const { t } = useTranslation();
+
+  return <div className="p-3">{t("Redirecting...")}</div>;
 }

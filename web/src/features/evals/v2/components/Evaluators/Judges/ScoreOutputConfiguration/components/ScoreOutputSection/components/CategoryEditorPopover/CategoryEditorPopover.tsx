@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -33,6 +34,7 @@ export function CategoryEditorPopover({
   onDelete: (() => void) | null;
   onDone: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       {children}
@@ -41,13 +43,13 @@ export function CategoryEditorPopover({
           <div>
             <p className="text-sm font-bold">{title}</p>
             <p className="text-muted-foreground text-xs">
-              Set the returned label.
+              {t("Set the returned label.")}
             </p>
           </div>
           <Input
             id={`score-output-category-${idSuffix}`}
-            aria-label="Category label"
-            placeholder="Category label"
+            aria-label={t("Category label")}
+            placeholder={t("Category label")}
             value={choice.label}
             onChange={(event) => onChange({ label: event.target.value })}
             onKeyDown={(event) => {
@@ -70,17 +72,17 @@ export function CategoryEditorPopover({
                   variant="ghost"
                   size="sm"
                   className="text-destructive hover:text-destructive"
-                  aria-label="Delete category"
+                  aria-label={t("Delete category")}
                   onClick={onDelete}
                 >
                   <Trash2 className="mr-1.5 h-4 w-4" />
-                  Delete
+                  {t("Delete")}
                 </Button>
               </PopoverClose>
             ) : null}
             <PopoverClose asChild>
               <Button type="button" size="sm" onClick={onDone}>
-                Done
+                {t("Done")}
               </Button>
             </PopoverClose>
           </div>

@@ -1,5 +1,7 @@
 import { DECISION_MODEL_LIMITS } from "@langfuse/shared";
 import { Plus, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { type TFunction } from "i18next";
 
 import { Button } from "@/src/components/ui/button";
 import { InfoTooltip } from "@/src/components/ui/InfoTooltip/InfoTooltip";
@@ -10,12 +12,12 @@ import { moveItem } from "@/src/features/evals/v2/fns/moveItem";
 
 export type ScoreLevelDraft = { description: string };
 
-function levelPlaceholder(index: number, count: number) {
-  if (index === 0) return "Lowest level, e.g. Calm, just stating facts";
+function levelPlaceholder(index: number, count: number, t: TFunction) {
+  if (index === 0) return t("Lowest level, e.g. Calm, just stating facts");
   if (index === count - 1) {
-    return "Highest level, e.g. Very angry or threatening to leave";
+    return t("Highest level, e.g. Very angry or threatening to leave");
   }
-  return "Describe this level";
+  return t("Describe this level");
 }
 
 /**
@@ -32,6 +34,7 @@ export function ScoreLevelsEditor({
   onChange: (levels: ScoreLevelDraft[]) => void;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const update = (index: number, description: string) =>
     onChange(levels.map((level, i) => (i === index ? { description } : level)));
   const remove = (index: number) =>
@@ -41,21 +44,23 @@ export function ScoreLevelsEditor({
   return (
     <div className="flex flex-col gap-2">
       <Label className="flex items-center gap-1.5">
-        Levels, low to high
-        <InfoTooltip label="About levels">
-          Each level is one point on the scale. The model judges every level on
-          its own against the state and returns a position between them, so
-          describe situations (“broken, but a workaround exists”), not degrees
-          (“moderately severe”). Two to ten levels; drag to reorder.
+        {t("Levels, low to high")}
+        <InfoTooltip label={t("About levels")}>
+          {t(
+            "Each level is one point on the scale. The model judges every level on its own against the state and returns a position between them, so describe situations (“broken, but a workaround exists”), not degrees (“moderately severe”). Two to ten levels; drag to reorder.",
+          )}
         </InfoTooltip>
         <span className="text-muted-foreground text-xs font-normal">
-          {levels.length} of {DECISION_MODEL_LIMITS.maxScoreLevels}
+          {t("{{current}} of {{max}}", {
+            current: levels.length,
+            max: DECISION_MODEL_LIMITS.maxScoreLevels,
+          })}
         </span>
       </Label>
       <SortableList
         items={levels}
         getId={(_level, index) => `level-${index}`}
-        getLabel={(_level, index) => `level ${index}`}
+        getLabel={(_level, index) => t("level {{index}}", { index })}
         onReorder={(from, to) => onChange(moveItem(levels, from, to))}
         renderItem={(level, index) => (
           <div className="grid grid-cols-[2rem_1fr_auto] items-center gap-2">
@@ -68,8 +73,8 @@ export function ScoreLevelsEditor({
             <Input
               value={level.description}
               onChange={(event) => update(index, event.target.value)}
-              placeholder={levelPlaceholder(index, levels.length)}
-              aria-label={`Level ${index} description`}
+              placeholder={levelPlaceholder(index, levels.length, t)}
+              aria-label={t("Level {{index}} description", { index })}
             />
             <Button
               type="button"
@@ -80,8 +85,10 @@ export function ScoreLevelsEditor({
               onClick={() => remove(index)}
               title={
                 canRemove
-                  ? "Remove level"
-                  : `Keep at least ${DECISION_MODEL_LIMITS.minScoreLevels} levels`
+                  ? t("Remove level")
+                  : t("Keep at least {{min}} levels", {
+                      min: DECISION_MODEL_LIMITS.minScoreLevels,
+                    })
               }
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -98,14 +105,20 @@ export function ScoreLevelsEditor({
           onClick={() => onChange([...levels, { description: "" }])}
         >
           <Plus className="mr-1 h-3.5 w-3.5" />
-          Add level
+          {t("Add level")}
         </Button>
         <span className="text-muted-foreground text-xs">
-          The score is the probability-weighted average of the level numbers, so
-          it can be a decimal from 0 to {Math.max(levels.length - 1, 0)}.
+          {t(
+            "The score is the probability-weighted average of the level numbers, so it can be a decimal from 0 to {{max}}.",
+            { max: Math.max(levels.length - 1, 0) },
+          )}
         </span>
       </div>
-      {error ? <p className="text-destructive text-xs">{error}</p> : null}
+      {error ? (
+        <p className="text-destructive text-xs">
+          {t(error, { value: DECISION_MODEL_LIMITS.minScoreLevels })}
+        </p>
+      ) : null}
     </div>
   );
 }

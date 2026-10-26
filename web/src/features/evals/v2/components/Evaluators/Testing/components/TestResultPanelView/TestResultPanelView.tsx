@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Switch } from "@/src/components/design-system/Switch/Switch";
 import { PrettyJsonView } from "@/src/components/ui/PrettyJsonView";
@@ -28,6 +29,10 @@ export type TestResultPanelState =
     }
   | { status: "decision-success"; results: DecisionModelQuestionResult[] };
 
+/**
+ * Titles of the result panel. The render site translates the value with
+ * `t()`; the literals are keys, not display strings.
+ */
 export type TestResultPanelTitle =
   | "LLM Output"
   | "Code Output"
@@ -61,17 +66,21 @@ function TestResultHeader({
   onRawOpenChange,
   traceActions,
 }: {
-  title: TestResultPanelTitle;
+  title: string;
   durationMs: number | null;
   rawOpen: boolean;
   onRawOpenChange: (open: boolean) => void;
   traceActions: ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="bg-secondary text-secondary-foreground flex flex-wrap items-center gap-2 border-b px-3 py-2">
-      <p className="text-sm leading-none font-bold">{title}</p>
+      <p className="text-sm leading-none font-bold">{t(title)}</p>
       {durationMs !== null ? (
-        <ResultStat icon={Clock} title="Duration of the test call">
+        <ResultStat
+          icon={Clock}
+          title={t("Duration of the test call")}
+        >
           {(durationMs / 1000).toFixed(2)}s
         </ResultStat>
       ) : null}
@@ -85,7 +94,7 @@ function TestResultHeader({
             checked={rawOpen}
             onCheckedChange={onRawOpenChange}
           />
-          Raw output
+          {t("Raw output")}
         </label>
         {traceActions}
       </span>
@@ -94,10 +103,11 @@ function TestResultHeader({
 }
 
 function RawOutputView({ rawOutput }: { rawOutput: unknown | null }) {
+  const { t } = useTranslation();
   if (rawOutput === null) {
     return (
       <p className="text-muted-foreground text-sm">
-        No raw output available for this run.
+        {t("No raw output available for this run.")}
       </p>
     );
   }
@@ -151,11 +161,12 @@ function LlmResultView({
   score,
   reasoning,
 }: Omit<Extract<TestResultPanelState, { status: "llm-success" }>, "status">) {
+  const { t } = useTranslation();
   return (
     <ResultCard>
-      <ScoreValue label="Score" value={score} />
+      <ScoreValue label={t("Score")} value={score} />
       {reasoning ? (
-        <ScoreNote label="Model reasoning">{reasoning}</ScoreNote>
+        <ScoreNote label={t("Model reasoning")}>{reasoning}</ScoreNote>
       ) : null}
     </ResultCard>
   );
@@ -164,6 +175,7 @@ function LlmResultView({
 function CodeResultView({
   scores,
 }: Omit<Extract<TestResultPanelState, { status: "code-success" }>, "status">) {
+  const { t } = useTranslation();
   return (
     <ResultCard>
       {scores.map((score, index) => (
@@ -173,7 +185,7 @@ function CodeResultView({
         >
           <ScoreValue label={score.name} value={score.value} />
           {score.comment ? (
-            <ScoreNote label="Comment">{score.comment}</ScoreNote>
+            <ScoreNote label={t("Comment")}>{score.comment}</ScoreNote>
           ) : null}
         </div>
       ))}
@@ -182,11 +194,21 @@ function CodeResultView({
 }
 
 function RunErrorView({ message }: { message: string }) {
+  const { t } = useTranslation();
   return (
     <div className="border-destructive/40 bg-destructive/5 flex flex-col gap-1 rounded-md border p-3">
-      <p className="text-destructive text-sm font-bold">Test run failed</p>
+      <p className="text-destructive text-sm font-bold">
+        {t("Test run failed")}
+      </p>
       <p className="text-sm">{message}</p>
     </div>
+  );
+}
+
+function EmptyResultView() {
+  const { t } = useTranslation();
+  return (
+    <p className="text-muted-foreground text-sm">{t("No test run yet.")}</p>
   );
 }
 
@@ -196,9 +218,7 @@ const RESULT_VIEWS: {
     result: Extract<TestResultPanelState, { status: Status }>,
   ) => ReactNode;
 } = {
-  empty: () => (
-    <p className="text-muted-foreground text-sm">No test run yet.</p>
-  ),
+  empty: () => <EmptyResultView />,
   // The rerun button carries the pending state on its own.
   running: () => null,
   "request-error": ({ message }) => (
@@ -235,7 +255,7 @@ export function TestResultPanelView({
   traceActions,
   rerunAction,
 }: {
-  title: TestResultPanelTitle;
+  title: string;
   result: TestResultPanelState;
   durationMs: number | null;
   rawOutput: unknown | null;

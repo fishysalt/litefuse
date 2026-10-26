@@ -1,5 +1,6 @@
 import { ModelParameterSettings } from "@/src/components/ModelParameters";
 import { Button } from "@/src/components/ui/button";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogBody,
@@ -54,6 +55,7 @@ function JudgeModelConfigurationDialogContent({
   onCancel: () => void;
   onSave: (model: ProjectDefaultModelConfig) => void;
 }) {
+  const { t } = useTranslation();
   const { modelParams, updateModelParamValue, setModelParamEnabled } =
     useModelParams(undefined, {
       initialModel: {
@@ -67,11 +69,13 @@ function JudgeModelConfigurationDialogContent({
   return (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Model configuration</DialogTitle>
+        <DialogTitle>{t("Model configuration")}</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <div className="flex items-center gap-4 border-b pb-4 text-sm">
-          <span className="text-muted-foreground w-24 shrink-0">Model</span>
+          <span className="text-muted-foreground w-24 shrink-0">
+            {t("Model")}
+          </span>
           <span className="font-mono">
             {initialModel.provider} / {initialModel.model}
           </span>
@@ -86,7 +90,7 @@ function JudgeModelConfigurationDialogContent({
       </DialogBody>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t("Cancel")}
         </Button>
         <Button
           type="button"
@@ -96,7 +100,7 @@ function JudgeModelConfigurationDialogContent({
             onSave({ provider, adapter, model, modelParams: modelConfig });
           }}
         >
-          Save
+          {t("Save")}
         </Button>
       </DialogFooter>
     </DialogContent>

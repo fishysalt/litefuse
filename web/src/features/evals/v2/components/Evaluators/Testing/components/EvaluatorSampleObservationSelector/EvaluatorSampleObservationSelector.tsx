@@ -1,5 +1,6 @@
 import { useId, useMemo } from "react";
 import { Star } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { FilterState } from "@langfuse/shared";
 
 import { Radio } from "@/src/components/design-system/Radio/Radio";
@@ -45,6 +46,7 @@ export function EvaluatorSampleObservationSelector({
   onSelect: (observation: SampleObservation | null) => void;
   onOpenTrace: (observation: SampleObservation) => void;
 }) {
+  const { t } = useTranslation();
   const selectionGroupName = useId();
   const leadingColumns = useMemo<LangfuseColumnDef<SampleObservation>[]>(
     () => [
@@ -54,11 +56,11 @@ export function EvaluatorSampleObservationSelector({
         header: () => (
           <div className="flex w-full justify-center">
             <Star aria-hidden="true" className="h-4 w-4" />
-            <span className="sr-only">Sample</span>
+            <span className="sr-only">{t("Sample")}</span>
           </div>
         ),
         headerBlock: true,
-        headerLabel: "Sample",
+        headerLabel: t("Sample"),
         size: 72,
         enableHiding: false,
         isFixedPosition: true,
@@ -74,14 +76,16 @@ export function EvaluatorSampleObservationSelector({
               id={`sample-selection-${selectionGroupName}-${row.original.id}`}
               name={selectionGroupName}
               checked={selectedObservationId === row.original.id}
-              aria-label={`Use ${row.original.name ?? row.original.id} as sample`}
+              aria-label={t("Use {{name}} as sample", {
+                name: row.original.name ?? row.original.id,
+              })}
               onChange={() => onSelect(row.original)}
             />
           </label>
         ),
       },
     ],
-    [onSelect, selectedObservationId, selectionGroupName],
+    [onSelect, selectedObservationId, selectionGroupName, t],
   );
 
   return (
@@ -101,12 +105,22 @@ export function EvaluatorSampleObservationSelector({
       getRowClassName={(observation) =>
         observation.id === selectedObservationId ? "bg-muted/50" : ""
       }
-      filterDescription="Filter the observations to a representative sample for testing this evaluator."
-      filterTooltip="These filters control which observations you can pick to test with."
-      matchingDescription="Select an observation to test the evaluator and verify the variable mapping."
-      matchingTooltip="Observations matching the current filters and global time range."
+      filterDescription={t(
+        "Filter the observations to a representative sample for testing this evaluator.",
+      )}
+      filterTooltip={t(
+        "These filters control which observations you can pick to test with.",
+      )}
+      matchingDescription={t(
+        "Select an observation to test the evaluator and verify the variable mapping.",
+      )}
+      matchingTooltip={t(
+        "Observations matching the current filters and global time range.",
+      )}
       formatCount={(count) =>
-        `(${compactNumberFormatter(count)} ${count === 1 ? "match" : "matches"})`
+        count === 1
+          ? t("({{total}} match)", { total: compactNumberFormatter(count) })
+          : t("({{total}} matches)", { total: compactNumberFormatter(count) })
       }
       mapObservedOptions={preserveObservedOptions}
     />

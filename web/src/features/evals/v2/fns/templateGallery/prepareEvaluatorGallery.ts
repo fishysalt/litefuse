@@ -7,6 +7,7 @@ import { getGalleryCategoryPresentation } from "@/src/features/evals/v2/fns/temp
 import { managedEvaluatorTemplateService } from "@/src/features/evals/v2/fns/templateGallery/managedEvaluatorTemplateService";
 import { EVALUATOR_GALLERY_PROJECT_SECTION_KEY } from "@/src/features/evals/v2/constants/evaluatorGallery";
 import { isOfferedEvaluatorType } from "@/src/features/evals/v2/constants/offeredEvaluatorTypes";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 
 const RECOMMENDED_TEMPLATE_ORDER = [
   "topic-decision-model",
@@ -90,7 +91,7 @@ export function prepareEvaluatorGallery({
       ? [
           {
             key: EVALUATOR_GALLERY_PROJECT_SECTION_KEY,
-            label: "Your templates",
+            label: i18nKey("Your templates"),
             icon: getGalleryCategoryPresentation(
               EVALUATOR_GALLERY_PROJECT_SECTION_KEY,
             ).icon,
@@ -110,8 +111,10 @@ export function prepareEvaluatorGallery({
       ? [
           {
             key: EVALUATOR_GALLERY_PROJECT_SECTION_KEY,
-            label: "Your templates",
-            description: "Start from a template this project already created.",
+            label: i18nKey("Your templates"),
+            description: i18nKey(
+              "Start from a template this project already created.",
+            ),
             totalCount: customTemplateCount,
             templates: filteredCustom.map((template) => ({
               source: "custom" as const,

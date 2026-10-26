@@ -1,5 +1,6 @@
 import { useId, useRef } from "react";
 import { TriangleAlert } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { InfoTooltip } from "@/src/components/ui/InfoTooltip/InfoTooltip";
 import { Label } from "@/src/components/ui/label";
@@ -26,6 +27,7 @@ export function QuestionInstructionsField({
   placeholder?: string;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const id = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const referenced = extractReferencedStateKeys(value);
@@ -55,12 +57,11 @@ export function QuestionInstructionsField({
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id} className="flex items-center gap-1.5">
-        Question
-        <InfoTooltip label="About questions">
-          Ask for one snap judgment a knowledgeable person makes in a second.
-          Name the state field the question is about in backticks, for example
-          “Does `question` request a refund?”. The model reads the state as a
-          JSON object, so the question does not repeat the data.
+        {t("Question")}
+        <InfoTooltip label={t("About questions")}>
+          {t(
+            "Ask for one snap judgment a knowledgeable person makes in a second. Name the state field the question is about in backticks, for example “Does `question` request a refund?”. The model reads the state as a JSON object, so the question does not repeat the data.",
+          )}
         </InfoTooltip>
       </Label>
       <Textarea
@@ -74,7 +75,7 @@ export function QuestionInstructionsField({
         className={cn(error && "border-destructive")}
       />
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <span className="text-muted-foreground">Fields:</span>
+        <span className="text-muted-foreground">{t("Fields:")}</span>
         {stateKeys.map((key) => {
           const used = referenced.includes(key);
           return (
@@ -82,7 +83,7 @@ export function QuestionInstructionsField({
               key={key}
               type="button"
               onClick={() => insertKey(key)}
-              title={`Insert \`${key}\` at the cursor`}
+              title={t("Insert `{{key}}` at the cursor", { key })}
               className={cn(
                 "rounded border px-1.5 py-0.5 font-mono transition-colors",
                 used
@@ -98,14 +99,14 @@ export function QuestionInstructionsField({
           <span
             key={key}
             className="text-dark-yellow flex items-center gap-1 rounded border border-dashed px-1.5 py-0.5 font-mono"
-            title={`\`${key}\` is not a state field`}
+            title={t("`{{key}}` is not a state field", { key })}
           >
             <TriangleAlert className="h-3 w-3" />
             {key}
           </span>
         ))}
       </div>
-      {error ? <p className="text-destructive text-xs">{error}</p> : null}
+      {error ? <p className="text-destructive text-xs">{t(error)}</p> : null}
     </div>
   );
 }

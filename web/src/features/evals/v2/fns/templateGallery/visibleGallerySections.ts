@@ -7,6 +7,7 @@ import type {
   GalleryNavigationItem,
   GallerySection,
 } from "@/src/features/evals/v2/types/templateGallery";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 
 function isGalleryAllSection(activeSection: string | null) {
   return !activeSection || activeSection === EVALUATOR_GALLERY_ALL_SECTION_KEY;
@@ -35,7 +36,7 @@ export function gallerySidebarItems(
   return [
     {
       key: EVALUATOR_GALLERY_ALL_SECTION_KEY,
-      label: "All",
+      label: i18nKey("All"),
       icon: getGalleryCategoryPresentation(EVALUATOR_GALLERY_ALL_SECTION_KEY)
         .icon,
       count: allCount,

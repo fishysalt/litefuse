@@ -1,4 +1,6 @@
+import { useTranslation } from "react-i18next";
 import { useStore } from "zustand";
+
 import { Button } from "@/src/components/ui/button";
 import { DialogFooter } from "@/src/components/ui/dialog";
 import {
@@ -30,6 +32,7 @@ export function RuleDialogFooter({
   onCancel: () => void;
   onSave: () => void;
 }) {
+  const { t } = useTranslation();
   const name = useStore(ruleSetupStore, (state) => state.name);
   const dirty = useStore(ruleSetupStore, isRuleDraftDirty);
   const nameMissing = !name.trim();
@@ -38,7 +41,9 @@ export function RuleDialogFooter({
       type="button"
       loading={mutationPending || nameGenerationPending}
       loadingText={
-        nameGenerationPending ? "Generating name..." : "Validating rule..."
+        nameGenerationPending
+          ? t("Generating name...")
+          : t("Validating rule...")
       }
       disabled={
         !canEdit ||
@@ -54,21 +59,21 @@ export function RuleDialogFooter({
       }
       onClick={onSave}
     >
-      {isEditing ? "Save changes" : "Save and activate"}
+      {isEditing ? t("Save changes") : t("Save and activate")}
     </Button>
   );
 
   return (
     <DialogFooter>
       <Button type="button" variant="outline" onClick={onCancel}>
-        {dirty ? "Cancel" : "Close"}
+        {dirty ? t("Cancel") : t("Close")}
       </Button>
       {nameMissing && !nameAIAssistanceAvailable && canEdit ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="inline-flex cursor-not-allowed">{saveButton}</span>
           </TooltipTrigger>
-          <TooltipContent>Add a rule name before saving.</TooltipContent>
+          <TooltipContent>{t("Add a rule name before saving.")}</TooltipContent>
         </Tooltip>
       ) : (
         saveButton

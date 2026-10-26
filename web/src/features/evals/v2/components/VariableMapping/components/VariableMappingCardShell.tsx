@@ -6,6 +6,7 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/src/components/ui/button";
 import { CollapsibleCard } from "@/src/features/evals/v2/components/CollapsibleCard/CollapsibleCard";
@@ -30,18 +31,19 @@ function VariableMappingCardHeaderContent({
   isUnmapped: boolean;
   warningMessage?: string | null;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <span className="text-primary-accent shrink-0 font-mono font-bold">
         {variableDisplay === "stateKey" ? variable : `{{${variable}}}`}
       </span>
       <span className="text-muted-foreground shrink-0">
-        {variableDisplay === "stateKey" ? "from" : "maps to"}
+        {variableDisplay === "stateKey" ? t("from") : t("maps to")}
       </span>
       {isUnmapped ? (
         <span className="text-dark-yellow flex min-w-0 items-center gap-1.5 font-bold">
           <TriangleAlert className="h-4 w-4 shrink-0" />
-          <span>nothing yet</span>
+          <span>{t("nothing yet")}</span>
         </span>
       ) : (
         <span className="@container flex min-w-0 flex-1 items-center gap-1.5">
@@ -49,7 +51,9 @@ function VariableMappingCardHeaderContent({
           {warningMessage ? (
             <span
               className="text-dark-yellow relative -top-px h-4 w-4 shrink-0 self-center"
-              aria-label={`Warning: ${warningMessage}`}
+              aria-label={t("Warning: {{message}}", {
+                message: warningMessage,
+              })}
               title={warningMessage}
             >
               <TriangleAlert className="h-4 w-4" aria-hidden="true" />
@@ -97,6 +101,7 @@ function VariableMappingCardShell({
   rename?: VariableRenameControls;
   children?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const isRenaming = rename?.isRenaming ?? false;
   const canToggle = !isEditing && !isRenaming;
   const bodyVisible = isExpanded || isEditing;
@@ -109,10 +114,12 @@ function VariableMappingCardShell({
       headerInteractive={!isRenaming}
       triggerTitle={
         isEditing
-          ? "Finish editing before collapsing this mapping"
+          ? t("Finish editing before collapsing this mapping")
           : bodyVisible
-            ? `Collapse {{${variable}}} mapping`
-            : `Expand {{${variable}}} mapping`
+            ? t("Collapse {{variable}} mapping", {
+                variable: `{{${variable}}}`,
+              })
+            : t("Expand {{variable}} mapping", { variable: `{{${variable}}}` })
       }
       header={
         isRenaming && rename ? (
@@ -140,7 +147,7 @@ function VariableMappingCardShell({
               type="button"
               variant="ghost"
               size="icon-xs"
-              title={`Rename ${variable}`}
+              title={t("Rename {{variable}}", { variable })}
               onClick={() => rename.onRenamingChange(true)}
             >
               <TextCursorInput className="h-3.5 w-3.5" />
@@ -152,8 +159,8 @@ function VariableMappingCardShell({
             size="icon-xs"
             title={
               isEditing
-                ? "Cancel — keep the current mapping"
-                : "Change the mapping"
+                ? t("Cancel — keep the current mapping")
+                : t("Change the mapping")
             }
             aria-expanded={isEditing}
             disabled={isRenaming}
@@ -173,8 +180,10 @@ function VariableMappingCardShell({
               className="hover:text-destructive"
               title={
                 variableDisplay === "stateKey"
-                  ? `Remove ${variable} from the state`
-                  : `Remove {{${variable}}} from the prompt`
+                  ? t("Remove {{variable}} from the state", { variable })
+                  : t("Remove {{variable}} from the prompt", {
+                      variable: `{{${variable}}}`,
+                    })
               }
               onClick={onDelete}
             >

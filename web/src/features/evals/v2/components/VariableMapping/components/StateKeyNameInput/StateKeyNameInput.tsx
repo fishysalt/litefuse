@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Input } from "@/src/components/ui/input";
 import { cn } from "@/src/utils/tailwind";
@@ -18,6 +19,7 @@ export function StateKeyNameInput({
   onCommit: (next: string) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(value);
   const trimmed = draft.trim();
   const error = trimmed === value ? null : validate(trimmed);
@@ -48,9 +50,9 @@ export function StateKeyNameInput({
             onCancel();
           }
         }}
-        aria-label="Field name"
+        aria-label={t("Field name")}
         aria-invalid={Boolean(error)}
-        placeholder="field_name"
+        placeholder={t("field_name")}
         className={cn(
           "h-7 w-56 font-mono text-sm",
           error && "border-destructive",
@@ -62,7 +64,7 @@ export function StateKeyNameInput({
         </span>
       ) : (
         <span className="text-muted-foreground shrink-0 text-xs">
-          Enter to save, Esc to cancel
+          {t("Enter to save, Esc to cancel")}
         </span>
       )}
     </span>

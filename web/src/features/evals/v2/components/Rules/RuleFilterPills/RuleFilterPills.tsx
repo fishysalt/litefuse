@@ -1,5 +1,6 @@
 import type { FilterState } from "@langfuse/shared";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { SingleLineOverflowList } from "@/src/components/SingleLineOverflowList";
 import { Badge } from "@/src/components/ui/badge";
@@ -27,6 +28,7 @@ export function RuleFilterPills({
   display?: "compact" | "search-bar";
   disabledReasons?: ReadonlyMap<number, string>;
 }) {
+  const { t } = useTranslation();
   const renderWithDisabledReason = (
     content: ReactNode,
     index: number,
@@ -62,7 +64,7 @@ export function RuleFilterPills({
         >
           <div className={COMPOSER_TEXT_CLASSES}>
             {filter.length === 0 ? (
-              <span className="text-muted-foreground">No filters</span>
+              <span className="text-muted-foreground">{t("No filters")}</span>
             ) : (
               filter.map((condition, index) => {
                 const query = filterStateToQueryText(
@@ -87,6 +89,12 @@ export function RuleFilterPills({
                 return (
                   <span key={key}>
                     {index > 0 ? (
+                      // The boolean connector of the filter query language, not
+                      // UI copy: `ComposerTokens` renders the same operator from
+                      // the draft verbatim, and the query text that reaches the
+                      // API keeps "and". Translating it here would make this
+                      // read-only projection disagree with the query it shows.
+                      // eslint-disable-next-line i18next/no-literal-string
                       <span className="text-qlang-keyword mx-1 font-bold uppercase">
                         and
                       </span>
@@ -123,7 +131,7 @@ export function RuleFilterPills({
             className="m-0"
           />
           {!hasFilters ? (
-            <span className="text-muted-foreground">No filters</span>
+            <span className="text-muted-foreground">{t("No filters")}</span>
           ) : null}
         </div>
       </div>
@@ -131,7 +139,9 @@ export function RuleFilterPills({
   }
 
   if (filter.length === 0) {
-    return <span className="text-muted-foreground text-sm">No filters</span>;
+    return (
+      <span className="text-muted-foreground text-sm">{t("No filters")}</span>
+    );
   }
 
   const items = filter.map((condition, index) => ({

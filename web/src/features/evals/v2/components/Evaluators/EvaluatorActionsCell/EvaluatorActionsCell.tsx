@@ -14,6 +14,7 @@ import {
   type DropdownMenuItemDefinition,
 } from "@/src/components/design-system/DropdownMenu/DropdownMenu";
 import { usePostHogClientCapture } from "@/src/features/posthog-analytics";
+import { useTranslation } from "react-i18next";
 
 export function EvaluatorActionsCell({
   canEdit,
@@ -45,6 +46,7 @@ export function EvaluatorActionsCell({
   onDelete: () => void;
 }) {
   const capture = usePostHogClientCapture();
+  const { t } = useTranslation();
 
   const handlePrimaryAction = () => {
     capture("evaluators:overview_action_click", { action: "view_scores" });
@@ -66,7 +68,7 @@ export function EvaluatorActionsCell({
       ? {
           type: "item",
           id: "view-traces",
-          title: "View traces",
+          title: t("View traces"),
           icon: Route,
           href: ruleTracesHrefs[0].href,
         }
@@ -74,18 +76,18 @@ export function EvaluatorActionsCell({
         ? {
             type: "submenu",
             id: "view-traces",
-            title: "View traces",
+            title: t("View traces"),
             icon: Route,
-            search: { placeholder: "Search rules" },
+            search: { placeholder: t("Search rules") },
             items: ruleTracesHrefs,
           }
         : {
             type: "item",
             id: "view-traces",
-            title: "View traces",
+            title: t("View traces"),
             icon: Route,
             disabled: {
-              reason: "This evaluator is not attached to any rule",
+              reason: t("This evaluator is not attached to any rule"),
             },
             onClick: () => undefined,
           };
@@ -101,11 +103,11 @@ export function EvaluatorActionsCell({
         title={
           canViewScores
             ? undefined
-            : "This evaluator has not produced any scores yet"
+            : t("This evaluator has not produced any scores yet")
         }
         onClick={handlePrimaryAction}
       >
-        View scores
+        {t("View scores")}
         <SquarePercent className="ml-1 h-3.5 w-3.5" />
       </Button>
       <DropdownMenu
@@ -117,7 +119,7 @@ export function EvaluatorActionsCell({
                 {
                   type: "item" as const,
                   id: "view-executions",
-                  title: "View executions",
+                  title: t("View executions"),
                   icon: ListTree,
                   onClick: onViewExecutions,
                 },
@@ -128,21 +130,21 @@ export function EvaluatorActionsCell({
                 {
                   type: "item" as const,
                   id: "edit",
-                  title: "Edit",
+                  title: t("Edit"),
                   icon: Pencil,
                   onClick: onEdit,
                 },
                 {
                   type: "item" as const,
                   id: "clone",
-                  title: "Clone",
+                  title: t("Clone"),
                   icon: Copy,
                   onClick: onClone,
                 },
                 {
                   type: "item" as const,
                   id: "delete",
-                  title: "Delete",
+                  title: t("Delete"),
                   icon: Trash2,
                   onClick: onDelete,
                 },
@@ -155,11 +157,11 @@ export function EvaluatorActionsCell({
             type="button"
             variant="ghost"
             size="icon-xs"
-            aria-label="Evaluator actions"
+            aria-label={t("Evaluator actions")}
             className="shrink-0"
             {...getTriggerProps()}
           >
-            <span className="sr-only">Open menu</span>
+            <span className="sr-only">{t("Open menu")}</span>
             <MoreVertical className="h-4 w-4" />
           </Button>
         )}

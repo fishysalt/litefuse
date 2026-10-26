@@ -1,5 +1,6 @@
 /* eslint-disable no-nested-ternary */
 import { useCallback, type RefObject } from "react";
+import { useTranslation } from "react-i18next";
 import { Scale, Search, Sparkles } from "lucide-react";
 import { EvalTemplateTypeEnum, type EvalTemplateType } from "@langfuse/shared";
 
@@ -77,6 +78,7 @@ export function EvaluatorGalleryView({
   decisionModelBannerDismissed: boolean;
   onDismissDecisionModelBanner: () => void;
 }) {
+  const { t } = useTranslation();
   const sidebarItems = gallerySidebarItems(navigationItems, sections);
   const resolvedSection =
     activeSection === EVALUATOR_GALLERY_ALL_SECTION_KEY ||
@@ -149,7 +151,7 @@ export function EvaluatorGalleryView({
                   ref={searchInputRef}
                   value={search}
                   onChange={(event) => onSearchChange(event.target.value)}
-                  placeholder="Search what you want to measure."
+                  placeholder={t("Search what you want to measure.")}
                   className="pl-8"
                 />
               </div>
@@ -163,19 +165,21 @@ export function EvaluatorGalleryView({
                   }
                 >
                   <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                  New LLM-as-a-judge
+                  {t("New LLM-as-a-judge")}
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
                   className="flex-1 shrink-0 gap-1.5 @2xl:flex-none"
-                  title="Ask TypeSafe Jev typed questions and get calibrated answers in one call. Experimental."
+                  title={t(
+                    "Ask TypeSafe Jev typed questions and get calibrated answers in one call. Experimental.",
+                  )}
                   onClick={() =>
                     onCreateFromScratch(EvalTemplateTypeEnum.DECISION_MODEL)
                   }
                 >
                   <Scale className="h-3.5 w-3.5" aria-hidden="true" />
-                  New decision model evaluator
+                  {t("New decision model evaluator")}
                 </Button>
               </div>
             </div>
@@ -192,7 +196,7 @@ export function EvaluatorGalleryView({
               {isLoading ? <GallerySkeleton /> : null}
               {errorMessage ? (
                 <div className="text-destructive py-8 text-center text-sm">
-                  Error: {errorMessage}
+                  {t("Error:")} {errorMessage}
                 </div>
               ) : null}
               {!isLoading && !errorMessage ? (
@@ -224,7 +228,7 @@ export function EvaluatorGalleryView({
                   ))
                 ) : (
                   <div className="text-muted-foreground py-8 text-center text-sm">
-                    No templates match your search.
+                    {t("No templates match your search.")}
                   </div>
                 )
               ) : null}
@@ -237,7 +241,7 @@ export function EvaluatorGalleryView({
                   role={isLoadingMoreProjectTemplates ? "status" : undefined}
                 >
                   {isLoadingMoreProjectTemplates
-                    ? "Loading more templates…"
+                    ? t("Loading more templates…")
                     : null}
                 </div>
               ) : null}

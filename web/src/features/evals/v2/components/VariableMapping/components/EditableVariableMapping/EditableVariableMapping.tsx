@@ -1,6 +1,7 @@
 /* eslint-disable no-nested-ternary */
 import { useMemo, useState, type ReactNode } from "react";
 import { TriangleAlert } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { PrettyJsonView } from "@/src/components/ui/PrettyJsonView";
 import { MediaReferenceTag } from "@/src/components/ui/media/MediaReferenceTag";
@@ -103,12 +104,16 @@ function MappingPreviewSurface({
   children: ReactNode;
   onEdit: () => void;
 }) {
+  const { t } = useTranslation();
+  const label = t("Change mapping for {{variable}}", {
+    variable: `{{${variable}}}`,
+  });
   return (
     <div
       role="button"
       tabIndex={0}
-      aria-label={`Change mapping for {{${variable}}}`}
-      title={`Change mapping for {{${variable}}}`}
+      aria-label={label}
+      title={label}
       className="hover:bg-muted/50 focus-visible:ring-ring cursor-pointer rounded-b-md transition-colors focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset"
       onClick={(event) => {
         if (
@@ -164,6 +169,7 @@ function TreeSelectorBody({
   onApplyJsonPath: (jsonSelector: string | null) => void;
 }) {
   const [pathEditing, setPathEditing] = useState(false);
+  const { t } = useTranslation();
   const { selectedColumnId } = fieldState;
 
   // Both the tree and the path suggestions walk the whole sample, so they are
@@ -209,7 +215,10 @@ function TreeSelectorBody({
 
   const variableLabel =
     variableDisplay === "stateKey" ? variable : `{{${variable}}}`;
-  const treeGuidance = `Click rows to open them — hover one and press "Use" to bind ${variableLabel}.`;
+  const treeGuidance = t(
+    "Click rows to open them — hover one and press \"Use\" to bind {{variable}}.",
+    { variable: variableLabel },
+  );
 
   return (
     <>
@@ -217,8 +226,10 @@ function TreeSelectorBody({
         <p className="text-muted-foreground border-b p-3 text-sm">
           {sourceUnavailableMessage ??
             (hasMatchingObservations
-              ? "Loading sample data…"
-              : "No observations match the current rule — mapping can be configured, but JSON paths cannot be validated yet.")}
+              ? t("Loading sample data…")
+              : t(
+                  "No observations match the current rule — mapping can be configured, but JSON paths cannot be validated yet.",
+                ))}
         </p>
       ) : null}
       <div className="flex min-w-0 items-center justify-between gap-2 border-b px-3 py-1.5">
@@ -234,12 +245,12 @@ function TreeSelectorBody({
           disabled={!selectedColumnId}
           title={
             selectedColumnId
-              ? "Enter a raw JSONPath (filters, slices, …)"
-              : "Pick a field in the tree first, then refine it as a path."
+              ? t("Enter a raw JSONPath (filters, slices, …)")
+              : t("Pick a field in the tree first, then refine it as a path.")
           }
           onClick={() => setPathEditing(true)}
         >
-          Type a JSONPath instead
+          {t("Type a JSONPath instead")}
         </button>
       </div>
       <SampleDataTreeSelector
@@ -293,6 +304,7 @@ function VariableMappingRow({
   onDelete?: () => void;
 }) {
   const capture = usePostHogClientCapture();
+  const { t } = useTranslation();
   const segments = useMemo(
     () =>
       fieldState.jsonSelector
@@ -322,7 +334,7 @@ function VariableMappingRow({
   const warningMessage =
     extracted?.error ??
     (sourceObject && extracted && !extracted.value
-      ? "This mapping is empty in the selected sample."
+      ? t("This mapping is empty in the selected sample.")
       : null);
 
   const body = editing ? (
@@ -373,16 +385,21 @@ function VariableMappingRow({
       {unmapped ? (
         <div className="text-dark-yellow flex w-full items-start gap-1.5 p-3 text-left text-sm">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          {`{{${variable}}} is not mapped yet — click to choose the data it pulls in.`}
+          {t(
+            "{{variable}} is not mapped yet — click to choose the data it pulls in.",
+            { variable: `{{${variable}}}` },
+          )}
         </div>
       ) : !sourceObject ? (
         <p className="text-muted-foreground p-3 text-sm">
           {sourceUnavailableMessage ??
-            "Pick a sample in the right pane to preview the value this mapping pulls in."}
+            t(
+              "Pick a sample in the right pane to preview the value this mapping pulls in.",
+            )}
         </p>
       ) : validationUnavailable ? (
         <p className="text-muted-foreground p-3 text-sm">
-          No sample value is available to preview this mapping yet.
+          {t("No sample value is available to preview this mapping yet.")}
         </p>
       ) : extracted?.error ? (
         <div className="text-dark-yellow flex items-start gap-1.5 p-3 text-sm">
@@ -391,7 +408,7 @@ function VariableMappingRow({
         </div>
       ) : !extracted?.value ? (
         <p className="text-muted-foreground p-3 text-sm italic">
-          empty in the sample
+          {t("empty in the sample")}
         </p>
       ) : (
         <MappedValuePreview value={extracted.value} />

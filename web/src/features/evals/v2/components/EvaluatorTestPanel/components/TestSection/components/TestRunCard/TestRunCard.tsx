@@ -1,4 +1,5 @@
 import { useStore } from "zustand";
+import { useTranslation } from "react-i18next";
 
 import { TestRunButton } from "@/src/features/evals/v2/components/Evaluators/Testing/components/TestRunButton/TestRunButton";
 import { useEvaluatorTestAvailability } from "@/src/features/evals/v2/hooks/useEvaluatorTestAvailability";
@@ -17,6 +18,7 @@ export function TestRunCard({
   canRunTest: boolean;
   onRunTest: () => void;
 }) {
+  const { t } = useTranslation();
   const selectedSampleLabel = useStore(store, (state) => {
     const observation = state.selectedObservation;
     return observation
@@ -39,8 +41,11 @@ export function TestRunCard({
       />
       <p className="text-muted-foreground text-sm">
         {selectedSampleLabel
-          ? `Sample: ${selectedSampleLabel}. Select a different row above to change it.`
-          : "Select an observation above to use it as the test sample."}
+          ? t(
+              "Sample: {{label}}. Select a different row above to change it.",
+              { label: selectedSampleLabel },
+            )
+          : t("Select an observation above to use it as the test sample.")}
       </p>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/src/components/ui/button";
 import { Label } from "@/src/components/ui/label";
@@ -19,6 +20,7 @@ export function NoulCriteriaEditor({
   criteria: NoulCriteriaDraft;
   onChange: (criteria: NoulCriteriaDraft) => void;
 }) {
+  const { t } = useTranslation();
   const id = useId();
   const hasContent = Boolean(criteria.true.trim() || criteria.false.trim());
   const [open, setOpen] = useState(hasContent);
@@ -33,9 +35,9 @@ export function NoulCriteriaEditor({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        Refine what yes and no mean
+        {t("Refine what yes and no mean")}
         <span className="text-muted-foreground ml-1 font-normal">
-          (optional)
+          {t("(optional)")}
         </span>
         <ChevronDown
           className={cn(
@@ -47,26 +49,30 @@ export function NoulCriteriaEditor({
       {open ? (
         <div className="grid gap-3 @md:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${id}-true`}>Yes means</Label>
+            <Label htmlFor={`${id}-true`}>{t("Yes means")}</Label>
             <Textarea
               id={`${id}-true`}
               value={criteria.true}
               onChange={(event) =>
                 onChange({ ...criteria, true: event.target.value })
               }
-              placeholder="The user clearly asks for money back, a refund, or a chargeback."
+              placeholder={t(
+                "The user clearly asks for money back, a refund, or a chargeback.",
+              )}
               rows={3}
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${id}-false`}>No means</Label>
+            <Label htmlFor={`${id}-false`}>{t("No means")}</Label>
             <Textarea
               id={`${id}-false`}
               value={criteria.false}
               onChange={(event) =>
                 onChange({ ...criteria, false: event.target.value })
               }
-              placeholder="A complaint or question without asking for money back."
+              placeholder={t(
+                "A complaint or question without asking for money back.",
+              )}
               rows={3}
             />
           </div>

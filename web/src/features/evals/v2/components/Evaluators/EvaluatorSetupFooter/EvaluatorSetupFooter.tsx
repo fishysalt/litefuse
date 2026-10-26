@@ -1,6 +1,7 @@
 /* eslint-disable no-nested-ternary */
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import { useTranslation } from "react-i18next";
 import { prepareEvaluatorDraft } from "@/src/features/evals/v2/fns/evaluators/prepareEvaluatorDraft";
 import { getPromptMessagesValidationError } from "@/src/features/evals/v2/fns/promptMessages/hasInvalidSystemPromptMessage";
 import { getScoreOutputValidation } from "@/src/features/evals/v2/fns/scoreOutput/getScoreOutputValidation";
@@ -29,6 +30,7 @@ export function EvaluatorSetupFooter({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const { t } = useTranslation();
   const {
     currentSnapshot,
     canSubmit,
@@ -66,17 +68,19 @@ export function EvaluatorSetupFooter({
   );
   const hasUnsavedChanges = currentSnapshot !== initialSnapshot;
   const disabledReason = !canWrite
-    ? "You do not have permission to create or change evaluators in this project."
+    ? t(
+        "You do not have permission to create or change evaluators in this project.",
+      )
     : nameMissing && !nameAIAssistanceAvailable
-      ? "Add an evaluator name before saving."
+      ? t("Add an evaluator name before saving.")
       : promptMessagesReason
-        ? promptMessagesReason
+        ? t(promptMessagesReason)
         : scoreOutputReason
-          ? scoreOutputReason
+          ? t(scoreOutputReason)
           : codeValidation &&
                 !codeValidation.isPending &&
                 !codeValidation.isValid
-              ? "Fix the code validation errors before saving."
+              ? t("Fix the code validation errors before saving.")
               : null;
   const saveDisabled =
     !canWrite ||
@@ -89,8 +93,8 @@ export function EvaluatorSetupFooter({
     isSaving;
 
   const sharedProps = {
-    closeLabel: hasUnsavedChanges ? "Cancel" : "Close",
-    saveLabel: isEditing ? "Save changes" : "Create evaluator",
+    closeLabel: hasUnsavedChanges ? t("Cancel") : t("Close"),
+    saveLabel: isEditing ? t("Save changes") : t("Create evaluator"),
     isSaving,
     saveDisabled,
     disabledReason,
@@ -104,7 +108,9 @@ export function EvaluatorSetupFooter({
 
   return (
     <EvaluatorSetupFooterView mode="create" {...sharedProps}>
-      Next: attach a rule to run this evaluator on incoming observations.
+      {t(
+        "Next: attach a rule to run this evaluator on incoming observations.",
+      )}
     </EvaluatorSetupFooterView>
   );
 }

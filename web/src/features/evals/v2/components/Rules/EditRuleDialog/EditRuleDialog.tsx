@@ -1,6 +1,7 @@
 /* eslint-disable @repo/no-null-render */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
+import { useTranslation } from "react-i18next";
 import { useDebounce } from "@/src/hooks/useDebounce";
 import {
   Dialog,
@@ -31,6 +32,7 @@ export function EditRuleDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const rule = api.evalsV2.rules.get.useQuery({ projectId, ruleId });
   const [evaluatorSearch, setEvaluatorSearch] = useState("");
   const [evaluatorSearchQuery, setEvaluatorSearchQuery] = useState("");
@@ -96,7 +98,7 @@ export function EditRuleDialog({
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent size="xl" className="max-w-6xl" closeOnInteractionOutside>
         <DialogHeader>
-          <DialogTitle>{rule.data?.name ?? "Evaluation rule"}</DialogTitle>
+          <DialogTitle>{rule.data?.name ?? t("Evaluation rule")}</DialogTitle>
         </DialogHeader>
         {rule.isPending || !rule.data ? (
           <DialogBody>

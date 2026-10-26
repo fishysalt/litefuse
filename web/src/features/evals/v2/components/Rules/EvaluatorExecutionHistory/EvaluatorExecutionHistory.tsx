@@ -1,4 +1,6 @@
 /* eslint-disable no-nested-ternary */
+import { useTranslation } from "react-i18next";
+
 import { Tooltip } from "@/src/components/design-system/Tooltip/Tooltip";
 import { cn } from "@/src/utils/tailwind";
 
@@ -24,9 +26,13 @@ export function EvaluatorExecutionHistory({
     durationMs?: number | null;
   }>;
 }) {
+  const { t } = useTranslation();
+
   if (traces.length === 0) {
     return (
-      <span className="text-muted-foreground text-xs">No recent runs</span>
+      <span className="text-muted-foreground text-xs">
+        {t("No recent runs")}
+      </span>
     );
   }
 
@@ -37,10 +43,15 @@ export function EvaluatorExecutionHistory({
     durationMs?: number | null;
   }) => {
     const parts = [
-      `${trace.level.toLowerCase()} at ${trace.timestamp.toLocaleString()}`,
+      // `level` is the trace level enum the API returns (error, warning, ...),
+      // so only the sentence around it is translated.
+      t("{{level}} at {{timestamp}}", {
+        level: trace.level.toLowerCase(),
+        timestamp: trace.timestamp.toLocaleString(),
+      }),
     ];
     if (typeof trace.durationMs === "number") {
-      parts.push(`took ${trace.durationMs} ms`);
+      parts.push(t("took {{duration}} ms", { duration: trace.durationMs }));
     }
     if (trace.statusMessage) {
       parts.push(trace.statusMessage);

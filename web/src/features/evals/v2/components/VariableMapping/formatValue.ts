@@ -1,7 +1,13 @@
+import { type TFunction } from "i18next";
+
 const MAX_PREVIEW_LENGTH = 700;
 const MAX_PREVIEW_CHILDREN = 10;
 const MAX_PREVIEW_DEPTH = 3;
 const MAX_OBJECT_ROWS = 50;
+
+/** Falls back to the English key so the helpers stay usable without i18n. */
+const translate = (t: TFunction | undefined, key: string) =>
+  t ? t(key) : key;
 
 function structuredPreview(value: unknown, depth: number): string {
   if (value === null || typeof value !== "object") {
@@ -32,8 +38,8 @@ function structuredPreview(value: unknown, depth: number): string {
   return `{${fields.join(",")}}`;
 }
 
-export function previewOf(value: unknown) {
-  if (value === undefined) return "No sample value available";
+export function previewOf(value: unknown, t?: TFunction) {
+  if (value === undefined) return translate(t, "No sample value available");
   if (typeof value === "string") {
     return value.length > MAX_PREVIEW_LENGTH
       ? `${value.slice(0, MAX_PREVIEW_LENGTH)}…`
@@ -55,13 +61,19 @@ export function objectEntriesForPreview(value: Record<string, unknown>) {
   };
 }
 
-export function typeBadge(value: unknown) {
-  if (value === undefined) return "no value";
-  if (Array.isArray(value)) return `list · ${value.length}`;
-  if (value === null) return "null";
-  if (typeof value === "object") return `object · ${Object.keys(value).length}`;
-  if (typeof value === "string") return "text";
-  if (typeof value === "number") return "number";
-  if (typeof value === "boolean") return "bool";
+export function typeBadge(value: unknown, t?: TFunction) {
+  if (value === undefined) return translate(t, "no value");
+  if (Array.isArray(value))
+    return t
+      ? t("list · {{total}}", { total: value.length })
+      : `list · ${value.length}`;
+  if (value === null) return translate(t, "null");
+  if (typeof value === "object")
+    return t
+      ? t("object · {{total}}", { total: Object.keys(value).length })
+      : `object · ${Object.keys(value).length}`;
+  if (typeof value === "string") return translate(t, "text");
+  if (typeof value === "number") return translate(t, "number");
+  if (typeof value === "boolean") return translate(t, "bool");
   return typeof value;
 }

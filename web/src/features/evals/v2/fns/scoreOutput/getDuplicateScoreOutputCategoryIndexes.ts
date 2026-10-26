@@ -1,7 +1,10 @@
 import { getCategoricalCategoryRuleViolations } from "@langfuse/shared";
 
-export const DUPLICATE_CATEGORY_NAMES_MESSAGE =
-  "Category names must be unique.";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
+
+export const DUPLICATE_CATEGORY_NAMES_MESSAGE = i18nKey(
+  "Category names must be unique.",
+);
 
 export function getDuplicateScoreOutputCategoryIndexes(categories: string[]) {
   return getCategoricalCategoryRuleViolations(categories).flatMap(

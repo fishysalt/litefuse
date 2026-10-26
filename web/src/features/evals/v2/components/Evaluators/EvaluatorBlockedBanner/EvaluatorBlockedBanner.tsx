@@ -6,11 +6,14 @@ import {
 import { AlertTriangle, ExternalLinkIcon, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { Fragment } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/src/components/ui/button";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 
-const DEFAULT_BLOCK_MESSAGE =
-  "This evaluator is paused until its configuration is fixed.";
+const DEFAULT_BLOCK_MESSAGE = i18nKey(
+  "This evaluator is paused until its configuration is fixed.",
+);
 
 function getResolutionAction({
   projectId,
@@ -27,13 +30,13 @@ function getResolutionAction({
   ) {
     return {
       href: `/project/${projectId}/settings/llm-connections`,
-      label: "Open model connections",
+      label: i18nKey("Open model connections"),
     };
   }
 
   return {
     href: `/project/${projectId}/evals/v2`,
-    label: "Open evaluators",
+    label: i18nKey("Open evaluators"),
   };
 }
 
@@ -55,6 +58,7 @@ export function EvaluatorBlockedBanner({
   reactivationPending: boolean;
   onReactivate: () => void;
 }) {
+  const { t } = useTranslation();
   const reason = blockReason ?? "EVAL_MODEL_CONFIG_INVALID";
   const blockMetadata = getEvaluatorBlockMetadata(reason);
   const blockedAtLabel = formatDistanceToNow(blockedAt, { addSuffix: true });
@@ -74,30 +78,30 @@ export function EvaluatorBlockedBanner({
 
         <div className="min-w-0 flex-1">
           <h2 className="text-foreground text-base font-bold">
-            Evaluator paused
+            {t("Evaluator paused")}
           </h2>
 
           <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground font-bold">
-              {blockMetadata.shortLabel}
+              {t(blockMetadata.shortLabel)}
             </span>
             <Fragment>
               <span className="bg-border h-1 w-1 rounded-full" />
               <span title={blockedAt.toLocaleString()}>
-                Paused {blockedAtLabel}
+                {t("Paused {{when}}", { when: blockedAtLabel })}
               </span>
             </Fragment>
           </div>
 
           <p className="text-muted-foreground mt-2 max-w-3xl text-sm">
-            {blockMessage ?? DEFAULT_BLOCK_MESSAGE}
+            {t(blockMessage ?? DEFAULT_BLOCK_MESSAGE)}
           </p>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button asChild variant="outline" size="sm" className="h-8 px-3">
               <Link href={resolutionAction.href}>
                 <ExternalLinkIcon className="mr-1.5 h-3.5 w-3.5" />
-                {resolutionAction.label}
+                {t(resolutionAction.label)}
               </Link>
             </Button>
 
@@ -111,7 +115,7 @@ export function EvaluatorBlockedBanner({
                 className="h-8 px-3"
               >
                 <RefreshCcw className="mr-1.5 h-3.5 w-3.5" />
-                Reactivate
+                {t("Reactivate")}
               </Button>
             ) : null}
           </div>

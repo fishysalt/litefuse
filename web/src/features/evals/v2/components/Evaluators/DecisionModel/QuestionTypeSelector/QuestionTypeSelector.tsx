@@ -1,7 +1,9 @@
 import { DecisionModelQuestionType } from "@langfuse/shared";
 import { Gauge, ListChecks, ToggleLeft, type LucideIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "@/src/utils/tailwind";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 
 export const QUESTION_TYPE_COPY: Record<
   DecisionModelQuestionType,
@@ -15,31 +17,34 @@ export const QUESTION_TYPE_COPY: Record<
   }
 > = {
   [DecisionModelQuestionType.CHOICE]: {
-    label: "Choice",
+    label: i18nKey("Choice"),
     icon: ListChecks,
-    summary: "Pick one of a fixed set of labels.",
-    writes: "a categorical score",
-    example: "Which team should handle this ticket?",
-    whenToUse:
+    summary: i18nKey("Pick one of a fixed set of labels."),
+    writes: i18nKey("a categorical score"),
+    example: i18nKey("Which team should handle this ticket?"),
+    whenToUse: i18nKey(
       "The answer is one of a few options with no order between them. Add an “other” option if the list may not cover every input.",
+    ),
   },
   [DecisionModelQuestionType.SCORE]: {
-    label: "Score",
+    label: i18nKey("Score"),
     icon: Gauge,
-    summary: "Rate along ordered levels you describe.",
-    writes: "a numeric score (the expected level)",
-    example: "How frustrated is the customer?",
-    whenToUse:
+    summary: i18nKey("Rate along ordered levels you describe."),
+    writes: i18nKey("a numeric score (the expected level)"),
+    example: i18nKey("How frustrated is the customer?"),
+    whenToUse: i18nKey(
       "The answer sits on a spectrum you can describe in steps. Describe situations, not degrees: “broken but a workaround exists” beats “moderately severe”.",
+    ),
   },
   [DecisionModelQuestionType.NOUL]: {
-    label: "Yes / no",
+    label: i18nKey("Yes / no"),
     icon: ToggleLeft,
-    summary: "Get the probability a statement is true.",
-    writes: "a numeric score (probability 0–1)",
-    example: "Does the message request a refund?",
-    whenToUse:
+    summary: i18nKey("Get the probability a statement is true."),
+    writes: i18nKey("a numeric score (probability 0–1)"),
+    example: i18nKey("Does the message request a refund?"),
+    whenToUse: i18nKey(
       "A clean yes/no where the probability itself is the signal. Define the condition precisely; 0.5 means undecided, not “medium”.",
+    ),
   },
 };
 
@@ -62,12 +67,13 @@ export function QuestionTypeSelector({
   onValueChange: (value: DecisionModelQuestionType) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const active = QUESTION_TYPE_COPY[value];
   return (
     <div className="@container flex flex-col gap-1.5">
       <div
         role="radiogroup"
-        aria-label="Question type"
+        aria-label={t("Question type")}
         className="grid gap-2 @lg:grid-cols-3"
       >
         {ORDER.map((type) => {
@@ -92,18 +98,21 @@ export function QuestionTypeSelector({
             >
               <span className="flex items-center gap-1.5 font-bold">
                 <copy.icon className="h-4 w-4 shrink-0" />
-                {copy.label}
+                {t(copy.label)}
               </span>
-              <span className="text-muted-foreground">{copy.summary}</span>
+              <span className="text-muted-foreground">{t(copy.summary)}</span>
               <span className="text-muted-foreground text-xs italic">
-                e.g. “{copy.example}”
+                {t("e.g. “{{example}}”", { example: t(copy.example) })}
               </span>
             </button>
           );
         })}
       </div>
       <p className="text-muted-foreground text-xs">
-        Writes {active.writes}. {active.whenToUse}
+        {t("Writes {{writes}}. {{whenToUse}}", {
+          writes: t(active.writes),
+          whenToUse: t(active.whenToUse),
+        })}
       </p>
     </div>
   );

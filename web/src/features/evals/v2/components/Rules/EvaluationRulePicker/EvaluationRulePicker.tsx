@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Check, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/src/components/ui/badge";
 import {
@@ -24,6 +25,7 @@ type EvaluationRule = {
 };
 
 function EvaluationRulePickerOption({ rule }: { rule: EvaluationRule }) {
+  const { t } = useTranslation();
   const creator =
     rule.createdByUser?.name ?? rule.createdByUser?.email ?? "API";
   const updated = rule.updatedAt
@@ -42,7 +44,7 @@ function EvaluationRulePickerOption({ rule }: { rule: EvaluationRule }) {
         </span>
         {rule.enabled !== undefined ? (
           <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
-            {rule.enabled ? "Active" : "Inactive"}
+            {rule.enabled ? t("Active") : t("Inactive")}
           </Badge>
         ) : null}
       </div>
@@ -50,8 +52,13 @@ function EvaluationRulePickerOption({ rule }: { rule: EvaluationRule }) {
         <div className="text-muted-foreground flex max-w-[45%] min-w-0 shrink-0 items-center justify-end gap-1 text-xs">
           {assignmentCount !== undefined ? (
             <span className="shrink-0">
-              {assignmentCount}{" "}
-              {assignmentCount === 1 ? "evaluator" : "evaluators"}
+              {assignmentCount === 1
+                ? t("{{evaluatorCount}} evaluator", {
+                    evaluatorCount: assignmentCount,
+                  })
+                : t("{{evaluatorCount}} evaluators", {
+                    evaluatorCount: assignmentCount,
+                  })}
             </span>
           ) : null}
           {hasCreatorMetadata ? (
@@ -61,14 +68,17 @@ function EvaluationRulePickerOption({ rule }: { rule: EvaluationRule }) {
               ) : null}
               <span
                 className="min-w-0 truncate"
-                title={`Created by ${creator}`}
+                title={t("Created by {{creator}}", { creator })}
               >
                 {creator}
               </span>
               {updated ? (
                 <>
                   <span aria-hidden>·</span>
-                  <span className="shrink-0" title={`Updated ${updated}`}>
+                  <span
+                    className="shrink-0"
+                    title={t("Updated {{updated}}", { updated })}
+                  >
                     {updated}
                   </span>
                 </>
@@ -112,6 +122,7 @@ export function EvaluationRulePicker<Rule extends EvaluationRule>({
   onSelectAvailableRule: (rule: Rule) => void;
   onCreateRule?: () => void;
 }) {
+  const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const resolvedOpen = open ?? internalOpen;
 
@@ -135,25 +146,25 @@ export function EvaluationRulePicker<Rule extends EvaluationRule>({
       >
         <Command shouldFilter={onSearchChange === undefined}>
           <CommandInput
-            placeholder="Find a rule..."
+            placeholder={t("Find a rule...")}
             value={search}
             onValueChange={onSearchChange}
           />
           <CommandList>
-            <CommandEmpty>No rule found.</CommandEmpty>
+            <CommandEmpty>{t("No rule found.")}</CommandEmpty>
             {onCreateRule ? (
-              <CommandGroup heading="New rule">
+              <CommandGroup heading={t("New rule")}>
                 <CommandItem
                   value="create new rule"
                   onSelect={() => select(onCreateRule)}
                 >
                   <Plus className="h-4 w-4" />
-                  Create a new rule
+                  {t("Create a new rule")}
                 </CommandItem>
               </CommandGroup>
             ) : null}
             {disabledRules.length > 0 ? (
-              <CommandGroup heading="Already attached">
+              <CommandGroup heading={t("Already attached")}>
                 {disabledRules.map(({ rule, reason }) => (
                   <CommandItem
                     key={rule.id}
@@ -168,7 +179,7 @@ export function EvaluationRulePicker<Rule extends EvaluationRule>({
                 ))}
               </CommandGroup>
             ) : null}
-            <CommandGroup heading="Available rules">
+            <CommandGroup heading={t("Available rules")}>
               {loading ? (
                 <Skeleton className="m-2 h-16" />
               ) : (
@@ -186,7 +197,7 @@ export function EvaluationRulePicker<Rule extends EvaluationRule>({
               )}
               {!loading && availableRules.length === 0 ? (
                 <div className="text-muted-foreground px-2 py-1.5 text-sm">
-                  No rules available
+                  {t("No rules available")}
                 </div>
               ) : null}
             </CommandGroup>

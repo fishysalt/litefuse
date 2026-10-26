@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { EvaluatorGalleryMethodBadge } from "@/src/features/evals/v2/components/EvaluatorGalleryView/components/EvaluatorGalleryMethodBadge/EvaluatorGalleryMethodBadge";
 import { getGalleryTemplatePresentation } from "@/src/features/evals/v2/fns/templateGallery/galleryTemplatePresentation";
 import type { GalleryTemplate } from "@/src/features/evals/v2/types/templateGallery";
@@ -9,8 +11,17 @@ export function EvaluatorTemplateRow({
   template: GalleryTemplate;
   onSelect: (template: GalleryTemplate) => void;
 }) {
+  const { t } = useTranslation();
   const { description, type, attribution } =
     getGalleryTemplatePresentation(template);
+  const attributionLabel = attribution
+    ? attribution.author
+      ? t("{{author}} · {{updated}}", {
+          author: attribution.author,
+          updated: attribution.updated,
+        })
+      : t("Updated {{updated}}", { updated: attribution.updated })
+    : null;
 
   return (
     <button
@@ -27,16 +38,16 @@ export function EvaluatorTemplateRow({
         </span>
         <span
           className="text-muted-foreground col-span-2 col-start-1 row-start-2 min-w-0 truncate text-sm @3xl:col-span-1 @3xl:col-start-2 @3xl:row-start-1"
-          title={description}
+          title={description ? t(description) : undefined}
         >
-          {description}
+          {description ? t(description) : null}
         </span>
-        {attribution ? (
+        {attributionLabel ? (
           <span
             className="text-muted-foreground/80 col-span-2 col-start-1 row-start-3 min-w-0 text-xs leading-5 whitespace-normal @3xl:col-span-1 @3xl:col-start-3 @3xl:row-start-1 @3xl:text-sm @3xl:whitespace-nowrap"
-            title={attribution}
+            title={attributionLabel}
           >
-            {attribution}
+            {attributionLabel}
           </span>
         ) : null}
         <span className="col-start-2 row-start-1 justify-self-end @3xl:col-start-4 @3xl:justify-self-start">

@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { InfoTooltip } from "@/src/components/ui/InfoTooltip/InfoTooltip";
 import { EvaluatorRecommendedCard } from "./components/EvaluatorRecommendedCard/EvaluatorRecommendedCard";
@@ -29,6 +30,7 @@ export function EvaluatorGallerySection({
   onExpandedChange?: (expanded: boolean) => void;
   onSelectTemplate: (template: GalleryTemplate) => void;
 }) {
+  const { t } = useTranslation();
   const isRecommended =
     section.key === EVALUATOR_GALLERY_RECOMMENDED_SECTION_KEY;
   const isSafety = section.key === EVALUATOR_GALLERY_SAFETY_SECTION_KEY;
@@ -43,7 +45,7 @@ export function EvaluatorGallerySection({
   return (
     <section className="flex scroll-mt-1 flex-col gap-3">
       {isRecommended ? (
-        <EvaluatorRecommendedCards label={section.label}>
+        <EvaluatorRecommendedCards label={t(section.label)}>
           {shownTemplates.map((template) => (
             <EvaluatorRecommendedCard
               key={getGalleryTemplateId(template)}
@@ -58,11 +60,13 @@ export function EvaluatorGallerySection({
             <div className="flex items-center gap-2">
               <Icon className={cn("h-3.5 w-3.5 shrink-0", iconClassName)} />
               <h4 className="text-muted-foreground text-xs font-bold tracking-wide uppercase">
-                {section.label}
+                {t(section.label)}
               </h4>
               {isSafety ? (
-                <InfoTooltip label={`About ${section.label}`}>
-                  {EVALUATOR_GALLERY_SAFETY_CALLOUT}
+                <InfoTooltip
+                  label={t("About {{topic}}", { topic: t(section.label) })}
+                >
+                  {t(EVALUATOR_GALLERY_SAFETY_CALLOUT)}
                 </InfoTooltip>
               ) : null}
             </div>
@@ -90,7 +94,9 @@ export function EvaluatorGallerySection({
           ) : (
             <ChevronDown className="h-3.5 w-3.5" />
           )}
-          {expanded ? "Show fewer" : `Show all ${totalCount} templates`}
+          {expanded
+            ? t("Show fewer")
+            : t("Show all {{count}} templates", { count: totalCount })}
         </button>
       ) : null}
     </section>

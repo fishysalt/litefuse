@@ -4,6 +4,7 @@ import {
 } from "@langfuse/shared";
 import { formatDistanceToNowStrict } from "date-fns";
 import { RotateCcw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
@@ -76,6 +77,8 @@ export function EvaluatorVersionHistoryList({
   onRestoreVersion: (version: EvaluatorVersion) => void;
   isLoading: boolean;
 }) {
+  const { t } = useTranslation();
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-2">
@@ -87,7 +90,9 @@ export function EvaluatorVersionHistoryList({
 
   if (versions.length === 0) {
     return (
-      <p className="text-muted-foreground text-sm">No saved versions found.</p>
+      <p className="text-muted-foreground text-sm">
+        {t("No saved versions found.")}
+      </p>
     );
   }
 
@@ -110,30 +115,36 @@ export function EvaluatorVersionHistoryList({
             disabled={false}
             triggerTitle={
               expandedVersionId === version.id
-                ? `Collapse version ${version.version}`
-                : `Show the definition saved as version ${version.version}`
+                ? t("Collapse version {{version}}", {
+                    version: version.version,
+                  })
+                : t("Show the definition saved as version {{version}}", {
+                    version: version.version,
+                  })
             }
             header={
               <>
                 <span className="shrink-0 font-bold">
-                  Version {version.version}
+                  {t("Version {{version}}", { version: version.version })}
                 </span>
                 {version.id === currentVersionId ? (
                   <Badge variant="success" className="shrink-0 px-2">
-                    Current
+                    {t("Current")}
                   </Badge>
                 ) : null}
                 <span className="text-muted-foreground flex min-w-0 shrink-0 items-center gap-1 text-xs">
                   <span
                     className="min-w-0 truncate"
-                    title={`Created by ${author}`}
+                    title={t("Created by {{author}}", { author })}
                   >
                     {author}
                   </span>
                   <span aria-hidden>·</span>
                   <span
                     className="shrink-0"
-                    title={`Saved ${version.createdAt.toLocaleString()}`}
+                    title={t("Saved {{date}}", {
+                      date: version.createdAt.toLocaleString(),
+                    })}
                   >
                     {saved}
                   </span>
@@ -147,8 +158,12 @@ export function EvaluatorVersionHistoryList({
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    aria-label={`Restore version ${version.version}`}
-                    title={`Restore version ${version.version}`}
+                    aria-label={t("Restore version {{version}}", {
+                      version: version.version,
+                    })}
+                    title={t("Restore version {{version}}", {
+                      version: version.version,
+                    })}
                     onClick={() => onRestoreVersion(version)}
                   >
                     <RotateCcw className="h-3.5 w-3.5" />

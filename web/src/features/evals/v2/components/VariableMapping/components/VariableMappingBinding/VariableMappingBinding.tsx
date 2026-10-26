@@ -1,4 +1,5 @@
 import { ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   crumbLabel,
@@ -14,13 +15,17 @@ export function VariableMappingBinding({
   columnLabel: string;
   jsonSelector: string | null;
 }) {
+  const { t } = useTranslation();
   const segments = jsonSelector ? jsonPathToSegments(jsonSelector) : [];
 
   if (segments === null) {
     return (
       <span
         className="min-w-0 truncate font-mono text-sm"
-        title={`${columnLabel}: ${jsonSelector ?? ""} — custom path`}
+        title={t("{{columnLabel}}: {{jsonSelector}} — custom path", {
+          columnLabel,
+          jsonSelector: jsonSelector ?? "",
+        })}
       >
         {columnLabel}: {jsonSelector}
       </span>

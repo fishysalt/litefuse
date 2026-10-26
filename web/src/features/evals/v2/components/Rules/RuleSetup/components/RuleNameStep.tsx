@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { useTranslation } from "react-i18next";
 import { useStore } from "zustand";
 
 import { AIAssistedInput } from "@/src/components/ui/ai-assisted-input";
@@ -14,19 +15,22 @@ export function RuleNameStep({
   nameAIAssistance: ComponentProps<typeof AIAssistedInput>["aiAssistance"];
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const name = useStore(store, (state) => state.name);
   const setName = useStore(store, (state) => state.actions.setName);
 
   return (
     <Stepper
       number={3}
-      title="Name rule"
-      description="Choose a name that describes what this rule evaluates."
+      title={t("Name rule")}
+      description={t(
+        "Choose a name that describes what this rule evaluates.",
+      )}
       onOpenChange={onOpenChange}
     >
       <div className="max-w-xl space-y-2">
         <label htmlFor="evaluation-rule-name" className="text-sm font-bold">
-          Name
+          {t("Name")}
         </label>
         <AIAssistedInput
           id="evaluation-rule-name"
@@ -34,8 +38,8 @@ export function RuleNameStep({
           maxLength={200}
           placeholder={
             nameAIAssistance.state === "generating"
-              ? "Generating a name…"
-              : "Rule name"
+              ? t("Generating a name…")
+              : t("Rule name")
           }
           onChange={(event) => setName(event.target.value)}
           aiAssistance={nameAIAssistance}

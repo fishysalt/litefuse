@@ -9,6 +9,8 @@ import {
   type ViewUpdate,
 } from "@uiw/react-codemirror";
 import { Prec } from "@codemirror/state";
+import { useTranslation } from "react-i18next";
+import { type TFunction } from "i18next";
 
 import { CodeMirrorEditor } from "@/src/components/editor";
 import { Switch } from "@/src/components/design-system/Switch/Switch";
@@ -66,6 +68,7 @@ function createVariableHighlighter(
   getStatus: (variable: string) => VariableMappingStatus | undefined,
   getMappingLabel: (variable: string) => string | undefined,
   validateVariableMappings: boolean,
+  t: TFunction,
 ) {
   const decorator = new MatchDecorator({
     regexp: new RegExp(MUSTACHE_REGEX.source, MUSTACHE_REGEX.flags),
@@ -75,8 +78,9 @@ function createVariableHighlighter(
       const status = !hasValidName
         ? {
             status: "invalid" as const,
-            message:
+            message: t(
               "Variable must start with a letter and can only contain letters and underscores",
+            ),
           }
         : (getStatus(match[1]) ??
           (mappingLabel
@@ -85,11 +89,11 @@ function createVariableHighlighter(
               ? { status: "invalid" as const }
               : undefined));
       const invalid = status?.status === "invalid";
-      const label = truncateEnd(mappingLabel || "map data", MAX_LABEL_LENGTH);
+      const label = truncateEnd(mappingLabel || t("map data"), MAX_LABEL_LENGTH);
       const title = invalid
-        ? (status.message ?? "Not connected to the sample data")
+        ? (status.message ?? t("Not connected to the sample data"))
         : mappingLabel
-          ? `Pulls from ${label}`
+          ? t("Pulls from {{label}}", { label })
           : undefined;
       add(
         from,
@@ -212,6 +216,7 @@ export function PromptVariableEditor({
   // objects every render, and only an extensions identity change makes
   // react-codemirror reconfigure the editor — which is the only thing that
   // re-runs the decorator while the document itself is unchanged.
+  const { t } = useTranslation();
   const statusKey = JSON.stringify(variableStatus ?? {});
   const mappingsKey = JSON.stringify(variableMappings ?? {});
   const extensions = useMemo(() => {
@@ -222,12 +227,13 @@ export function PromptVariableEditor({
         (variable) => status[variable],
         (variable) => mappingLabels[variable],
         validateVariableMappings,
+        t,
       ),
       variableTheme,
       Prec.highest(promptFontTheme),
       ...(readOnly ? [Prec.highest(readOnlySurfaceTheme)] : []),
     ];
-  }, [statusKey, mappingsKey, readOnly, validateVariableMappings]);
+  }, [statusKey, mappingsKey, readOnly, validateVariableMappings, t]);
 
   const hasToolbar =
     Boolean(toolbarStart) ||
@@ -283,7 +289,7 @@ export function PromptVariableEditor({
                     onPreviewEnabledChange?.(checked)
                   }
                 />
-                Preview
+                {t("Preview")}
               </label>
             ) : null}
             {toolbarActions}

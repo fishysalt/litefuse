@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { FilterState } from "@langfuse/shared";
 
 import type { FieldRegistry } from "@/src/features/search-bar";
@@ -52,6 +53,7 @@ export function RuleSampleObservationSelector({
   onSelect: (observation: SampleObservation | null) => void;
   onOpenTrace: (observation: SampleObservation) => void;
 }) {
+  const { t } = useTranslation();
   const previewFilters = useMemo(
     () => toEventsPreviewFilters(filterState),
     [filterState],
@@ -72,12 +74,22 @@ export function RuleSampleObservationSelector({
       leadingColumns={[]}
       resolveSelection={resolveSelection}
       getRowClassName={undefined}
-      filterDescription="Define which incoming observations match this rule."
-      filterTooltip="Only new observations matching these filters are evaluated by this rule."
-      matchingDescription="The first match is used to preview attached evaluator mappings."
-      matchingTooltip="Observations matching the rule filters over the last seven days."
+      filterDescription={t(
+        "Define which incoming observations match this rule.",
+      )}
+      filterTooltip={t(
+        "Only new observations matching these filters are evaluated by this rule.",
+      )}
+      matchingDescription={t(
+        "The first match is used to preview attached evaluator mappings.",
+      )}
+      matchingTooltip={t(
+        "Observations matching the rule filters over the last seven days.",
+      )}
       formatCount={(count) =>
-        `(${compactNumberFormatter(count)} ${count === 1 ? "match" : "matches"})`
+        count === 1
+          ? t("({{total}} match)", { total: compactNumberFormatter(count) })
+          : t("({{total}} matches)", { total: compactNumberFormatter(count) })
       }
       mapObservedOptions={addRuleTagAlias}
     />

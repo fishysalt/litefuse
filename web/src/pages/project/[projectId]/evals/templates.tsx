@@ -1,4 +1,5 @@
 import type { GetServerSideProps } from "next";
+import { useTranslation } from "react-i18next";
 
 // LITEFUSE: /evals/templates was the legacy (v1) evaluator-template list before
 // the evaluators UI moved to the canonical /evals paths and the legacy UI moved
@@ -19,5 +20,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 };
 
 export default function EvaluatorTemplatesRedirectPage() {
-  return <div className="p-3">Redirecting...</div>;
+  const { t } = useTranslation();
+
+  return <div className="p-3">{t("Redirecting...")}</div>;
 }

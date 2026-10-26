@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { Button } from "@/src/components/ui/button";
 import {
   Select,
@@ -19,17 +21,18 @@ export function EvaluatorGallerySidebar({
   activeSection: string | null;
   onSelectSection: (key: string) => void;
 }) {
+  const { t } = useTranslation();
   const selectedSection = activeSection ?? items[0]?.key;
   const selectedItem = items.find((item) => item.key === selectedSection);
 
   return (
     <>
       <nav
-        aria-label="Browse categories"
+        aria-label={t("Browse categories")}
         className="hidden w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r p-4 @2xl:flex"
       >
         <div className="text-muted-foreground px-3 pb-2 text-xs font-bold tracking-wide uppercase">
-          Browse
+          {t("Browse")}
         </div>
         {items.map((item) => {
           const isActive = selectedSection === item.key;
@@ -55,8 +58,8 @@ export function EvaluatorGallerySidebar({
                 className={cn("mr-2 h-3.5 w-3.5 shrink-0", iconClassName)}
               />
               <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3">
-                <span className="truncate" title={item.label}>
-                  {item.label}
+                <span className="truncate" title={t(item.label)}>
+                  {t(item.label)}
                 </span>
                 {item.count !== undefined ? (
                   <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
@@ -69,11 +72,14 @@ export function EvaluatorGallerySidebar({
         })}
       </nav>
 
-      <nav aria-label="Browse categories" className="border-b p-3 @2xl:hidden">
+      <nav
+        aria-label={t("Browse categories")}
+        className="border-b p-3 @2xl:hidden"
+      >
         <Select value={selectedSection} onValueChange={onSelectSection}>
-          <SelectTrigger aria-label="Browse categories" className="w-full">
-            <SelectValue placeholder="Browse categories">
-              {selectedItem?.label}
+          <SelectTrigger aria-label={t("Browse categories")} className="w-full">
+            <SelectValue placeholder={t("Browse categories")}>
+              {selectedItem ? t(selectedItem.label) : undefined}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -84,8 +90,8 @@ export function EvaluatorGallerySidebar({
                 className="[&>span:last-child]:w-full"
               >
                 <span className="flex w-full items-center justify-between gap-3">
-                  <span className="truncate" title={item.label}>
-                    {item.label}
+                  <span className="truncate" title={t(item.label)}>
+                    {t(item.label)}
                   </span>
                   {item.count !== undefined ? (
                     <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">

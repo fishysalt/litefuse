@@ -1,4 +1,5 @@
 import type { GetServerSideProps } from "next";
+import { useTranslation } from "react-i18next";
 
 // LITEFUSE: /evals/configs was the legacy (v1) job-configuration list before the
 // evaluators UI moved to the canonical /evals paths and the legacy UI moved to
@@ -19,5 +20,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 };
 
 export default function EvaluatorConfigsRedirectPage() {
-  return <div className="p-3">Redirecting...</div>;
+  const { t } = useTranslation();
+
+  return <div className="p-3">{t("Redirecting...")}</div>;
 }

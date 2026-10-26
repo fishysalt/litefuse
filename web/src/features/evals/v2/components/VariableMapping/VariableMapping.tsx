@@ -1,4 +1,5 @@
 import { Braces } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { evalVariableColumnLabel } from "@/src/features/evals/v2/fns/variableMapping/evalVariableColumnLabel";
 import type { VariableFieldState } from "@/src/features/evals/v2/types/variableMapping";
@@ -58,17 +59,23 @@ function ReadOnlyVariableMapping({
 }
 
 function EmptyVariableMapping({ mode }: Pick<VariableMappingProps, "mode">) {
+  const { t } = useTranslation();
   return (
     <div className="border-border bg-muted/20 flex flex-col items-center justify-center gap-2 rounded-md border px-6 py-8 text-center">
       <div className="bg-muted text-muted-foreground flex size-9 items-center justify-center rounded-full">
         <Braces className="size-4" aria-hidden />
       </div>
       <div className="space-y-1">
-        <p className="text-sm font-bold">No variables to map</p>
+        <p className="text-sm font-bold">{t("No variables to map")}</p>
         <p className="text-muted-foreground text-xs">
           {mode === "editable"
-            ? "Add a {{variable}} to the prompt to map evaluation data."
-            : "This prompt does not contain any variables."}
+            ? // The variable syntax is literal text, so it travels as a value:
+              // i18next does not re-interpolate those.
+              t(
+                "Add a {{variable}} to the prompt to map evaluation data.",
+                { variable: "{{variable}}" },
+              )
+            : t("This prompt does not contain any variables.")}
         </p>
       </div>
     </div>

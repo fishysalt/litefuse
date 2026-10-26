@@ -11,6 +11,7 @@ import type {
   DecisionModelQuestionDraft,
   DecisionModelQuestionDraftErrors,
 } from "@/src/features/evals/v2/types/decisionModel";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 import { safeRandomUUID } from "@/src/utils/safe-random-uuid";
 
 /** The editor authors plain text; persisted JSON entries are shown serialized. */
@@ -90,22 +91,22 @@ export function getQuestionDraftErrors(
   for (const draft of drafts) {
     const own: DecisionModelQuestionDraftErrors = {};
     if (!draft.instructions.trim()) {
-      own.instructions = "Every question needs instructions.";
+      own.instructions = i18nKey("Every question needs instructions.");
     }
     const scoreName = draft.scoreName.trim();
     if (!scoreName) {
-      own.scoreName = "Every question needs a score name.";
+      own.scoreName = i18nKey("Every question needs a score name.");
     } else if ((scoreNameCounts.get(scoreName) ?? 0) > 1) {
-      own.scoreName = `Another question already writes “${scoreName}”.`;
+      own.scoreName = i18nKey("Another question already writes “{{name}}”.");
     }
     if (draft.type === DecisionModelQuestionType.CHOICE) {
       const values = draft.options.map((option) => option.value.trim());
       if (values.length < DECISION_MODEL_LIMITS.minChoiceOptions) {
-        own.options = `Add at least ${DECISION_MODEL_LIMITS.minChoiceOptions} options.`;
+        own.options = i18nKey("Add at least {{value}} options.");
       } else if (values.some((value) => !value)) {
-        own.options = "Every option needs a label.";
+        own.options = i18nKey("Every option needs a label.");
       } else if (new Set(values).size !== values.length) {
-        own.options = "Option labels must be unique.";
+        own.options = i18nKey("Option labels must be unique.");
       }
     }
     if (draft.type === DecisionModelQuestionType.SCORE) {
@@ -113,9 +114,9 @@ export function getQuestionDraftErrors(
         level.description.trim(),
       );
       if (descriptions.length < DECISION_MODEL_LIMITS.minScoreLevels) {
-        own.levels = `Add at least ${DECISION_MODEL_LIMITS.minScoreLevels} levels.`;
+        own.levels = i18nKey("Add at least {{value}} levels.");
       } else if (descriptions.some((description) => !description)) {
-        own.levels = "Every level needs a description.";
+        own.levels = i18nKey("Every level needs a description.");
       }
     }
     if (Object.keys(own).length > 0) errors[draft.id] = own;

@@ -1,5 +1,6 @@
 import { Scale, Sparkles } from "lucide-react";
 import { EvalTemplateTypeEnum, type EvalTemplateType } from "@langfuse/shared";
+import { useTranslation } from "react-i18next";
 
 import { Tabs } from "@/src/components/design-system/Tabs/Tabs";
 
@@ -18,6 +19,8 @@ export function EvaluationTypeToggle({
   onValueChange: (value: EvalTemplateType) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Tabs
       value={value}
@@ -29,7 +32,7 @@ export function EvaluationTypeToggle({
             value={EvalTemplateTypeEnum.LLM_AS_JUDGE}
             disabled={disabled}
             icon={Sparkles}
-            label="LLM-as-a-judge"
+            label={t("LLM-as-a-judge")}
           />
         ) : null}
         {!disabled || value === EvalTemplateTypeEnum.DECISION_MODEL ? (
@@ -37,7 +40,7 @@ export function EvaluationTypeToggle({
             value={EvalTemplateTypeEnum.DECISION_MODEL}
             disabled={disabled}
             icon={Scale}
-            label="Decision model (experimental)"
+            label={t("Decision model (experimental)")}
           />
         ) : null}
       </Tabs.List>

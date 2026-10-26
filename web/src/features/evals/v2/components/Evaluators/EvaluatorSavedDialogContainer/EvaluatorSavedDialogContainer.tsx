@@ -8,6 +8,8 @@ import {
 } from "@langfuse/shared";
 import { ChevronDown } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+
 import { Button } from "@/src/components/ui/button";
 import { PopoverTrigger } from "@/src/components/ui/popover";
 import { selectTriggerClassName } from "@/src/components/ui/select";
@@ -54,6 +56,7 @@ export function EvaluatorSavedDialogContainer({
   onDismiss: () => Promise<void>;
   onFinish: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const capture = usePostHogClientCapture();
   const utils = api.useUtils();
   const activation = useActivationConfirmation({ projectId });
@@ -488,7 +491,7 @@ export function EvaluatorSavedDialogContainer({
             />
             {selectedRule.assignments.length > 0 ? (
               <p className="text-muted-foreground text-sm">
-                Already attached to:{" "}
+                {t("Already attached to:")}{" "}
                 {selectedRule.assignments
                   .map(({ evaluator }) => evaluator.name)
                   .join(", ")}
@@ -497,7 +500,9 @@ export function EvaluatorSavedDialogContainer({
           </>
         ) : selectedRuleId === null ? (
           <p className="text-muted-foreground text-sm">
-            Continue to the rule editor to create a rule for this evaluator.
+            {t(
+              "Continue to the rule editor to create a rule for this evaluator.",
+            )}
           </p>
         ) : null}
       </div>
@@ -561,9 +566,9 @@ export function EvaluatorSavedDialogContainer({
     />
   ) : evaluator.type !== EvalTemplateType.CODE ? (
     <div className="space-y-2">
-      <h3 className="text-sm font-bold">Cost estimate</h3>
+      <h3 className="text-sm font-bold">{t("Cost estimate")}</h3>
       <p className="text-muted-foreground text-sm">
-        Costs will be estimated in the rule editor.
+        {t("Costs will be estimated in the rule editor.")}
       </p>
     </div>
   ) : null;

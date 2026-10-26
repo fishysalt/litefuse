@@ -1,6 +1,7 @@
 /* eslint-disable no-nested-ternary */
 import { Check, Link2, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
@@ -36,7 +37,7 @@ export function EvaluatorAssignmentsEditor({
   onSearchChange,
   sampleObject,
   unvalidatedSourceColumnIds,
-  emptyDescription = "Attach an evaluator to run on matching observations.",
+  emptyDescription,
   sourceUnavailableMessage,
   disabled = false,
   costEstimates,
@@ -56,6 +57,10 @@ export function EvaluatorAssignmentsEditor({
   estimatingEvaluatorIds: string[];
   footerTrailing: ReactNode;
 }) {
+  const { t } = useTranslation();
+  const resolvedEmptyDescription =
+    emptyDescription ??
+    t("Attach an evaluator to run on matching observations.");
   const [pickerOpen, setPickerOpen] = useState(false);
   const assignments = useStore(store, (state) => state.assignments);
   const attachedIds = useStore(
@@ -86,10 +91,10 @@ export function EvaluatorAssignmentsEditor({
           >
             <span className="flex items-center gap-2 text-sm font-bold">
               <Link2 className="h-4 w-4" />
-              Attach evaluator
+              {t("Attach evaluator")}
             </span>
             <span className="text-muted-foreground text-sm font-normal">
-              {emptyDescription}
+              {resolvedEmptyDescription}
             </span>
           </button>
         ) : (
@@ -101,7 +106,7 @@ export function EvaluatorAssignmentsEditor({
             className="text-foreground hover:text-foreground inline-flex h-auto items-center gap-1.5 px-0 py-0 text-xs leading-none underline-offset-4 hover:bg-transparent hover:underline"
           >
             <Plus className="size-3.5 shrink-0" aria-hidden="true" />
-            Attach another evaluator
+            {t("Attach another evaluator")}
           </Button>
         )}
       </PopoverTrigger>
@@ -111,14 +116,14 @@ export function EvaluatorAssignmentsEditor({
       >
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Find an evaluator..."
+            placeholder={t("Find an evaluator...")}
             value={search}
             onValueChange={onSearchChange}
           />
           <CommandList className="min-h-0 flex-1">
-            <CommandEmpty>No evaluator found.</CommandEmpty>
+            <CommandEmpty>{t("No evaluator found.")}</CommandEmpty>
             {attached.length > 0 ? (
-              <CommandGroup heading="Already attached">
+              <CommandGroup heading={t("Already attached")}>
                 {attached.map((evaluator) => (
                   <CommandItem
                     key={evaluator.id}
@@ -133,7 +138,7 @@ export function EvaluatorAssignmentsEditor({
               </CommandGroup>
             ) : null}
             {available.length > 0 ? (
-              <CommandGroup heading="Available evaluators">
+              <CommandGroup heading={t("Available evaluators")}>
                 {available.map((evaluator) => (
                   <CommandItem
                     key={evaluator.id}
@@ -187,7 +192,9 @@ export function EvaluatorAssignmentsEditor({
                   key={evaluatorId}
                   evaluatorId={evaluatorId}
                   evaluatorName={
-                    assignment?.evaluatorName ?? evaluator?.name ?? "Evaluator"
+                    assignment?.evaluatorName ??
+                    evaluator?.name ??
+                    t("Evaluator")
                   }
                   evaluatorType={
                     assignment?.evaluatorType ??

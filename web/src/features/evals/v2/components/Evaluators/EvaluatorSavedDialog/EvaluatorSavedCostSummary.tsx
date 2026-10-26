@@ -1,5 +1,7 @@
 /* eslint-disable no-nested-ternary */
 import { EvalTemplateType, EvalTemplateTypeEnum } from "@langfuse/shared";
+import { useTranslation } from "react-i18next";
+
 import { InfoTooltip } from "@/src/components/ui/InfoTooltip/InfoTooltip";
 import { Skeleton } from "@/src/components/ui/skeleton";
 import { Slider } from "@/src/components/ui/slider";
@@ -47,17 +49,19 @@ export function EvaluatorSavedCostSummary({
         isEstimating: boolean;
       };
 }) {
+  const { t } = useTranslation();
   const sampledObservations = Math.round(matchingObservations * sampling);
 
   return (
     <div className="space-y-5">
       <section className="space-y-2">
         <div className="flex items-center gap-1.5">
-          <h3 className="text-sm font-bold">Sampling</h3>
+          <h3 className="text-sm font-bold">{t("Sampling")}</h3>
           {!onSamplingChange ? (
-            <InfoTooltip label="Sampling is set by the selected rule">
-              The sampling rate is inherited from the selected rule. You can
-              edit it directly in the rule.
+            <InfoTooltip label={t("Sampling is set by the selected rule")}>
+              {t(
+                "The sampling rate is inherited from the selected rule. You can edit it directly in the rule.",
+              )}
             </InfoTooltip>
           ) : null}
         </div>
@@ -75,7 +79,7 @@ export function EvaluatorSavedCostSummary({
 
       {evaluatorType === EvalTemplateTypeEnum.CODE ? (
         <section>
-          <h3 className="text-sm font-bold">Matches</h3>
+          <h3 className="text-sm font-bold">{t("Matches")}</h3>
           {isEstimating ? (
             <div className="mt-2 space-y-2">
               <Skeleton className="h-5 w-24" />
@@ -84,10 +88,14 @@ export function EvaluatorSavedCostSummary({
           ) : (
             <>
               <p className="mt-1 font-mono text-base font-bold tabular-nums">
-                {compactNumberFormatter(matchingObservations, 1)} / week
+                {t("{{value}} / week", {
+                  value: compactNumberFormatter(matchingObservations, 1),
+                })}
               </p>
               <p className="text-muted-foreground text-xs tabular-nums">
-                {compactNumberFormatter(sampledObservations, 1)} sampled
+                {t("{{value}} sampled", {
+                  value: compactNumberFormatter(sampledObservations, 1),
+                })}
               </p>
             </>
           )}

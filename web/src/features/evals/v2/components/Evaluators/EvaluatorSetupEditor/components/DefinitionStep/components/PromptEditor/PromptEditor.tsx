@@ -31,6 +31,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
@@ -59,12 +60,13 @@ import { useEvaluatorSetupSample } from "@/src/features/evals/v2/hooks/useEvalua
 import { useCopyToClipboard } from "@/src/hooks/useCopyToClipboard";
 import type { EvaluatorSetupStore } from "@/src/features/evals/v2/store/evaluatorSetupStore/evaluatorSetupStore";
 import { cn } from "@/src/utils/tailwind";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
 import type { EvaluatorPromptMessage } from "@langfuse/shared";
 
 const ROLES: Array<{ value: EvaluatorPromptMessage["role"]; label: string }> = [
-  { value: "system", label: "System" },
-  { value: "user", label: "User" },
-  { value: "assistant", label: "Assistant" },
+  { value: "system", label: i18nKey("System") },
+  { value: "user", label: i18nKey("User") },
+  { value: "assistant", label: i18nKey("Assistant") },
 ];
 
 type PreparedPromptEditorState = ReturnType<typeof preparePromptEditorState>;
@@ -88,6 +90,7 @@ export function PromptEditorContent({
   store: EvaluatorSetupStore;
   sampleObject: Record<string, unknown> | null;
 }) {
+  const { t } = useTranslation();
   const state = useStore(
     store,
     useShallow((state) => ({
@@ -113,6 +116,9 @@ export function PromptEditorContent({
     : -1;
   const activeMessage =
     activeMessageIndex >= 0 ? state.promptMessages[activeMessageIndex] : null;
+  const activeMessageRole = ROLES.find(
+    (role) => role.value === activeMessage?.role,
+  );
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor),
@@ -178,7 +184,7 @@ export function PromptEditorContent({
           }}
         >
           <Plus className="h-3.5 w-3.5 shrink-0" />
-          Add message
+          {t("Add message")}
         </Button>
       </div>
       <DragOverlay dropAnimation={null}>
@@ -189,13 +195,13 @@ export function PromptEditorContent({
             className="bg-secondary text-secondary-foreground flex h-9 w-full items-center gap-2 rounded-md border px-2 shadow-lg"
           >
             <Badge variant="tertiary" className="h-5 shrink-0">
-              {ROLES.find((role) => role.value === activeMessage.role)?.label}
+              {activeMessageRole ? t(activeMessageRole.label) : null}
             </Badge>
             <span
               className="min-w-0 truncate text-xs"
-              title={activeMessage.content || "Empty message"}
+              title={activeMessage.content || t("Empty message")}
             >
-              {activeMessage.content || "Empty message"}
+              {activeMessage.content || t("Empty message")}
             </span>
           </div>
         ) : null}
@@ -227,15 +233,18 @@ function SortablePromptMessage({
   onChange: (message: EvaluatorPromptMessage) => void;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
   const { copy } = useCopyToClipboard();
   const hasEmptyContent = message.content.trim().length === 0;
   const hasInvalidSystemRole = index > 0 && message.role === "system";
+  const roleCopy = ROLES.find((role) => role.value === message.role);
   const warningReason = [
     hasEmptyContent ? EMPTY_PROMPT_MESSAGE_ERROR : null,
     hasInvalidSystemRole ? INVALID_SYSTEM_PROMPT_MESSAGE_ERROR : null,
   ]
-    .filter(Boolean)
+    .filter((reason): reason is string => Boolean(reason))
+    .map((reason) => t(reason))
     .join(" ");
   const roleBadge = (
     <Badge variant="tertiary" className="h-5 shrink-0 gap-1 leading-none">
@@ -244,12 +253,12 @@ function SortablePromptMessage({
           className="text-dark-yellow h-3.5 w-3.5"
           aria-label={
             hasEmptyContent
-              ? "Empty prompt message"
-              : "Invalid system message position"
+              ? t("Empty prompt message")
+              : t("Invalid system message position")
           }
         />
       ) : null}
-      {ROLES.find((role) => role.value === message.role)?.label}
+      {roleCopy ? t(roleCopy.label) : null}
     </Badge>
   );
   const {
@@ -278,8 +287,10 @@ function SortablePromptMessage({
         <button
           type="button"
           className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-full flex w-7 cursor-grab touch-none items-start justify-center pt-2 opacity-0 transition-opacity group-hover/prompt-message:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
-          aria-label={`Reorder ${message.role} prompt message`}
-          title="Drag to reorder message"
+          aria-label={t("Reorder {{role}} prompt message", {
+            role: message.role,
+          })}
+          title={t("Drag to reorder message")}
           {...attributes}
           {...listeners}
         >
@@ -306,8 +317,13 @@ function SortablePromptMessage({
               size="icon-xs"
               className="shrink-0"
               aria-expanded={expanded}
-              aria-label={`${expanded ? "Collapse" : "Expand"} ${message.role} prompt message`}
-              title={`${expanded ? "Collapse" : "Expand"} prompt message`}
+              aria-label={t("{{action}} {{role}} prompt message", {
+                action: expanded ? t("Collapse") : t("Expand"),
+                role: message.role,
+              })}
+              title={t("{{action}} prompt message", {
+                action: expanded ? t("Collapse") : t("Expand"),
+              })}
               onClick={() => setExpanded((current) => !current)}
             >
               <ChevronDown
@@ -334,9 +350,9 @@ function SortablePromptMessage({
             {!expanded ? (
               <span
                 className="text-muted-foreground min-w-0 flex-1 truncate px-1 text-xs leading-none"
-                title={message.content || "Empty message"}
+                title={message.content || t("Empty message")}
               >
-                {message.content || "Empty message"}
+                {message.content || t("Empty message")}
               </span>
             ) : null}
           </>
@@ -349,15 +365,15 @@ function SortablePromptMessage({
                 type="button"
                 variant="ghost"
                 size="icon-xs"
-                aria-label="Prompt message settings"
-                title="Prompt message settings"
+                aria-label={t("Prompt message settings")}
+                title={t("Prompt message settings")}
               >
                 <MoreVertical className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuLabel className="text-muted-foreground px-2 py-1 text-[10px] font-bold tracking-wider uppercase">
-                Role
+                {t("Role")}
               </DropdownMenuLabel>
               {ROLES.map((role) => {
                 const disabledReason =
@@ -369,10 +385,10 @@ function SortablePromptMessage({
                     key={role.value}
                     disabled={Boolean(disabledReason)}
                     allowPointerEventsWhenDisabled={Boolean(disabledReason)}
-                    title={disabledReason ?? undefined}
+                    title={disabledReason ? t(disabledReason) : undefined}
                     onSelect={() => onChange({ ...message, role: role.value })}
                   >
-                    <span className="flex-1">{role.label}</span>
+                    <span className="flex-1">{t(role.label)}</span>
                     {message.role === role.value ? (
                       <Check className="h-3.5 w-3.5" />
                     ) : null}
@@ -386,7 +402,7 @@ function SortablePromptMessage({
                 }}
               >
                 <Copy className="mr-2 h-3.5 w-3.5" />
-                Copy prompt
+                {t("Copy prompt")}
               </DropdownMenuItem>
               {messageCount > 1 ? (
                 <DropdownMenuItem
@@ -394,7 +410,7 @@ function SortablePromptMessage({
                   onSelect={onRemove}
                 >
                   <Trash2 className="mr-2 h-3.5 w-3.5" />
-                  Delete message
+                  {t("Delete message")}
                 </DropdownMenuItem>
               ) : null}
             </DropdownMenuContent>

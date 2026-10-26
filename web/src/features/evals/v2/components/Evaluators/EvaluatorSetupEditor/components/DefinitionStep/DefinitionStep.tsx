@@ -1,5 +1,6 @@
 import type { EvalTemplateType } from "@langfuse/shared";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { EvaluationTypeConfiguration } from "@/src/features/evals/v2/components/Evaluators/EvaluationTypeConfiguration/EvaluationTypeConfiguration";
 import { Stepper } from "@/src/features/evals/v2/components/Stepper/Stepper";
@@ -46,11 +47,14 @@ function DefinitionStepBody(props: DefinitionStepContent) {
 }
 
 export function DefinitionStep(props: DefinitionStepProps) {
+  const { t } = useTranslation();
   return (
     <Stepper
       number={1}
-      title="Define evaluation"
-      description="Choose whether an LLM or your own code evaluates the data, then define the instructions it follows and the score it reports."
+      title={t("Define evaluation")}
+      description={t(
+        "Choose whether an LLM or your own code evaluates the data, then define the instructions it follows and the score it reports.",
+      )}
       open={props.open}
       onOpenChange={props.onOpenChange}
     >

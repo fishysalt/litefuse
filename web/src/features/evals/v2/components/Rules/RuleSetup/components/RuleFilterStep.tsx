@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useStore } from "zustand";
 
 import { RuleSampleObservationSelector } from "@/src/features/evals/v2/components/Evaluators/Testing/components/RuleSampleObservationSelector/RuleSampleObservationSelector";
@@ -16,6 +17,7 @@ export function RuleFilterStep({
   projectId: string;
   store: RuleSetupStore;
 }) {
+  const { t } = useTranslation();
   const filter = useStore(store, (state) => state.filter);
   const selectedObservationId = useStore(
     store,
@@ -29,8 +31,10 @@ export function RuleFilterStep({
   return (
     <Stepper
       number={1}
-      title="Configure rule scope"
-      description="Set filters and a sampling rate to control which incoming observations are evaluated."
+      title={t("Configure rule scope")}
+      description={t(
+        "Set filters and a sampling rate to control which incoming observations are evaluated.",
+      )}
     >
       <RuleSampleObservationSelector
         projectId={projectId}

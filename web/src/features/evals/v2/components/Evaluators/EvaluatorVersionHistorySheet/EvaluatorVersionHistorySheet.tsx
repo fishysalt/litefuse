@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Sheet,
   SheetContent,
@@ -43,6 +44,7 @@ export function EvaluatorVersionHistorySheet({
 }) {
   const [versionToRestore, setVersionToRestore] =
     useState<EvaluatorVersion | null>(null);
+  const { t } = useTranslation();
   const [expandedVersionId, setExpandedVersionId] = useState<string | null>(
     defaultExpandedVersionId,
   );
@@ -79,9 +81,11 @@ export function EvaluatorVersionHistorySheet({
     >
       <SheetContent className="flex flex-col gap-5 overflow-y-auto sm:max-w-2xl">
         <SheetHeader>
-          <SheetTitle>Evaluator versions</SheetTitle>
+          <SheetTitle>{t("Evaluator versions")}</SheetTitle>
           <SheetDescription>
-            Review or restore saved definition versions for {evaluatorName}.
+            {t("Review or restore saved definition versions for {{name}}.", {
+              name: evaluatorName,
+            })}
           </SheetDescription>
         </SheetHeader>
         <EvaluatorVersionHistoryList
@@ -104,7 +108,7 @@ export function EvaluatorVersionHistorySheet({
             {isLoadingMore ? (
               <>
                 <Spinner size="sm" variant="muted" />
-                <span className="sr-only">Loading more versions</span>
+                <span className="sr-only">{t("Loading more versions")}</span>
               </>
             ) : null}
           </div>
@@ -115,9 +119,14 @@ export function EvaluatorVersionHistorySheet({
         onOpenChange={(open) => {
           if (!open) setVersionToRestore(null);
         }}
-        title={`Restore version ${versionToRestore?.version}?`}
-        description={`This will replace the current evaluator definition with version ${versionToRestore?.version}. It won't be saved until you click "Save changes".`}
-        confirmLabel="Restore version"
+        title={t("Restore version {{version}}?", {
+          version: versionToRestore?.version,
+        })}
+        description={t(
+          'This will replace the current evaluator definition with version {{version}}. It won\'t be saved until you click "Save changes".',
+          { version: versionToRestore?.version },
+        )}
+        confirmLabel={t("Restore version")}
         confirmVariant="default"
         onConfirm={() => {
           if (!versionToRestore) return;

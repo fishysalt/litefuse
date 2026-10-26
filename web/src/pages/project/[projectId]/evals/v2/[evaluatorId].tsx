@@ -1,4 +1,5 @@
 import type { GetServerSideProps } from "next";
+import { useTranslation } from "react-i18next";
 
 // LITEFUSE: /evals/v2/[evaluatorId] was the temporary route of the migrated evaluators UI before
 // the routes were aligned with upstream. The new UI now lives on the canonical
@@ -18,5 +19,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 };
 
 export default function EvaluatorsV2RedirectPage() {
-  return <div className="p-3">Redirecting...</div>;
+  const { t } = useTranslation();
+
+  return <div className="p-3">{t("Redirecting...")}</div>;
 }

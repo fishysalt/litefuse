@@ -1,9 +1,13 @@
 import type { EvaluatorPromptMessage } from "@langfuse/shared";
 
-export const EMPTY_PROMPT_MESSAGE_ERROR =
-  "Add content to every prompt message before saving.";
-export const INVALID_SYSTEM_PROMPT_MESSAGE_ERROR =
-  "System messages are only allowed as the first prompt message.";
+import { i18nKey } from "@/src/features/i18n/i18nKey";
+
+export const EMPTY_PROMPT_MESSAGE_ERROR = i18nKey(
+  "Add content to every prompt message before saving.",
+);
+export const INVALID_SYSTEM_PROMPT_MESSAGE_ERROR = i18nKey(
+  "System messages are only allowed as the first prompt message.",
+);
 
 function hasInvalidSystemPromptMessage(
   messages: EvaluatorPromptMessage[],

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { InfoTooltip } from "@/src/components/ui/InfoTooltip/InfoTooltip";
 
@@ -15,6 +16,7 @@ export function SectionHeader({
   tooltip: string;
   trailing: ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-y-1">
       <div className="flex min-w-0 items-center gap-1.5">
@@ -22,7 +24,9 @@ export function SectionHeader({
           {title}
         </h3>
         {meta}
-        <InfoTooltip label={`About ${title}`}>{tooltip}</InfoTooltip>
+        <InfoTooltip label={t("About {{title}}", { title })}>
+          {tooltip}
+        </InfoTooltip>
       </div>
       {description || trailing ? (
         <div className="flex items-center gap-2">

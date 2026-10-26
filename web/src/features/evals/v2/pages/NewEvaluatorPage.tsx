@@ -1,6 +1,7 @@
 /* eslint-disable no-nested-ternary */
 import { useRouter } from "next/router";
 import { EvalTemplateTypeEnum } from "@langfuse/shared";
+import { useTranslation } from "react-i18next";
 
 import { SupportOrUpgradePage } from "@/src/components/SupportOrUpgradePage";
 import { Skeleton } from "@/src/components/ui/skeleton";
@@ -17,6 +18,7 @@ function requestedEvaluatorType(value: string | string[] | undefined) {
 }
 
 export default function NewEvaluatorPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const projectId = router.query.projectId as string;
   // Creating an evaluator needs `evaluator:CUD`. The list page already hides
@@ -52,7 +54,9 @@ export default function NewEvaluatorPage() {
   }
 
   if (template.isNotFound) {
-    return <div className="p-6">Evaluator template not found</div>;
+    return (
+      <div className="p-6">{t("Evaluator template not found")}</div>
+    );
   }
 
   const initialType = requestedEvaluatorType(router.query.type);

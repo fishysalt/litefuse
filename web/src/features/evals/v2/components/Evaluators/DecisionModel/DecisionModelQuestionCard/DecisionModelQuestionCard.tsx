@@ -1,6 +1,8 @@
 import { useId } from "react";
 import { DecisionModelQuestionType } from "@langfuse/shared";
 import { Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { type TFunction } from "i18next";
 
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
@@ -34,14 +36,22 @@ export type DecisionModelQuestionCardProps = {
   errors?: DecisionModelQuestionDraftErrors;
 };
 
-function writesLine(question: DecisionModelQuestionDraft) {
+function writesLine(question: DecisionModelQuestionDraft, t: TFunction) {
   switch (question.type) {
     case DecisionModelQuestionType.CHOICE:
-      return `Writes a categorical score with one of ${question.options.length} labels.`;
+      return t(
+        "Writes a categorical score with one of {{total}} labels.",
+        { total: question.options.length },
+      );
     case DecisionModelQuestionType.SCORE:
-      return `Writes a numeric score from 0 to ${Math.max(question.levels.length - 1, 0)} (expected level; can fall between levels).`;
+      return t(
+        "Writes a numeric score from 0 to {{max}} (expected level; can fall between levels).",
+        { max: Math.max(question.levels.length - 1, 0) },
+      );
     case DecisionModelQuestionType.NOUL:
-      return "Writes a numeric score from 0 to 1: the probability the answer is yes.";
+      return t(
+        "Writes a numeric score from 0 to 1: the probability the answer is yes.",
+      );
   }
 }
 
@@ -96,23 +106,29 @@ export function DecisionModelQuestionCard({
   onRemove,
   errors = {},
 }: DecisionModelQuestionCardProps) {
+  const { t } = useTranslation();
   const id = useId();
   const copy = QUESTION_TYPE_COPY[question.type];
   const hasErrors = Object.values(errors).some(Boolean);
-  const summary = question.instructions.trim() || "Untitled question";
+  const summary = question.instructions.trim() || t("Untitled question");
 
   return (
     <CollapsibleCard
       open={expanded}
       onOpenChange={onExpandedChange}
       disabled={false}
-      triggerTitle={expanded ? "Collapse question" : "Expand question"}
+      triggerTitle={
+        expanded ? t("Collapse question") : t("Expand question")
+      }
       header={
         <span className="flex min-w-0 items-center gap-2">
           <span className="text-muted-foreground shrink-0 font-mono text-xs">
             {index + 1}
           </span>
-          <copy.icon className="h-4 w-4 shrink-0" aria-label={copy.label} />
+          <copy.icon
+            className="h-4 w-4 shrink-0"
+            aria-label={t(copy.label)}
+          />
           <Badge
             variant="secondary"
             className={cn(
@@ -120,7 +136,7 @@ export function DecisionModelQuestionCard({
               !question.scoreName.trim() && "text-dark-yellow",
             )}
           >
-            {question.scoreName.trim() || "score name missing"}
+            {question.scoreName.trim() || t("score name missing")}
           </Badge>
           <span
             className={cn(
@@ -133,7 +149,7 @@ export function DecisionModelQuestionCard({
           </span>
           {hasErrors ? (
             <Badge variant="destructive" className="shrink-0">
-              Needs attention
+              {t("Needs attention")}
             </Badge>
           ) : null}
         </span>
@@ -148,7 +164,9 @@ export function DecisionModelQuestionCard({
             disabled={!onRemove}
             onClick={onRemove ?? undefined}
             title={
-              onRemove ? "Remove question" : "At least one question is required"
+              onRemove
+                ? t("Remove question")
+                : t("At least one question is required")
             }
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -159,11 +177,11 @@ export function DecisionModelQuestionCard({
       <div className="flex flex-col gap-5 p-4">
         <div className="flex flex-col gap-1.5">
           <Label className="flex items-center gap-1.5">
-            Type
-            <InfoTooltip label="About question types">
-              Choice picks one of a fixed set of labels. Score rates along
-              ordered levels you describe. Yes/no returns the probability that a
-              statement is true. Pick the one your code can act on directly.
+            {t("Type")}
+            <InfoTooltip label={t("About question types")}>
+              {t(
+                "Choice picks one of a fixed set of labels. Score rates along ordered levels you describe. Yes/no returns the probability that a statement is true. Pick the one your code can act on directly.",
+              )}
             </InfoTooltip>
           </Label>
           <QuestionTypeSelector
@@ -186,7 +204,7 @@ export function DecisionModelQuestionCard({
             })
           }
           stateKeys={stateKeys}
-          placeholder={copy.example}
+          placeholder={t(copy.example)}
           error={errors.instructions}
         />
 
@@ -201,10 +219,11 @@ export function DecisionModelQuestionCard({
             htmlFor={`${id}-score-name`}
             className="flex items-center gap-1.5"
           >
-            Score name
-            <InfoTooltip label="About score names">
-              Each question writes its own score under this name. Keep it
-              stable: renaming starts a new score series.
+            {t("Score name")}
+            <InfoTooltip label={t("About score names")}>
+              {t(
+                "Each question writes its own score under this name. Keep it stable: renaming starts a new score series.",
+              )}
             </InfoTooltip>
           </Label>
           <div className="flex flex-wrap items-center gap-3">
@@ -214,7 +233,7 @@ export function DecisionModelQuestionCard({
               onChange={(event) =>
                 onChange({ ...question, scoreName: event.target.value })
               }
-              placeholder="e.g. refund_requested"
+              placeholder={t("e.g. refund_requested")}
               aria-invalid={Boolean(errors.scoreName)}
               className={cn(
                 "max-w-xs font-mono",
@@ -222,11 +241,13 @@ export function DecisionModelQuestionCard({
               )}
             />
             <span className="text-muted-foreground text-xs">
-              {writesLine(question)}
+              {writesLine(question, t)}
             </span>
           </div>
           {errors.scoreName ? (
-            <p className="text-destructive text-xs">{errors.scoreName}</p>
+            <p className="text-destructive text-xs">
+              {t(errors.scoreName, { name: question.scoreName.trim() })}
+            </p>
           ) : null}
         </div>
       </div>

@@ -3,6 +3,7 @@ import { EvalTargetObject, EvalTemplateType } from "@langfuse/shared";
 import { Link2, Plus, Unlink } from "lucide-react";
 import { useRouter } from "next/router";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useDebounce } from "@/src/hooks/useDebounce";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
@@ -102,6 +103,7 @@ function EvaluatorRuleRelationshipsSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const preparedEvaluatorMapping = prepareModernRuleVariableMapping(
     evaluatorDefaultVariableMapping,
     evaluatorType,
@@ -178,11 +180,19 @@ function EvaluatorRuleRelationshipsSheet({
           onFocusOutside={keepSheetOpenForRelationshipOverlay}
         >
           <SheetHeader>
-            <SheetTitle>Rules</SheetTitle>
+            <SheetTitle>{t("Rules")}</SheetTitle>
             <SheetDescription>
               {assignments.isPending
-                ? "Loading attached rules…"
-                : `This evaluator is used by ${assignmentCount} ${assignmentCount === 1 ? "rule" : "rules"}. Attach it to a rule to run the evaluator on incoming observations.`}
+                ? t("Loading attached rules…")
+                : assignmentCount === 1
+                  ? t(
+                      "This evaluator is used by {{count}} rule. Attach it to a rule to run the evaluator on incoming observations.",
+                      { count: assignmentCount },
+                    )
+                  : t(
+                      "This evaluator is used by {{count}} rules. Attach it to a rule to run the evaluator on incoming observations.",
+                      { count: assignmentCount },
+                    )}
             </SheetDescription>
           </SheetHeader>
 
@@ -227,7 +237,7 @@ function EvaluatorRuleRelationshipsSheet({
                             "bg-light-green text-dark-green hover:bg-light-green",
                         )}
                       >
-                        {evaluationRule.enabled ? "Active" : "Inactive"}
+                        {evaluationRule.enabled ? t("Active") : t("Inactive")}
                       </Badge>
                       {requiresLegacyMigrationAction({
                         targetObject: evaluationRule.targetObject,
@@ -249,7 +259,7 @@ function EvaluatorRuleRelationshipsSheet({
                               }),
                             );
                           }}
-                          title="Upgrade now"
+                          title={t("Upgrade now")}
                           showChevron={false}
                           compact
                         />
@@ -269,7 +279,7 @@ function EvaluatorRuleRelationshipsSheet({
                         }
                       >
                         <Unlink className="h-3.5 w-3.5" />
-                        Disconnect
+                        {t("Disconnect")}
                       </Button>
                     </li>
                   ))}
@@ -289,7 +299,7 @@ function EvaluatorRuleRelationshipsSheet({
                   .filter((rule) => attachedRuleIds.has(rule.id))
                   .map((rule) => ({
                     rule,
-                    reason: "This evaluator is already attached.",
+                    reason: t("This evaluator is already attached."),
                   }))}
                 availableRules={(rules.data?.rules ?? []).filter(
                   (rule) => !attachedRuleIds.has(rule.id),
@@ -309,10 +319,11 @@ function EvaluatorRuleRelationshipsSheet({
                               },
                             ]
                           : [],
-                      title: "Attach evaluator to rule",
-                      description:
+                      title: t("Attach evaluator to rule"),
+                      description: t(
                         "This rule is active. Based on matching observations and the latest evaluator trace from the last seven days:",
-                      confirmLabel: "Attach evaluator to rule",
+                      ),
+                      confirmLabel: t("Attach evaluator to rule"),
                       onConfirm: async () => {
                         await attach.mutateAsync({
                           projectId,
@@ -341,10 +352,10 @@ function EvaluatorRuleRelationshipsSheet({
                       >
                         <span className="flex items-center gap-2 text-sm font-bold">
                           <Link2 className="h-4 w-4" />
-                          Attach to rule
+                          {t("Attach to rule")}
                         </span>
                         <span className="text-muted-foreground text-sm font-normal">
-                          Choose a rule that should run this evaluator.
+                          {t("Choose a rule that should run this evaluator.")}
                         </span>
                       </button>
                     ) : (
@@ -356,7 +367,7 @@ function EvaluatorRuleRelationshipsSheet({
                         disabled={!hasWriteAccess}
                       >
                         <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Attach another rule
+                        {t("Attach another rule")}
                       </Button>
                     )}
                   </PopoverTrigger>

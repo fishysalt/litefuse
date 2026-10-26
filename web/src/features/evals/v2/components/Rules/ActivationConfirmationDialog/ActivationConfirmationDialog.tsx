@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { ConfirmDialog } from "@/src/components/ui/confirm-dialog";
 import type {
   ActivationConfirmationState,
@@ -18,6 +20,7 @@ export function ActivationConfirmationDialog({
   onSamplingChange?: (sampling: number) => void;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
   const hasOnlyUnavailableEstimates =
     estimate.estimates.length === 0 && estimate.unavailableEstimateCount > 0;
   const hasCostDetails =
@@ -35,7 +38,7 @@ export function ActivationConfirmationDialog({
       confirmVariant="default"
       size={hasOnlyUnavailableEstimates ? "default" : "lg"}
       loading={confirmation.isConfirming}
-      loadingText="Validating rule..."
+      loadingText={t("Validating rule...")}
       onConfirm={onConfirm}
     >
       {hasCostDetails ? (

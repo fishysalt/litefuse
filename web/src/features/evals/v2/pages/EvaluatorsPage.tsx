@@ -8,6 +8,7 @@ import {
 } from "@langfuse/shared";
 import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/router";
+import { useTranslation } from "react-i18next";
 import { type ComponentProps, useMemo, useRef, useState } from "react";
 import { StringParam, useQueryParam, withDefault } from "use-query-params";
 import { useStore } from "zustand";
@@ -108,6 +109,7 @@ function EvaluatorsOverviewSelectionBar({
     selectedIds: string[];
   }) => void;
 }) {
+  const { t } = useTranslation();
   const rowSelection = useStore(selectionStore, (state) => state.rowSelection);
   const selectAll = useStore(selectionStore, (state) => state.selectAll);
   const selectedIds = Object.keys(rowSelection).filter(
@@ -130,7 +132,7 @@ function EvaluatorsOverviewSelectionBar({
           onClick={() => onDeleteSelection({ selectAll, selectedIds })}
         >
           <Trash2 className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Delete</span>
+          <span className="hidden sm:inline">{t("Delete")}</span>
         </Button>
       ) : null}
     </OverviewSelectionBar>
@@ -177,6 +179,7 @@ function EvaluatorsTableToolbar({
 }
 
 export default function EvaluatorsPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const capture = usePostHogClientCapture();
   const projectId = router.query.projectId as string;
@@ -228,13 +231,13 @@ export default function EvaluatorsPage() {
               ...facet,
               renderOptionSuffix: (model: string) =>
                 model === projectDefaultModel.defaultModel?.model ? (
-                  <Badge variant="secondary">Project default</Badge>
+                  <Badge variant="secondary">{t("Project default")}</Badge>
                 ) : null,
             }
           : facet,
       ),
     }),
-    [projectDefaultModel.defaultModel?.model],
+    [projectDefaultModel.defaultModel?.model, t],
   );
   const viewControllersRef = useRef<Pick<
     ReturnType<typeof useTableViewManager>,
@@ -347,8 +350,11 @@ export default function EvaluatorsPage() {
         isAllMatching: deleteAll,
       });
       showSuccessToast({
-        title: "Evaluators deleted",
-        description: `${deletedCount} evaluator${deletedCount === 1 ? "" : "s"} deleted.`,
+        title: t("Evaluators deleted"),
+        description:
+          deletedCount === 1
+            ? t("{{count}} evaluator deleted.", { count: deletedCount })
+            : t("{{count}} evaluators deleted.", { count: deletedCount }),
       });
       await Promise.all([
         utils.evalsV2.list.invalidate({ projectId }),
@@ -370,7 +376,7 @@ export default function EvaluatorsPage() {
       {
         accessorKey: "name",
         id: "name",
-        header: "Name",
+        header: t("Name"),
         size: 320,
         isFixedPosition: true,
         enableSorting: true,
@@ -383,7 +389,7 @@ export default function EvaluatorsPage() {
       {
         accessorKey: "status",
         id: "status",
-        header: "Status",
+        header: t("Status"),
         size: 130,
         enableHiding: true,
         cell: ({ row }) => (
@@ -399,7 +405,7 @@ export default function EvaluatorsPage() {
       {
         accessorKey: "executionTraces",
         id: "executionTraces",
-        header: "Last 5 runs",
+        header: t("Last 5 runs"),
         size: 130,
         enableHiding: true,
         cell: ({ row }) => {
@@ -415,7 +421,9 @@ export default function EvaluatorsPage() {
             <button
               type="button"
               className="focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
-              aria-label={`View executions for ${row.original.name}`}
+              aria-label={t("View executions for {{name}}", {
+                name: row.original.name,
+              })}
               onClick={(event) => {
                 // The run markers are a drill-down inside the row; without this
                 // the row's own onClick also fires and the evaluator detail page
@@ -440,7 +448,7 @@ export default function EvaluatorsPage() {
       {
         accessorKey: "type",
         id: "type",
-        header: "Type",
+        header: t("Type"),
         size: 160,
         enableHiding: true,
         enableSorting: true,
@@ -453,7 +461,7 @@ export default function EvaluatorsPage() {
       {
         accessorKey: "model",
         id: "model",
-        header: "Model",
+        header: t("Model"),
         size: 180,
         enableHiding: true,
         cell: ({ row }) => {
@@ -469,7 +477,7 @@ export default function EvaluatorsPage() {
       },
       createUserTableColumn<EvaluatorRow>({
         accessorKey: "createdByUser",
-        header: "Created by",
+        header: t("Created by"),
         size: 180,
         enableHiding: true,
         variant: "text",
@@ -478,7 +486,7 @@ export default function EvaluatorsPage() {
       {
         accessorKey: "createdAt",
         id: "createdAt",
-        header: "Created at",
+        header: t("Created at"),
         size: 180,
         enableHiding: true,
         defaultHidden: true,
@@ -488,7 +496,7 @@ export default function EvaluatorsPage() {
       {
         accessorKey: "updatedAt",
         id: "updatedAt",
-        header: "Updated at",
+        header: t("Updated at"),
         size: 180,
         enableHiding: true,
         enableSorting: true,
@@ -497,7 +505,7 @@ export default function EvaluatorsPage() {
       {
         accessorKey: "actions",
         id: "actions",
-        header: "Actions",
+        header: t("Actions"),
         size: 170,
         isFixedPosition: true,
         enableSorting: false,
@@ -561,6 +569,7 @@ export default function EvaluatorsPage() {
       linkTargets.data,
       router,
       selectActionColumn,
+      t,
     ],
   );
   const [columnVisibility, setColumnVisibility] =
@@ -627,11 +636,12 @@ export default function EvaluatorsPage() {
   return (
     <Page
       headerProps={{
-        title: "Evaluators",
+        title: t("Evaluators"),
         titleBadges: <V4MigrationUpdateRequiredBadge />,
         help: {
-          description:
+          description: t(
             "Create reusable evaluator definitions and test them before activation.",
+          ),
         },
         actionButtonsRight: (
           <div className="flex gap-2">
@@ -665,9 +675,9 @@ export default function EvaluatorsPage() {
                     mode="default"
                     defaultModel={projectDefaultModel.defaultModel}
                     selectedModel={null}
-                    missingDefaultLabel="Set project default model"
+                    missingDefaultLabel={t("Set project default model")}
                     loading={projectDefaultModel.update.isPending}
-                    loadingText="Setting model..."
+                    loadingText={t("Setting model...")}
                     disabled={
                       !projectDefaultModel.canUpdate ||
                       !projectDefaultModel.canRead ||
@@ -690,7 +700,7 @@ export default function EvaluatorsPage() {
             {hasEvaluatorWriteAccess ? (
               <Button onClick={() => setGalleryOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
-                New evaluator
+                {t("New evaluator")}
               </Button>
             ) : null}
           </div>
@@ -805,7 +815,7 @@ export default function EvaluatorsPage() {
                   onRowClick={(row) =>
                     router.push(`/project/${projectId}/evals/${row.id}`)
                   }
-                  noResultsMessage="No evaluators found."
+                  noResultsMessage={t("No evaluators found.")}
                 />
               </div>
             </ResizableFilterLayout>

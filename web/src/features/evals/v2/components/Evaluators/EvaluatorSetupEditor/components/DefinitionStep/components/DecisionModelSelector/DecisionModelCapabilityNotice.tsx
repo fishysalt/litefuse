@@ -3,6 +3,8 @@ import {
   supportedModels,
   supportsDecisionModels,
 } from "@langfuse/shared";
+import { useTranslation } from "react-i18next";
+import { type TFunction } from "i18next";
 
 /**
  * LITEFUSE ADDITION (gap D4): the decision-model picker only offers connections
@@ -42,6 +44,7 @@ function getConnectionModels(connection: DecisionModelCapabilityConnection) {
 
 export function getDecisionModelConnectionExclusionReason(
   connection: DecisionModelCapabilityConnection,
+  t: TFunction,
 ): string | null {
   const label = `"${connection.provider}" (adapter "${connection.adapter}")`;
 
@@ -53,14 +56,17 @@ export function getDecisionModelConnectionExclusionReason(
   // fired for OpenAI, which no longer reports as decision-model capable — and was
   // removed rather than left as dead text.
   if (!supportsDecisionModels(connection.adapter)) {
-    return `${label} cannot answer decision-model questions; decision-model evaluators need a TypeSafe or OpenAI connection.`;
+    return t(
+      "{{label}} cannot answer decision-model questions; decision-model evaluators need a TypeSafe or OpenAI connection.",
+      { label },
+    );
   }
 
   const hasAllowedModel = getConnectionModels(connection).some((model) =>
     isAllowedDecisionModel(connection.adapter, model),
   );
   if (!hasAllowedModel) {
-    return `${label} has no allowed decision model configured.`;
+    return t("{{label}} has no allowed decision model configured.", { label });
   }
 
   return null;
@@ -71,8 +77,11 @@ export function DecisionModelCapabilityNotice({
 }: {
   connections: DecisionModelCapabilityConnection[];
 }) {
+  const { t } = useTranslation();
   const reasons = connections
-    .map(getDecisionModelConnectionExclusionReason)
+    .map((connection) =>
+      getDecisionModelConnectionExclusionReason(connection, t),
+    )
     .filter((reason): reason is string => reason !== null);
 
   if (reasons.length === 0) {
@@ -81,7 +90,9 @@ export function DecisionModelCapabilityNotice({
 
   return (
     <p className="text-muted-foreground text-xs">
-      Not available for decision models: {reasons.join(" ")}
+      {t("Not available for decision models: {{reasons}}", {
+        reasons: reasons.join(" "),
+      })}
     </p>
   );
 }

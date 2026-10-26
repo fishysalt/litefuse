@@ -1,4 +1,6 @@
 /* eslint-disable no-nested-ternary */
+import { Trans, useTranslation } from "react-i18next";
+
 import { Slider } from "@/src/components/ui/slider";
 import { InfoTooltip } from "@/src/components/ui/InfoTooltip/InfoTooltip";
 import {
@@ -23,6 +25,7 @@ export function ActivationCostEstimateDetails({
   onSamplingChange?: (sampling: number) => void;
   descriptionAsTooltip?: boolean;
 }) {
+  const { t } = useTranslation();
   const hasNoMatchingObservations = matchingObservations === 0;
   const hasOnlyUnavailableEstimates =
     baseEstimates.length === 0 && unavailableEstimateCount > 0;
@@ -32,24 +35,34 @@ export function ActivationCostEstimateDetails({
   // gone; the observation-count wording and the sampling slider stay.
   const hasEstimates = baseEstimates.length > 0;
   const description = hasNoMatchingObservations
-    ? "No observations matched this rule in the last 7 days, so there is nothing to estimate yet. It will evaluate matching observations as they arrive."
+    ? t(
+        "No observations matched this rule in the last 7 days, so there is nothing to estimate yet. It will evaluate matching observations as they arrive.",
+      )
     : hasOnlyUnavailableEstimates
-      ? "Activating this rule may incur costs. Are you sure you want to continue?"
-      : `${compactNumberFormatter(matchingObservations, 1)} observations matched this rule in the last 7 days.`;
+      ? t(
+          "Activating this rule may incur costs. Are you sure you want to continue?",
+        )
+      : t(
+          "{{observationCount}} observations matched this rule in the last 7 days.",
+          {
+            observationCount: compactNumberFormatter(matchingObservations, 1),
+          },
+        );
 
   return (
     <div className="flex flex-col gap-4">
       {descriptionAsTooltip ? (
         <div>
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-bold">Cost estimation</p>
-            <InfoTooltip label="About cost estimation">
+            <p className="text-sm font-bold">{t("Cost estimation")}</p>
+            <InfoTooltip label={t("About cost estimation")}>
               {description}
             </InfoTooltip>
           </div>
           <p className="text-muted-foreground text-sm">
-            Review the expected cost before running this evaluator
-            automatically.
+            {t(
+              "Review the expected cost before running this evaluator automatically.",
+            )}
           </p>
         </div>
       ) : (
@@ -59,10 +72,11 @@ export function ActivationCostEstimateDetails({
       {hasEstimates ? (
         <div className="space-y-2">
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-bold">Sampling rate</p>
-            <InfoTooltip label="About sampling rate">
-              The percentage of matching observations that will be evaluated.
-              Lower sampling rates reduce evaluation volume and cost.
+            <p className="text-sm font-bold">{t("Sampling rate")}</p>
+            <InfoTooltip label={t("About sampling rate")}>
+              {t(
+                "The percentage of matching observations that will be evaluated. Lower sampling rates reduce evaluation volume and cost.",
+              )}
             </InfoTooltip>
           </div>
           <Slider
@@ -76,13 +90,41 @@ export function ActivationCostEstimateDetails({
             onValueChange={(value) => onSamplingChange?.(value[0] ?? sampling)}
           />
           <p className="text-muted-foreground text-xs">
-            {baseEstimates.length === 1 ? "This evaluator" : "Each evaluator"}{" "}
-            would run on{" "}
-            <span className="text-foreground font-bold tabular-nums">
-              {compactNumberFormatter(sampledObservations, 1)}
-            </span>{" "}
-            of the {compactNumberFormatter(matchingObservations, 1)} matching
-            observations.
+            {baseEstimates.length === 1 ? (
+              <Trans
+                i18nKey="This evaluator would run on <0>{{sampledCount}}</0> of the {{matchingCount}} matching observations."
+                values={{
+                  sampledCount: compactNumberFormatter(sampledObservations, 1),
+                  matchingCount: compactNumberFormatter(
+                    matchingObservations,
+                    1,
+                  ),
+                }}
+                components={[
+                  <span
+                    key="sampledCount"
+                    className="text-foreground font-bold tabular-nums"
+                  />,
+                ]}
+              />
+            ) : (
+              <Trans
+                i18nKey="Each evaluator would run on <0>{{sampledCount}}</0> of the {{matchingCount}} matching observations."
+                values={{
+                  sampledCount: compactNumberFormatter(sampledObservations, 1),
+                  matchingCount: compactNumberFormatter(
+                    matchingObservations,
+                    1,
+                  ),
+                }}
+                components={[
+                  <span
+                    key="sampledCount"
+                    className="text-foreground font-bold tabular-nums"
+                  />,
+                ]}
+              />
+            )}
           </p>
         </div>
       ) : null}

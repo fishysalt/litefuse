@@ -1,6 +1,7 @@
 /* eslint-disable no-nested-ternary */
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   objectEntriesForPreview,
@@ -139,6 +140,7 @@ function TreeRow({
   onSelect: (columnId: string, segments: PathSegment[]) => void;
   currentKey: string | null;
 }) {
+  const { t } = useTranslation();
   const key = pathKey(columnId, segments);
   const isOpen = expanded.has(key);
   const isCurrent = currentKey === key;
@@ -146,7 +148,7 @@ function TreeRow({
   const expandable = isArray
     ? value.length > 0
     : isPlainObject(value) && Object.keys(value).length > 0;
-  const preview = previewOf(value);
+  const preview = previewOf(value, t);
   const directMediaDescriptor = expandable ? null : classifyMediaValue(value);
   const hasMedia =
     directMediaDescriptor !== null ||
@@ -188,7 +190,7 @@ function TreeRow({
               ? undefined
               : expandable
                 ? preview
-                : `Pull ${variableLabel} from here`
+                : t("Pull {{variable}} from here", { variable: variableLabel })
           }
         >
           {expandable ? (
@@ -220,30 +222,32 @@ function TreeRow({
         {partial ? (
           <span
             className="text-dark-yellow shrink-0 self-center rounded border px-1 py-px text-[10px]"
-            title="Not present in every entry of this list"
+            title={t("Not present in every entry of this list")}
           >
-            not in every entry
+            {t("not in every entry")}
           </span>
         ) : null}
         <span className="text-muted-foreground shrink-0 self-center rounded border px-1 py-px text-[10px] group-focus-within/row:hidden group-hover/row:hidden">
-          {badge ?? typeBadge(value)}
+          {badge ?? typeBadge(value, t)}
         </span>
         {isCurrent ? (
           <span
             className="text-primary-accent bg-primary-accent/10 shrink-0 self-center rounded border border-transparent px-1.5 py-px text-[10px] font-bold"
-            title={`${variableLabel} currently maps to here`}
+            title={t("{{variable}} currently maps to here", {
+              variable: variableLabel,
+            })}
           >
-            current
+            {t("current")}
           </span>
         ) : null}
         <button
           type="button"
           data-tree-row-action=""
           className="bg-primary text-primary-foreground hover:bg-primary/90 hidden shrink-0 self-center rounded px-2 py-0.5 text-xs font-bold shadow-sm group-focus-within/row:inline-flex group-hover/row:inline-flex"
-          title={`Pull ${variableLabel} from here`}
+          title={t("Pull {{variable}} from here", { variable: variableLabel })}
           onClick={() => onSelect(columnId, segments)}
         >
-          Use
+          {t("Use")}
         </button>
       </div>
 
@@ -259,7 +263,7 @@ function TreeRow({
                     segments={[...segments, WILDCARD]}
                     label="[*]"
                     value={representative.value}
-                    badge="every entry"
+                    badge={t("every entry")}
                     partialChildKeys={representative.partialKeys}
                     depth={depth + 1}
                     expanded={expanded}
@@ -273,7 +277,7 @@ function TreeRow({
                     segments={[...segments, LAST]}
                     label="last"
                     value={value[value.length - 1]}
-                    badge="last entry"
+                    badge={t("last entry")}
                     depth={depth + 1}
                     expanded={expanded}
                     onToggleExpand={onToggleExpand}
@@ -300,7 +304,10 @@ function TreeRow({
                       className="text-muted-foreground px-2 py-1 text-xs"
                       style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
                     >
-                      {`+${value.length - MAX_CONCRETE_ENTRIES} more entries — [*] covers all of them; use the path editor for a specific one.`}
+                      {t(
+                        "+{{total}} more entries — [*] covers all of them; use the path editor for a specific one.",
+                        { total: value.length - MAX_CONCRETE_ENTRIES },
+                      )}
                     </p>
                   ) : null}
                 </>
@@ -333,7 +340,7 @@ function TreeRow({
                       className="text-muted-foreground px-2 py-1 text-xs"
                       style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
                     >
-                      +{remaining} more properties
+                      {t("+{{total}} more properties", { total: remaining })}
                     </p>
                   ) : null}
                 </>

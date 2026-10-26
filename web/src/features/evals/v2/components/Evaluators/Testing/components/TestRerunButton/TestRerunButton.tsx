@@ -1,4 +1,5 @@
 import { Play } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/src/components/ui/button";
 
@@ -11,6 +12,7 @@ export function TestRerunButton({
   disabledReason: string | null;
   onRerun: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Button
       type="button"
@@ -18,11 +20,11 @@ export function TestRerunButton({
       size="sm"
       loading={isPending}
       disabled={disabledReason !== null}
-      title={disabledReason ?? "Run the test again"}
+      title={disabledReason ? t(disabledReason) : t("Run the test again")}
       onClick={onRerun}
     >
       <Play className="mr-1.5 h-3.5 w-3.5" />
-      Run again
+      {t("Run again")}
     </Button>
   );
 }
